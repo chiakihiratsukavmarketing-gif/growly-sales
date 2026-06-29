@@ -1,0 +1,38 @@
+{
+  "exportedAt": "2026-06-29T14:03:48.958Z",
+  "totalLeads": 2,
+  "candidateCount": 1,
+  "excludedCount": 1,
+  "note": "Gmail下書きではなく手動確認用エクスポート。自動送信は行いません。",
+  "candidates": [
+    {
+      "leadId": "346fe720-26c7-4913-b0a9-6d1d70833865",
+      "companyName": "Export Test Co",
+      "area": "宮城県仙台市",
+      "industry": "工務店",
+      "websiteUrl": "https://export-test.example",
+      "instagramUrl": null,
+      "contactFormUrl": "https://export-test.example/contact",
+      "emailCandidates": [
+        "info@export-test.example"
+      ],
+      "emailSubject": "テスト件名",
+      "emailBody": "テスト本文です。ご担当者様向けの営業文。",
+      "salesAngle": "",
+      "companyAnalysis": "",
+      "customHook": "",
+      "reviewComment": "",
+      "sourceUrls": [
+        "https://export-test.example"
+      ],
+      "exportedAt": "2026-06-29T14:03:48.958Z"
+    }
+  ],
+  "excluded": [
+    {
+      "leadId": "2205e057-5e6b-44a4-ad03-153402d5a6dc",
+      "companyName": "Export Test Co",
+      "reason": "humanReviewStatus=pending（人間承認待ち）"
+    }
+  ]
+}

@@ -1,0 +1,84 @@
+{
+  "probedAt": "2026-06-29T00:20:14.785Z",
+  "results": [
+    {
+      "companyName": "サスティナライフ森の家",
+      "websiteUrl": "https://www.sustainalife.co.jp/",
+      "bucket": "email_confirmed",
+      "emailCandidates": [
+        "info@sustainalife.co.jp"
+      ],
+      "emailCandidateSourceUrls": [
+        "https://sustainalife.co.jp/"
+      ],
+      "contactFormUrl": "https://sustainalife.co.jp/contact",
+      "collectionStatus": "collected"
+    },
+    {
+      "companyName": "株式会社徳田工務店",
+      "websiteUrl": "https://www.tokuta.jp/",
+      "bucket": "failed_manual_review",
+      "emailCandidates": [],
+      "emailCandidateSourceUrls": [],
+      "contactFormUrl": null,
+      "collectionStatus": "failed",
+      "error": "fetch failed"
+    },
+    {
+      "companyName": "株式会社仙臺屋",
+      "websiteUrl": "https://www.sendaiya1000.com/",
+      "bucket": "failed_manual_review",
+      "emailCandidates": [],
+      "emailCandidateSourceUrls": [],
+      "contactFormUrl": null,
+      "collectionStatus": "failed",
+      "error": "fetch failed"
+    },
+    {
+      "companyName": "ヒノケン株式会社",
+      "websiteUrl": "https://hinoken.co.jp/",
+      "bucket": "failed_manual_review",
+      "emailCandidates": [],
+      "emailCandidateSourceUrls": [],
+      "contactFormUrl": null,
+      "collectionStatus": "failed",
+      "error": "fetch failed",
+      "note": "サイト取得failed。contactページのメールは手動確認が必要"
+    }
+  ],
+  "manualReview": [
+    {
+      "companyName": "株式会社徳田工務店",
+      "websiteUrl": "https://www.tokuta.jp/",
+      "collectionStatus": "failed",
+      "manualEmailCandidates": [],
+      "reason": "fetch failed"
+    },
+    {
+      "companyName": "株式会社仙臺屋",
+      "websiteUrl": "https://www.sendaiya1000.com/",
+      "collectionStatus": "failed",
+      "manualEmailCandidates": [],
+      "reason": "fetch failed"
+    },
+    {
+      "companyName": "ヒノケン株式会社",
+      "websiteUrl": "https://hinoken.co.jp/",
+      "collectionStatus": "failed",
+      "manualEmailCandidates": [
+        {
+          "email": "sato@hinoken.co.jp",
+          "sourceUrl": "https://hinoken.co.jp/contact/",
+          "note": "contactページ掲載メモ（サイト取得failed・手動確認候補。自動分類ではpersonal_likeのためemailCandidates未採用）"
+        }
+      ],
+      "reason": "サイト取得failed。contactページのメールは手動確認が必要"
+    }
+  ],
+  "summary": {
+    "email_confirmed": 1,
+    "form_later": 0,
+    "failed_manual_review": 3,
+    "phone_or_unknown": 0
+  }
+}

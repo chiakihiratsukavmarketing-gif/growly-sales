@@ -1,0 +1,10 @@
+{
+  "runAt": "2026-06-29T00:22:07.864Z",
+  "processed": 46,
+  "generated": 27,
+  "rejected": 19,
+  "revised": 5,
+  "approved": 22,
+  "skipped": 19,
+  "note": "自動送信なし。humanReviewStatus=pending, sendStatus=not_sent"
+}

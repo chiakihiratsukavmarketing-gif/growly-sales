@@ -1,0 +1,48 @@
+{
+  "name": "growly-sales",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Growly Sales - AI営業OS for SNS運用代行",
+  "scripts": {
+    "growly-sales:day1": "tsx src/growly-sales/scripts/run-growly-sales-day1.ts",
+    "growly-sales:generate": "tsx src/growly-sales/scripts/run-growly-sales-generate.ts",
+    "growly-sales:verify": "tsx src/growly-sales/scripts/verify-growly-sales.ts",
+    "growly-sales:ui:build": "vite build",
+    "growly-sales:ui": "vite build && tsx src/growly-sales/scripts/run-growly-sales-ui.ts",
+    "growly-sales:export-drafts": "tsx src/growly-sales/scripts/run-growly-sales-export-drafts.ts",
+    "growly-sales:mvp-check": "tsx src/growly-sales/scripts/run-growly-sales-mvp-check.ts",
+    "growly-sales:gmail-preview": "tsx src/growly-sales/scripts/run-growly-sales-gmail-draft-preview.ts",
+    "growly-sales:gmail-preview-targets": "tsx src/growly-sales/scripts/run-growly-sales-gmail-draft-preview-targets.ts",
+    "growly-sales:gmail-create-drafts": "tsx src/growly-sales/scripts/run-growly-sales-gmail-create-drafts.ts",
+    "growly-sales:email-outreach-candidates": "tsx src/growly-sales/scripts/run-growly-sales-email-outreach-candidates.ts",
+    "growly-sales:email-lead-probe": "tsx src/growly-sales/scripts/run-growly-sales-email-lead-probe.ts",
+    "growly-sales:refresh-email-leads": "tsx src/growly-sales/scripts/run-growly-sales-refresh-email-leads.ts",
+    "growly-sales:reply-phase-prepare": "tsx src/growly-sales/scripts/run-growly-sales-reply-phase-prepare.ts",
+    "growly-sales:reply-awaiting": "tsx src/growly-sales/scripts/run-growly-sales-reply-awaiting.ts",
+    "growly-sales:gmail-oauth-helper": "tsx src/growly-sales/scripts/run-growly-sales-gmail-oauth-helper.ts",
+    "growly-sales:external-preview": "tsx src/growly-sales/scripts/run-growly-sales-external-candidates-preview.ts",
+    "growly-sales:external-fetch": "tsx src/growly-sales/scripts/run-growly-sales-external-fetch.ts",
+    "growly-sales:external-import-approved": "tsx src/growly-sales/scripts/run-growly-sales-import-approved-candidates.ts",
+    "growly-sales:candidates-preview": "tsx src/growly-sales/scripts/run-growly-sales-candidates-preview.ts",
+    "growly-sales:fetch-candidates": "tsx src/growly-sales/scripts/run-growly-sales-fetch-candidates.ts",
+    "growly-sales:candidates-audit": "tsx src/growly-sales/scripts/run-growly-sales-candidates-audit.ts",
+    "growly-sales:daily30-preview": "tsx src/growly-sales/scripts/run-growly-sales-daily30-preview.ts",
+    "growly-sales:daily30-fetch": "tsx src/growly-sales/scripts/run-growly-sales-daily30-fetch.ts",
+    "growly-sales:daily30-generate-copy": "tsx src/growly-sales/scripts/run-growly-sales-daily30-generate-copy.ts",
+    "growly-sales:daily30-import-draft-candidates": "tsx src/growly-sales/scripts/run-growly-sales-daily30-import-draft-candidates.ts"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.7.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0",
+    "vite": "^6.4.3"
+  }
+}

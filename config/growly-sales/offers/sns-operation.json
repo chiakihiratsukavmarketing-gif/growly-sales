@@ -1,0 +1,28 @@
+{
+  "offerId": "sns-operation",
+  "offerName": "Instagram/SNS運用代行",
+  "entryOffer": "無料SNS診断レポート",
+  "mainValue": "来場予約・資料請求・採用導線につながるSNS設計",
+  "targetGoals": [
+    "来場予約",
+    "資料請求",
+    "問い合わせ",
+    "採用応募"
+  ],
+  "salesAngles": [
+    "子育て世帯に選ばれるInstagram集客診断",
+    "来場予約・資料請求につながる施工事例発信",
+    "SNS採用導線の改善",
+    "地域密着型の事例投稿改善",
+    "Instagram/SNS運用代行の無料診断レポート"
+  ],
+  "ctaPattern": "無料診断をご希望の場合は「希望」とご返信ください",
+  "prohibitedClaims": [
+    "必ず成果が出る",
+    "必ず問い合わせが増える",
+    "売上保証",
+    "必ず来場が増える",
+    "100%成功"
+  ],
+  "emailTone": "丁寧、自然、上から目線にならない"
+}

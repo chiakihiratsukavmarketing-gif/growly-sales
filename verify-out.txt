@@ -1,0 +1,616 @@
+﻿node.exe : npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help
+ npmrc` for supported config options.
+発生場所 行:1 文字:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm warn Unknow...config options.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+> growly-sales@0.1.0 growly-sales:verify
+> tsx src/growly-sales/scripts/verify-growly-sales.ts
+
+Growly Sales 窶・Verify
+========================
+  笨・Lead has required field: id
+  笨・Lead has required field: companyName
+  笨・Lead has required field: area
+  笨・Lead has required field: industry
+  笨・Lead has required field: websiteUrl
+  笨・Lead has required field: emailCandidates
+  笨・Lead has required field: sourceUrls
+  笨・Lead has required field: leadScore
+  笨・Lead has required field: reviewStatus
+  笨・Lead has required field: humanReviewStatus
+  笨・Lead has required field: sendStatus
+  笨・Lead has required field: doNotContact
+  笨・Lead has required field: riskLevel
+  笨・Lead has required field: createdAt
+  笨・Lead has required field: updatedAt
+  笨・leadScore is valid: B
+  笨・reviewStatus is valid: pending
+  笨・humanReviewStatus is valid: pending
+  笨・collectionStatus is valid: collected
+  笨・sendStatus is valid: not_sent
+  笨・UTF-8 BOM is stripped on read
+  笨・Mojibake replacement character is detected
+  笨・Mojibake in companyName is detected
+  笨・sourceUrls is not empty
+  笨・Lead enum validation passes
+  笨・Dedupe removes identical leads
+  笨・Dedupe key matches for duplicates
+  笨・doNotContact=true leads are not send eligible
+  笨・Approved non-blocked leads are send eligible (future use)
+  笨・JSON save/load works
+  笨・JSON data integrity
+  笨・CSV save/load works
+  笨・CSV data integrity
+  笨・Empty JSON does not crash
+  笨・Empty CSV does not crash
+  笨・input-sites.csv has no CSV encoding warnings (0 found)
+  笨・input-sites.csv Japanese fields have no mojibake
+  笨・leads.json companyName/area/industry have no mojibake
+  笨・.env is listed in .gitignore
+  笨・.env.example exists
+  笨・.env file may exist locally (not verified in git)
+  笨・No hardcoded API keys in source (0 found)
+  笨・housing.json loads with targetId=housing
+  笨・housing.json has targetId
+  笨・housing.json has targetName
+  笨・housing.json has industries
+  笨・housing.json has defaultAreas
+  笨・housing.json has searchKeywords
+  笨・housing.json has highPrioritySignals
+  笨・housing.json has mediumPrioritySignals
+  笨・housing.json has lowPrioritySignals
+  笨・housing.json has avoidTargets
+  笨・housing.json has preferredContactMethods
+  笨・housing.json has scoringNotes
+  笨・housing.json has all required fields
+  笨・sns-operation.json loads with offerId=sns-operation
+  笨・sns-operation.json has offerId
+  笨・sns-operation.json has offerName
+  笨・sns-operation.json has entryOffer
+  笨・sns-operation.json has mainValue
+  笨・sns-operation.json has targetGoals
+  笨・sns-operation.json has salesAngles
+  笨・sns-operation.json has ctaPattern
+  笨・sns-operation.json has prohibitedClaims
+  笨・sns-operation.json has emailTone
+  笨・sns-operation.json has all required fields
+  笨・API_PRODUCTION_ENABLED is false by default
+  笨・Places adapter is not active without production enable
+  笨・Web search adapter is not active without production enable
+  笨・searchPlaces returns disabled when production is off
+  笨・searchPlaces returns mock mode
+  笨・searchPlaces does not return live results
+  笨・searchWeb returns disabled when production is off
+  笨・searchWeb does not return live results
+  笨・C:\Users\chiak\AI_\Growly Sales\src\growly-sales\adapters\placesAdapter.ts gates API with isApiProductionEnabled
+  笨・Adapter C:\Users\chiak\AI_\Growly Sales\src\growly-sales\adapters\placesAdapter.ts has no Google Maps HTML scraping
+  笨・Adapter C:\Users\chiak\AI_\Growly Sales\src\growly-sales\adapters\placesAdapter.ts has no Google Maps HTML scraping
+  笨・Adapter C:\Users\chiak\AI_\Growly Sales\src\growly-sales\adapters\placesAdapter.ts has no Google Maps HTML scraping
+  笨・Adapter C:\Users\chiak\AI_\Growly Sales\src\growly-sales\adapters\placesAdapter.ts has no Google Maps HTML scraping
+  笨・C:\Users\chiak\AI_\Growly Sales\src\growly-sales\adapters\webSearchAdapter.ts gates API with isApiProductionEnabled
+  笨・Adapter C:\Users\chiak\AI_\Growly Sales\src\growly-sales\adapters\webSearchAdapter.ts has no Google Maps HTML scraping
+  笨・Adapter C:\Users\chiak\AI_\Growly Sales\src\growly-sales\adapters\webSearchAdapter.ts has no Google Maps HTML scraping
+  笨・Adapter C:\Users\chiak\AI_\Growly Sales\src\growly-sales\adapters\webSearchAdapter.ts has no Google Maps HTML scraping
+  笨・Adapter C:\Users\chiak\AI_\Growly Sales\src\growly-sales\adapters\webSearchAdapter.ts has no Google Maps HTML scraping
+  笨・No Google Maps HTML scraping patterns in source
+  笨・Places/Web search adapters gated; disabled without API_PRODUCTION_ENABLED
+  笨・Facebook detected as social media
+  笨・Facebook is invalid companyProfileUrl
+  笨・Same-site about page is valid profile
+  笨・/reform is invalid contactFormUrl
+  笨・/contact is valid contactFormUrl
+  笨・/request is valid contactFormUrl
+  笨・URL classification rules for profile/contact are correct
+  笨・All leads have valid instagramUrl (or null) and non-empty sourceUrls
+  笶・Lead 譬ｪ蠑丈ｼ夂､ｾ關ｩ驥主ｷ･蜍吝ｺ・ contactFormUrl is not a contact page 窶・https://hagino.co.jp/contactus
+  笶・Lead 譬ｪ蠑丈ｼ夂､ｾ豕牙ｷ･蜍吝ｺ・ contactFormUrl is not a contact page 窶・https://izumi-construction.co.jp/contact-4
+  笶・Lead 譬ｪ蠑丈ｼ夂､ｾ蜈ｫ蠑・ contactFormUrl is not a contact page 窶・https://hachiben.com/form.html
+  笶・Lead 譬ｪ蠑丈ｼ夂､ｾ豬・㍽蟾･蜍吝ｺ・ contactFormUrl is not a contact page 窶・https://asano-build.co.jp/contact.html
+  笶・Lead 譛蛾剞莨夂､ｾ繧｢繧､繝ｪ繝･繧ｦ菴丞ｮ・ contactFormUrl is not a contact page 窶・http://airyu.jp/contact.html
+  笶・Lead 繧ｻ繧ｪ繝ｪ繝ｼ繝帙・繝譬ｪ蠑丈ｼ夂､ｾ: contactFormUrl is not a contact page 窶・https://theoryhome.jp/contacts
+  笨・No personal emails in sample lead
+  笨・Personal email detection works
+  笨・generateCompanyAnalysis produces Japanese text
+  笨・generateCustomHook produces Japanese text
+  笨・generateSalesEmail produces emailSubject
+  笨・generateSalesEmail produces emailBody
+  笨・generateSalesEmail uses standard subject template
+  笨・generateSalesEmail subject has no leading brackets
+  笨・generateSalesEmail uses production intro line
+  笨・generateSalesEmail includes homepage impression
+  笨・generateSalesEmail avoids mechanical impression phrases
+  笨・generateSalesEmail embeds customHook impression tail
+  笨・generateSalesEmail uses hope-reply CTA
+  笨・generateSalesEmail includes no-push line
+  笨・generateSalesEmail uses formal signature
+  笨・generateSalesEmail includes signature URL
+  笨・generateSalesEmail uses outreach signature email
+  笨・generateSalesEmail signature has no blank lines between fields
+  笨・generateSalesEmail signature is compact (company name directly followed by name line)
+  笨・generateSalesEmail does not use test ops phrase
+  笨・follow-up only lead detected
+  笨・follow-up lead excluded from Gmail drafts
+  笨・reviewSalesEmail returns valid status: approve
+  笨・Prohibited claim in email causes reject
+  笨・doNotContact=true causes reject
+  笨・riskLevel=high causes reject
+  笨・Empty emailBody causes reject
+  笨・All persisted leads keep safe sendStatus 窶・no draft/auto-send from system
+  笨・Persisted leads have review results (35 with emailBody)
+  笨・emailBody has no test ops phrase: 譽ｮ縺ｮ繧√＄縺ｿ蟾･謌ｿ
+  笨・emailBody has no test ops phrase: 荳蟒ｺ險ｭ
+  笨・emailBody has no test ops phrase: 譬ｪ蠑丈ｼ夂､ｾ縲闖・次蟾･蜍吝ｺ・  笨・emailBody has no test ops phrase: 菴仙・蟾･蜍吝ｺ・  笨・emailBody has no test ops phrase: 繧ｿ繧ｫ繧ｳ繧ｦ繝ｻ繝上え繧ｹ
+  笨・emailBody has no test ops phrase: 譛蛾剞莨夂､ｾ骼檎伐蟾･蜍吝ｺ・  笨・emailBody has no test ops phrase: 繧ｦ繝・Α蟾･蜍吝ｺ・  笨・emailBody has no test ops phrase: 譬ｪ蠑丈ｼ夂､ｾ繧ｰ繝ｬ繧､繝医・繝ｯ繝ｼ繧ｯ
+  笨・emailBody has no test ops phrase: 譬ｪ蠑丈ｼ夂､ｾ譚懊ワ繧ｦ繧ｹ
+  笨・emailBody has no test ops phrase: 蜊∝柱蟒ｺ險ｭ譬ｪ蠑丈ｼ夂､ｾ
+  笨・emailBody has no test ops phrase: 繧ｸ繧ｧ繧､繧ｦ繝・ラ螳ｮ蝓・  笨・emailBody has no test ops phrase: 豎滓搗蟾･蜍吝ｺ・  笨・emailBody has no test ops phrase: 譬ｪ蠑丈ｼ夂､ｾ繝ｪ繝ｩ繧､繝・  笨・emailBody has no test ops phrase: 譬ｪ蠑丈ｼ夂､ｾ關ｩ驥主ｷ･蜍吝ｺ・  笨・emailBody has no test ops phrase: 譬ｪ蠑丈ｼ夂､ｾ豕牙ｷ･蜍吝ｺ・  笨・emailBody has no test ops phrase: 繧ｹ繝｢繝ｪ蟾･讌ｭ譬ｪ蠑丈ｼ夂､ｾ
+  笨・emailBody has no test ops phrase: 譬ｪ蠑丈ｼ夂､ｾ闖・ｪ蟒ｺ險ｭ蟾･讌ｭ
+  笨・emailBody has no test ops phrase: 譬ｪ蠑丈ｼ夂､ｾ豌ｴ髢灘ｷ･蜍吝ｺ・  笨・emailBody has no test ops phrase: 蟾･闃ｸ譬ｪ蠑丈ｼ夂､ｾ
+  笨・emailBody has no test ops phrase: 譬ｪ蠑丈ｼ夂､ｾ蜈ｫ蠑・  笨・emailBody has no test ops phrase: 譬ｪ蠑丈ｼ夂､ｾ繝ｩ繧､繝輔ぃ繝ｼ
+  笨・emailBody has no test ops phrase: 譬ｪ蠑丈ｼ夂､ｾ繧ｰ繝ｪ繝ｼ繝ｳ繝上え繧ｶ繝ｼ
+  笨・emailBody has no test ops phrase: 縺輔￥繧牙ｷ･謌ｿ譬ｪ蠑丈ｼ夂､ｾ
+  笨・emailBody has no test ops phrase: 譬ｪ蠑丈ｼ夂､ｾ繧ｪ繝ｫ繝・Μ繝輔か繝ｼ繝
+  笨・emailBody has no test ops phrase: 譬ｪ蠑丈ｼ夂､ｾ謚蟾･
+  笨・emailBody has no test ops phrase: 譬ｪ蠑丈ｼ夂､ｾ豬・㍽蟾･蜍吝ｺ・  笨・emailBody has no test ops phrase: 譛ｬ髢鍋ｷ丞粋險育判
+  笨・emailBody has no test ops phrase: 譛蛾剞莨夂､ｾ繧｢繧､繝ｪ繝･繧ｦ菴丞ｮ・  笨・emailBody has no test ops phrase: 繧ｻ繧ｪ繝ｪ繝ｼ繝帙・繝譬ｪ蠑丈ｼ夂､ｾ
+  笨・emailBody has no test ops phrase: 繧ｵ繧ｯ繧ｿ蟾･蜍吝ｺ・  笨・emailBody has no test ops phrase: 譬ｪ蠑丈ｼ夂､ｾ螻ｱ螟ｧ繝帙・繝
+  笨・emailBody has no test ops phrase: 繧ｿ繧ｫ繧ｫ繝・・繝ｬ繧､繝ｳ繝帙・繝
+  笨・emailBody has no test ops phrase: 繧ｵ繧ｹ繝・ぅ繝翫Λ繧､繝墓｣ｮ縺ｮ螳ｶ
+  笨・emailBody has no test ops phrase: 譬ｪ蠑丈ｼ夂､ｾ蠕ｳ逕ｰ蟾･蜍吝ｺ・  笨・emailBody has no test ops phrase: 譬ｪ蠑丈ｼ夂､ｾ莉呵・螻・  笨・Persisted emailBody does not contain Growly Sales 繝・せ繝磯°逕ｨ
+  笨・Persisted customHook values are not all identical
+  笨・customHook has sufficient differentiation across leads
+  笨・customHook length ok: 譽ｮ縺ｮ繧√＄縺ｿ蟾･謌ｿ
+  笨・customHook has no prohibited phrase: 譽ｮ縺ｮ繧√＄縺ｿ蟾･謌ｿ
+  笨・customHook length ok: 荳蟒ｺ險ｭ
+  笨・customHook has no prohibited phrase: 荳蟒ｺ險ｭ
+  笨・emailBody has no mechanical impression phrase: 荳蟒ｺ險ｭ
+  笨・emailBody includes hook impression: 荳蟒ｺ險ｭ
+  笨・customHook length ok: 譬ｪ蠑丈ｼ夂､ｾ縲闖・次蟾･蜍吝ｺ・  笨・customHook has no prohibited phrase: 譬ｪ蠑丈ｼ夂､ｾ縲闖・次蟾･蜍吝ｺ・  笨・customHook length ok: 繧｢繧ｪ繝舌け繝ｩ繝輔ヨ
+  笨・customHook has no prohibited phrase: 繧｢繧ｪ繝舌け繝ｩ繝輔ヨ
+  笨・customHook length ok: 菴仙・蟾･蜍吝ｺ・  笨・customHook has no prohibited phrase: 菴仙・蟾･蜍吝ｺ・  笨・emailBody has no mechanical impression phrase: 菴仙・蟾･蜍吝ｺ・  笨・emailBody includes hook impression: 菴仙・蟾･蜍吝ｺ・  笨・customHook length ok: 繧ｿ繧ｫ繧ｳ繧ｦ繝ｻ繝上え繧ｹ
+  笨・customHook has no prohibited phrase: 繧ｿ繧ｫ繧ｳ繧ｦ繝ｻ繝上え繧ｹ
+  笨・customHook length ok: 譛蛾剞莨夂､ｾ骼檎伐蟾･蜍吝ｺ・  笨・customHook has no prohibited phrase: 譛蛾剞莨夂､ｾ骼檎伐蟾･蜍吝ｺ・  笨・customHook length ok: 繧ｦ繝・Α蟾･蜍吝ｺ・  笨・customHook has no prohibited phrase: 繧ｦ繝・Α蟾･蜍吝ｺ・  笨・customHook length ok: 譬ｪ蠑丈ｼ夂､ｾ繧ｰ繝ｬ繧､繝医・繝ｯ繝ｼ繧ｯ
+  笨・customHook has no prohibited phrase: 譬ｪ蠑丈ｼ夂､ｾ繧ｰ繝ｬ繧､繝医・繝ｯ繝ｼ繧ｯ
+  笨・emailBody has no mechanical impression phrase: 譬ｪ蠑丈ｼ夂､ｾ繧ｰ繝ｬ繧､繝医・繝ｯ繝ｼ繧ｯ
+  笨・emailBody includes hook impression: 譬ｪ蠑丈ｼ夂､ｾ繧ｰ繝ｬ繧､繝医・繝ｯ繝ｼ繧ｯ
+  笨・customHook length ok: 譬ｪ蠑丈ｼ夂､ｾ譚懊ワ繧ｦ繧ｹ
+  笨・customHook has no prohibited phrase: 譬ｪ蠑丈ｼ夂､ｾ譚懊ワ繧ｦ繧ｹ
+  笨・emailBody has no mechanical impression phrase: 譬ｪ蠑丈ｼ夂､ｾ譚懊ワ繧ｦ繧ｹ
+  笨・emailBody includes hook impression: 譬ｪ蠑丈ｼ夂､ｾ譚懊ワ繧ｦ繧ｹ
+  笨・customHook length ok: 蜊∝柱蟒ｺ險ｭ譬ｪ蠑丈ｼ夂､ｾ
+  笨・customHook has no prohibited phrase: 蜊∝柱蟒ｺ險ｭ譬ｪ蠑丈ｼ夂､ｾ
+  笨・emailBody has no mechanical impression phrase: 蜊∝柱蟒ｺ險ｭ譬ｪ蠑丈ｼ夂､ｾ
+  笨・emailBody includes hook impression: 蜊∝柱蟒ｺ險ｭ譬ｪ蠑丈ｼ夂､ｾ
+  笨・customHook length ok: 繧ｸ繧ｧ繧､繧ｦ繝・ラ螳ｮ蝓・  笨・customHook has no prohibited phrase: 繧ｸ繧ｧ繧､繧ｦ繝・ラ螳ｮ蝓・  笨・emailBody has no mechanical impression phrase: 繧ｸ繧ｧ繧､繧ｦ繝・ラ螳ｮ蝓・  笨・emailBody includes hook impression: 繧ｸ繧ｧ繧､繧ｦ繝・ラ螳ｮ蝓・  笨・customHook length ok: 豎滓搗蟾･蜍吝ｺ・  笨・customHook has no prohibited phrase: 豎滓搗蟾･蜍吝ｺ・  笨・emailBody has no mechanical impression phrase: 豎滓搗蟾･蜍吝ｺ・  笨・emailBody includes hook impression: 豎滓搗蟾･蜍吝ｺ・  笨・customHook length ok: 譬ｪ蠑丈ｼ夂､ｾ繝ｪ繝ｩ繧､繝・  笨・customHook has no prohibited phrase: 譬ｪ蠑丈ｼ夂､ｾ繝ｪ繝ｩ繧､繝・  笨・emailBody has no mechanical impression phrase: 譬ｪ蠑丈ｼ夂､ｾ繝ｪ繝ｩ繧､繝・  笨・emailBody includes hook impression: 譬ｪ蠑丈ｼ夂､ｾ繝ｪ繝ｩ繧､繝・  笨・customHook length ok: 譬ｪ蠑丈ｼ夂､ｾ關ｩ驥主ｷ･蜍吝ｺ・  笨・customHook has no prohibited phrase: 譬ｪ蠑丈ｼ夂､ｾ關ｩ驥主ｷ･蜍吝ｺ・  笨・emailBody has no mechanical impression phrase: 譬ｪ蠑丈ｼ夂､ｾ關ｩ驥主ｷ･蜍吝ｺ・  笨・emailBody includes hook impression: 譬ｪ蠑丈ｼ夂､ｾ關ｩ驥主ｷ･蜍吝ｺ・  笨・customHook length ok: 譬ｪ蠑丈ｼ夂､ｾ蛹玲ｲ｢蟾･蜍吝ｺ・  笨・customHook has no prohibited phrase: 譬ｪ蠑丈ｼ夂､ｾ蛹玲ｲ｢蟾･蜍吝ｺ・  笨・customHook length ok: 譬ｪ蠑丈ｼ夂､ｾ繧ｳ繝ｪ繝ｳ繝ｳ繝上え繧ｹ
+  笨・customHook has no prohibited phrase: 譬ｪ蠑丈ｼ夂､ｾ繧ｳ繝ｪ繝ｳ繝ｳ繝上え繧ｹ
+  笨・customHook length ok: 譬ｪ蠑丈ｼ夂､ｾ繝帙け繝・  笨・customHook has no prohibited phrase: 譬ｪ蠑丈ｼ夂､ｾ繝帙け繝・  笨・customHook length ok: 譬ｪ蠑丈ｼ夂､ｾ莉吝床蟾･蜍吝ｺ・  笨・customHook has no prohibited phrase: 譬ｪ蠑丈ｼ夂､ｾ莉吝床蟾･蜍吝ｺ・  笨・customHook length ok: 譬ｪ蠑丈ｼ夂､ｾ荳ｸ螳ｮ蟒ｺ險ｭ
+  笨・customHook has no prohibited phrase: 譬ｪ蠑丈ｼ夂､ｾ荳ｸ螳ｮ蟒ｺ險ｭ
+  笨・customHook length ok: 譬ｪ蠑丈ｼ夂､ｾ繧ｹ繧ｿ繧､繝ｫ繝帙・繝
+  笨・customHook has no prohibited phrase: 譬ｪ蠑丈ｼ夂､ｾ繧ｹ繧ｿ繧､繝ｫ繝帙・繝
+  笨・customHook length ok: 遏ｳ鮟貞ｻｺ遽牙ｷ･謌ｿ
+  笨・customHook has no prohibited phrase: 遏ｳ鮟貞ｻｺ遽牙ｷ･謌ｿ
+  笨・customHook length ok: 譬ｪ蠑丈ｼ夂､ｾ豕牙ｷ･蜍吝ｺ・  笨・customHook has no prohibited phrase: 譬ｪ蠑丈ｼ夂､ｾ豕牙ｷ･蜍吝ｺ・  笨・emailBody has no mechanical impression phrase: 譬ｪ蠑丈ｼ夂､ｾ豕牙ｷ･蜍吝ｺ・  笨・emailBody includes hook impression: 譬ｪ蠑丈ｼ夂､ｾ豕牙ｷ･蜍吝ｺ・  笨・customHook length ok: 繧ｹ繝｢繝ｪ蟾･讌ｭ譬ｪ蠑丈ｼ夂､ｾ
+  笨・customHook has no prohibited phrase: 繧ｹ繝｢繝ｪ蟾･讌ｭ譬ｪ蠑丈ｼ夂､ｾ
+  笨・emailBody has no mechanical impression phrase: 繧ｹ繝｢繝ｪ蟾･讌ｭ譬ｪ蠑丈ｼ夂､ｾ
+  笨・emailBody includes hook impression: 繧ｹ繝｢繝ｪ蟾･讌ｭ譬ｪ蠑丈ｼ夂､ｾ
+  笨・customHook length ok: 譬ｪ蠑丈ｼ夂､ｾ闖・ｪ蟒ｺ險ｭ蟾･讌ｭ
+  笨・customHook has no prohibited phrase: 譬ｪ蠑丈ｼ夂､ｾ闖・ｪ蟒ｺ險ｭ蟾･讌ｭ
+  笨・emailBody has no mechanical impression phrase: 譬ｪ蠑丈ｼ夂､ｾ闖・ｪ蟒ｺ險ｭ蟾･讌ｭ
+  笨・emailBody includes hook impression: 譬ｪ蠑丈ｼ夂､ｾ闖・ｪ蟒ｺ險ｭ蟾･讌ｭ
+  笨・customHook length ok: 繝偵ヮ繧ｱ繝ｳ譬ｪ蠑丈ｼ夂､ｾ
+  笨・customHook has no prohibited phrase: 繝偵ヮ繧ｱ繝ｳ譬ｪ蠑丈ｼ夂､ｾ
+  笨・customHook length ok: 譬ｪ蠑丈ｼ夂､ｾ譟ｿ豐｢蟾･蜍吝ｺ・  笨・customHook has no prohibited phrase: 譬ｪ蠑丈ｼ夂､ｾ譟ｿ豐｢蟾･蜍吝ｺ・  笨・customHook length ok: 譬ｪ蠑丈ｼ夂､ｾ豌ｴ髢灘ｷ･蜍吝ｺ・  笨・customHook has no prohibited phrase: 譬ｪ蠑丈ｼ夂､ｾ豌ｴ髢灘ｷ･蜍吝ｺ・  笨・emailBody has no mechanical impression phrase: 譬ｪ蠑丈ｼ夂､ｾ豌ｴ髢灘ｷ･蜍吝ｺ・  笨・emailBody includes hook impression: 譬ｪ蠑丈ｼ夂､ｾ豌ｴ髢灘ｷ･蜍吝ｺ・  笨・customHook length ok: 蟾･闃ｸ譬ｪ蠑丈ｼ夂､ｾ
+  笨・customHook has no prohibited phrase: 蟾･闃ｸ譬ｪ蠑丈ｼ夂､ｾ
+  笨・emailBody has no mechanical impression phrase: 蟾･闃ｸ譬ｪ蠑丈ｼ夂､ｾ
+  笨・emailBody includes hook impression: 蟾･闃ｸ譬ｪ蠑丈ｼ夂､ｾ
+  笨・customHook length ok: 譬ｪ蠑丈ｼ夂､ｾ蜈ｫ蠑・  笨・customHook has no prohibited phrase: 譬ｪ蠑丈ｼ夂､ｾ蜈ｫ蠑・  笨・emailBody has no mechanical impression phrase: 譬ｪ蠑丈ｼ夂､ｾ蜈ｫ蠑・  笨・emailBody includes hook impression: 譬ｪ蠑丈ｼ夂､ｾ蜈ｫ蠑・  笨・customHook length ok: 譬ｪ蠑丈ｼ夂､ｾ繝ｩ繧､繝輔ぃ繝ｼ
+  笨・customHook has no prohibited phrase: 譬ｪ蠑丈ｼ夂､ｾ繝ｩ繧､繝輔ぃ繝ｼ
+  笨・emailBody has no mechanical impression phrase: 譬ｪ蠑丈ｼ夂､ｾ繝ｩ繧､繝輔ぃ繝ｼ
+  笨・emailBody includes hook impression: 譬ｪ蠑丈ｼ夂､ｾ繝ｩ繧､繝輔ぃ繝ｼ
+  笨・customHook length ok: 譬ｪ蠑丈ｼ夂､ｾ繧ｰ繝ｪ繝ｼ繝ｳ繝上え繧ｶ繝ｼ
+  笨・customHook has no prohibited phrase: 譬ｪ蠑丈ｼ夂､ｾ繧ｰ繝ｪ繝ｼ繝ｳ繝上え繧ｶ繝ｼ
+  笨・emailBody has no mechanical impression phrase: 譬ｪ蠑丈ｼ夂､ｾ繧ｰ繝ｪ繝ｼ繝ｳ繝上え繧ｶ繝ｼ
+  笨・emailBody includes hook impression: 譬ｪ蠑丈ｼ夂､ｾ繧ｰ繝ｪ繝ｼ繝ｳ繝上え繧ｶ繝ｼ
+  笨・customHook length ok: 縺輔￥繧牙ｷ･謌ｿ譬ｪ蠑丈ｼ夂､ｾ
+  笨・customHook has no prohibited phrase: 縺輔￥繧牙ｷ･謌ｿ譬ｪ蠑丈ｼ夂､ｾ
+  笨・emailBody has no mechanical impression phrase: 縺輔￥繧牙ｷ･謌ｿ譬ｪ蠑丈ｼ夂､ｾ
+  笨・emailBody includes hook impression: 縺輔￥繧牙ｷ･謌ｿ譬ｪ蠑丈ｼ夂､ｾ
+  笨・customHook length ok: 譬ｪ蠑丈ｼ夂､ｾ繧ｪ繝ｫ繝・Μ繝輔か繝ｼ繝
+  笨・customHook has no prohibited phrase: 譬ｪ蠑丈ｼ夂､ｾ繧ｪ繝ｫ繝・Μ繝輔か繝ｼ繝
+  笨・customHook length ok: 譛蛾剞莨夂､ｾ螻ｱ蜀・ｷ･蜍吝ｺ・  笨・customHook has no prohibited phrase: 譛蛾剞莨夂､ｾ螻ｱ蜀・ｷ･蜍吝ｺ・  笨・customHook length ok: 譬ｪ蠑丈ｼ夂､ｾ謚蟾･
+  笨・customHook has no prohibited phrase: 譬ｪ蠑丈ｼ夂､ｾ謚蟾･
+  笨・customHook length ok: 譬ｪ蠑丈ｼ夂､ｾ豬・㍽蟾･蜍吝ｺ・  笨・customHook has no prohibited phrase: 譬ｪ蠑丈ｼ夂､ｾ豬・㍽蟾･蜍吝ｺ・  笨・customHook length ok: 譛ｬ髢鍋ｷ丞粋險育判
+  笨・customHook has no prohibited phrase: 譛ｬ髢鍋ｷ丞粋險育判
+  笨・emailBody has no mechanical impression phrase: 譛ｬ髢鍋ｷ丞粋險育判
+  笨・emailBody includes hook impression: 譛ｬ髢鍋ｷ丞粋險育判
+  笨・customHook length ok: 譛蛾剞莨夂､ｾ繧｢繧､繝ｪ繝･繧ｦ菴丞ｮ・  笨・customHook has no prohibited phrase: 譛蛾剞莨夂､ｾ繧｢繧､繝ｪ繝･繧ｦ菴丞ｮ・  笨・emailBody has no mechanical impression phrase: 譛蛾剞莨夂､ｾ繧｢繧､繝ｪ繝･繧ｦ菴丞ｮ・  笨・emailBody includes hook impression: 譛蛾剞莨夂､ｾ繧｢繧､繝ｪ繝･繧ｦ菴丞ｮ・  笨・customHook length ok: 繧ｻ繧ｪ繝ｪ繝ｼ繝帙・繝譬ｪ蠑丈ｼ夂､ｾ
+  笨・customHook has no prohibited phrase: 繧ｻ繧ｪ繝ｪ繝ｼ繝帙・繝譬ｪ蠑丈ｼ夂､ｾ
+  笨・emailBody has no mechanical impression phrase: 繧ｻ繧ｪ繝ｪ繝ｼ繝帙・繝譬ｪ蠑丈ｼ夂､ｾ
+  笨・emailBody includes hook impression: 繧ｻ繧ｪ繝ｪ繝ｼ繝帙・繝譬ｪ蠑丈ｼ夂､ｾ
+  笨・customHook length ok: 繧ｵ繧ｯ繧ｿ蟾･蜍吝ｺ・  笨・customHook has no prohibited phrase: 繧ｵ繧ｯ繧ｿ蟾･蜍吝ｺ・  笨・emailBody has no mechanical impression phrase: 繧ｵ繧ｯ繧ｿ蟾･蜍吝ｺ・  笨・emailBody includes hook impression: 繧ｵ繧ｯ繧ｿ蟾･蜍吝ｺ・  笨・customHook length ok: 譬ｪ蠑丈ｼ夂､ｾ螻ｱ螟ｧ繝帙・繝
+  笨・customHook has no prohibited phrase: 譬ｪ蠑丈ｼ夂､ｾ螻ｱ螟ｧ繝帙・繝
+  笨・emailBody has no mechanical impression phrase: 譬ｪ蠑丈ｼ夂､ｾ螻ｱ螟ｧ繝帙・繝
+  笨・emailBody includes hook impression: 譬ｪ蠑丈ｼ夂､ｾ螻ｱ螟ｧ繝帙・繝
+  笨・customHook length ok: 繧ｿ繧ｫ繧ｫ繝・・繝ｬ繧､繝ｳ繝帙・繝
+  笨・customHook has no prohibited phrase: 繧ｿ繧ｫ繧ｫ繝・・繝ｬ繧､繝ｳ繝帙・繝
+  笨・emailBody has no mechanical impression phrase: 繧ｿ繧ｫ繧ｫ繝・・繝ｬ繧､繝ｳ繝帙・繝
+  笨・emailBody includes hook impression: 繧ｿ繧ｫ繧ｫ繝・・繝ｬ繧､繝ｳ繝帙・繝
+  笨・customHook length ok: 繧ｵ繧ｹ繝・ぅ繝翫Λ繧､繝墓｣ｮ縺ｮ螳ｶ
+  笨・customHook has no prohibited phrase: 繧ｵ繧ｹ繝・ぅ繝翫Λ繧､繝墓｣ｮ縺ｮ螳ｶ
+  笨・emailBody has no mechanical impression phrase: 繧ｵ繧ｹ繝・ぅ繝翫Λ繧､繝墓｣ｮ縺ｮ螳ｶ
+  笨・emailBody includes hook impression: 繧ｵ繧ｹ繝・ぅ繝翫Λ繧､繝墓｣ｮ縺ｮ螳ｶ
+  笨・customHook length ok: 譬ｪ蠑丈ｼ夂､ｾ蠕ｳ逕ｰ蟾･蜍吝ｺ・  笨・customHook has no prohibited phrase: 譬ｪ蠑丈ｼ夂､ｾ蠕ｳ逕ｰ蟾･蜍吝ｺ・  笨・emailBody includes hook impression: 譬ｪ蠑丈ｼ夂､ｾ蠕ｳ逕ｰ蟾･蜍吝ｺ・  笨・customHook length ok: 譬ｪ蠑丈ｼ夂､ｾ莉呵・螻・  笨・customHook has no prohibited phrase: 譬ｪ蠑丈ｼ夂､ｾ莉呵・螻・  笨・emailBody has no mechanical impression phrase: 譬ｪ蠑丈ｼ夂､ｾ莉呵・螻・  笨・emailBody includes hook impression: 譬ｪ蠑丈ｼ夂､ｾ莉呵・螻・  笨・customHook is not company-name-only template swap
+  笨・customHook differentiation checks passed for persisted leads
+  笨・regenerate keeps sendStatus=not_sent
+  笨・regenerate keeps replyStatus
+  笨・regenerate keeps followUpDate
+  笨・regenerate keeps communicationMemo
+  笨・regenerate resets humanReviewStatus to pending
+  笨・regenerate updates customHook
+  笨・follow-up regenerate keeps humanReviewStatus
+  笨・follow-up regenerate keeps emailBody
+  笨・preserveWorkflowState on regenerate works correctly
+  笨・DraftCandidatesView shows copy-is-not-send notice
+  笨・CopyButton does not assign sendStatus
+  笨・CopyButton uses clipboard only
+  笨・Copy operation safety UI verified
+  笨・approveLeadForDraft sets humanReviewStatus=approved
+  笨・approveLeadForDraft keeps sendStatus=not_sent
+  笨・approved lead is draft candidate
+  笨・approved lead is not blocked
+  笨・markLeadNeedsRevision sets needs_revision
+  笨・markLeadNeedsRevision saves comment
+  笨・rejectLead sets humanReviewStatus=rejected
+  笨・rejectLead keeps sendStatus=not_sent
+  笨・markDoNotContact sets doNotContact=true
+  笨・markDoNotContact sets sendStatus=blocked
+  笨・markDoNotContact sets nextAction
+  笨・updateLeadEmailDraft updates emailSubject
+  笨・updateLeadEmailDraft updates emailBody
+  笨・updateLeadEmailDraft updates updatedAt
+  笨・sort priority favors approve+pending, A score, low risk
+  笨・sortLeadsForDisplay orders by priority
+  笨・updateLeadReview workflow functions work correctly
+  笨・markManualSent sets sendStatus=manual_sent
+  笨・markManualSent sets manualSentAt
+  笨・markManualSent sets manualSendMethod
+  笨・pending Lead cannot be manual_sent
+  笨・markReplyStatus updates replyStatus=replied
+  笨・markReplyStatus sets replySummary
+  笨・markReplyStatus sets repliedAt
+  笨・markFollowUpNeeded records followUpDate
+  笨・markDealStatus updates dealStatus=won
+  笨・updateLeadCommunication workflow functions work correctly
+  笨・Phase 10 file exists: ui\GrowlySalesDashboard.tsx
+  笨・Phase 10 file exists: ui\LeadListView.tsx
+  笨・Phase 10 file exists: ui\LeadDetailPanel.tsx
+  笨・Phase 10 file exists: ui\LeadStatusBadge.tsx
+  笨・Phase 10 file exists: ui\LeadReviewActions.tsx
+  笨・Phase 10 file exists: ui\DraftStatsPanel.tsx
+  笨・Phase 10 file exists: ui\DraftCandidatesView.tsx
+  笨・Phase 10 file exists: ui\DraftCandidateCard.tsx
+  笨・Phase 10 file exists: ui\CopyButton.tsx
+  笨・Phase 10 file exists: ui\LeadCommunicationActions.tsx
+  笨・Phase 10 file exists: ui\communicationApi.ts
+  笨・Phase 10 file exists: drafts\buildUiDraftCandidates.ts
+  笨・Phase 10 file exists: config\paths.ts
+  笨・Phase 10 file exists: storage\loadLeadsForApi.ts
+  笨・Phase 10 file exists: workflow\updateLeadCommunication.ts
+  笨・Phase 10 file exists: workflow\updateLeadReview.ts
+  笨・Phase 10 file exists: server\uiServer.ts
+  笨・Phase 10 file exists: drafts\selectDraftCandidates.ts
+  笨・Phase 10 file exists: drafts\exportDraftCandidates.ts
+  笨・Phase 10 file exists: scripts\run-growly-sales-export-drafts.ts
+  笨・Phase 10 file exists: ui\PilotModeBanner.tsx
+  笨・Phase 10 file exists: ui\PilotSummaryPanel.tsx
+  笨・Phase 10 file exists: ui\pilotSummaryApi.ts
+  笨・Phase 10 file exists: ui\SummaryStatCard.tsx
+  笨・Phase 10 file exists: ui\SectionCard.tsx
+  笨・Phase 10 file exists: ui\InfoBanner.tsx
+  笨・Phase 10 file exists: analytics\buildPilotSummary.ts
+  笨・Phase 10 file exists: scripts\run-growly-sales-mvp-check.ts
+  笨・Approved not_sent lead is draft candidate
+  笨・Eligible lead is not excluded
+  笨・pending Lead is not a draft candidate
+  笨・rejected Lead is not a draft candidate
+  笨・needs_revision Lead is not a draft candidate
+  笨・doNotContact=true is not a draft candidate
+  笨・riskLevel=high is not a draft candidate
+  笨・empty emailSubject is not a draft candidate
+  笨・empty emailBody is not a draft candidate
+  笨・prohibited phrase excludes draft candidate
+  笨・mojibake excludes draft candidate
+  笨・sendStatus=sent is not a draft candidate
+  笨・reviewStatus=revise is not a draft candidate
+  笨・export selects one candidate from mixed leads
+  笨・export excludes ineligible leads
+  笨・export produces 3 output files
+  笨・Draft export file exists: draftCandidates.json
+  笨・Draft export file exists: draftCandidates.csv
+  笨・Draft export file exists: draft-copy.txt
+  笨・draft-copy.txt contains company name
+  笨・draft-copy.txt has safety notice
+  笨・export does not change sendStatus on in-memory leads
+  笨・Draft export selection and file generation work correctly
+  笨・/api/draft-candidates logic returns only approved leads
+  笨・excludedCount reflects ineligible leads
+  笨・UI candidates are all humanReviewStatus=approved
+  笨・UI candidates keep sendStatus=not_sent
+  笨・rejected Lead is not in UI candidates
+  笨・needs_revision Lead is not in UI candidates
+  笨・doNotContact=true is not in UI candidates
+  笨・riskLevel=high is not in UI candidates
+  笨・CopyButton uses clipboard API
+  笨・CopyButton documents that sendStatus is not changed
+  笨・CopyButton does not assign sendStatus
+  笨・DraftCandidatesView has auto-send warning
+  笨・DraftCandidatesView has Gmail warning
+  笨・DraftCandidateCard shows auto-send notice
+  笨・subject+body copy format includes 莉ｶ蜷・  笨・subject+body copy format includes 蝠上＞蜷医ｏ縺婉RL
+  笨・uiServer has draft-candidates API
+  笨・uiServer has draft-stats API
+  笨・uiServer has export-drafts API
+  笨・uiServer has no Gmail drafts.send
+  笨・uiServer has no Gmail messages.send
+  笨・draftStatsApi calls /api/draft-stats
+  笨・Draft candidates UI and API logic verified
+  笨・getLeadsJsonPath resolves to project data/growly-sales/leads.json
+  笨・data/growly-sales/leads.json exists
+  笨・uiServer uses getLeadsJsonPath
+  笨・uiServer does not use process.cwd() for leads path
+  笨・loadLeadsForApi reads leads.json with lead data
+  笨・draft-stats can read leads.json
+  笨・draft-candidates can read leads.json
+  笨・path resolution works when cwd is data/growly-sales
+  笨・loadLeadsForApi works when cwd is data/growly-sales
+  笨・getDraftsDir is correct
+  笨・getProjectRoot matches verify PROJECT_ROOT
+  笨・Project path resolution is cwd-independent
+  笨・buildSalesAnalytics aggregates totalLeads
+  笨・manual_sent counted as manualSentLeads
+  笨・not_sent counted as notSentLeads
+  笨・followUpDate leads extracted
+  笨・followUpList sorted by date asc
+  笨・nextActionList generated
+  笨・nextActionList priority: overdue followUp first
+  笨・nextActionList includes approved+not_sent
+  笨・manualSendRate is finite
+  笨・replyRate is finite
+  笨・wonRate is not NaN/Infinity
+  笨・leadScore breakdown exists
+  笨・salesAngle breakdown exists
+  笨・operation summary has overallStatus
+  笨・operation summary has warningSignals
+  笨・operation summary has nextRecommendedActions
+  笨・operation summary has dataQualityNotes
+  笨・OperationSummaryPanel warning text exists
+  笨・checkLocalMvpReadiness returns ready boolean
+  笨・checkLocalMvpReadiness returns passedChecks
+  笨・checkLocalMvpReadiness returns failedChecks
+  笨・checkLocalMvpReadiness returns warnings
+  笨・checkLocalMvpReadiness returns nextSteps
+  笨・SalesAnalyticsView warning text exists
+  笨・PILOT_RUNBOOK exists
+  笨・PILOT_CHECKLIST exists
+  笨・UI has pilot mode banner
+  笨・UI shows local manual MVP / pilot mode label
+  笨・UI shows external API unused
+  笨・UI shows Gmail unused
+  笨・UI shows no auto-send
+  笨・UI shows local JSON storage
+  笨・uiServer has pilot-summary API
+  笨・buildPilotSummary counts totalLeads
+  笨・buildPilotSummary computes remaining to pilot
+  笨・buildPilotSummary counts approved
+  笨・buildPilotSummary counts manual sent
+  笨・buildPilotSummary counts reply recorded
+  笨・over 10 leads does not error, flags recommendation
+  笨・remaining to pilot is 0 when at or over target
+  笨・README mentions pilot 10-company recommendation
+  笨・Gmail file exists: integrations/gmail/gmailDraftAdapter.ts
+  笨・Gmail file exists: integrations/gmail/gmailAuth.ts
+  笨・Gmail file exists: integrations/gmail/buildGmailDraftMessage.ts
+  笨・Gmail file exists: integrations/gmail/gmailDraftTypes.ts
+  笨・Gmail file exists: integrations/gmail/previewGmailDrafts.ts
+  笨・Gmail file exists: integrations/gmail/selectGmailDraftCandidates.ts
+  笨・Gmail file exists: scripts/run-growly-sales-gmail-draft-preview.ts
+  笨・Gmail file exists: scripts/run-growly-sales-gmail-create-drafts.ts
+  笨・Gmail file exists: workflow/updateLeadGmailDraft.ts
+  笨・gmail-preview does not call createGmailDraft
+  笨・previewGmailDrafts has no external fetch
+  笨・gmail-create-drafts requires CREATE_DRAFTS confirmation
+  笨・gmail-create-drafts has confirmation prompt
+  笨・no-email form-only lead excluded from Gmail drafts
+  笨・pending lead with email is Gmail draft eligible
+  笨・doNotContact lead excluded from Gmail drafts
+  笨・approved email lead is Gmail draft eligible
+  笨・Gmail draft create keeps sendStatus=not_sent
+  笨・gmailDraftStatus=draft_created
+  笨・draft_created lead has gmailDraftId
+  笨・gmail preview eligible count (approved + pending with email)
+  笨・gmail preview skipped form-only
+  笨・gmail preview no excluded when pending has email
+  笨・gmailDraftStatus valid: none
+  笨・gmailDraftStatus valid: previewed
+  笨・gmailDraftStatus valid: draft_created
+  笨・gmailDraftStatus valid: failed
+  笨・gmailDraftStatus valid: skipped
+  笨・package.json has gmail-preview script
+  笨・package.json has gmail-create-drafts script
+  笨・gmail-create-drafts respects GMAIL_DRAFT_CREATE_LIMIT
+  笨・GMAIL_DRAFT_CREATE_LIMIT=1 parsed
+  笨・draft create limit slices targets
+  笨・null limit keeps all targets
+  笨・empty GMAIL_DRAFT_CREATE_LIMIT means no limit
+  笨・gmailFetchDiagnostics exists
+  笨・diagnostics do not log access_token
+  笨・diagnostics do not console log tokens
+  笨・formatSafeFetchError includes message
+  笨・formatSafeFetchError includes cause.code
+  笨・formatSafeFetchError includes cause.hostname
+  笨・parseGoogleApiErrorMessage extracts error.message
+  笨・parseGoogleApiErrorMessage does not return access_token
+  笨・diagnostic error has stage
+  笨・diagnostic log includes stage
+  笨・gmailAuth labels oauth refresh stage
+  笨・gmailDraftAdapter labels drafts.create stage
+  笨・Gmail fetch diagnostics checks passed
+  笨・Gmail draft phase checks passed
+  笨・gmail-oauth-helper script exists
+  笨・package.json has growly-sales:gmail-oauth-helper
+  笨・helper uses gmail.compose scope
+  笨・helper does not call drafts.create
+  笨・helper does not call send APIs
+  笨・helper does not write token files
+  笨・helper does not append token files
+  笨・helper does not stream token files
+  笨・helper does not auto-edit .env
+  笨・helper uses OAuth token endpoint only
+  笨・helper does not call Gmail API
+  笨・helper has no hardcoded API keys
+  笨・auth URL includes gmail.compose
+  笨・auth URL uses localhost redirect
+  笨・auth URL is Google OAuth
+  笨・Gmail OAuth helper checks passed
+  笨・env.ts provides ensureProjectEnvLoaded
+  笨・env.ts loads .env via getProjectRoot
+  笨・env.ts does not use dotenv package
+  笨・gmailAuth loads project .env
+  笨・gmail-create-drafts loads project .env
+  笨・Gmail env triple enables isGmailConfigured
+  笨・isGmailConfigured reads project .env triple
+  笨・empty GMAIL_CREDENTIALS_PATH does not block env triple
+  笨・project .env loading checks passed
+  笨・package.json has external-preview script
+  笨・package.json has external-fetch script
+  笨・package.json has external-import-approved script
+  笨・external-preview does not call searchPlaces
+  笨・external-preview does not call searchWeb
+  笨・external-preview does not fetch live
+  笨・external-preview does not modify leads.json
+  笨・external-preview is dry-run without external communication
+  笨・external-fetch requires FETCH_CANDIDATES
+  笨・external-fetch does not directly Lead-import
+  笨・external-fetch saves to external-candidates store
+  笨・external-fetch gated by FETCH_CANDIDATES; no direct Lead import
+  笨・external-import requires IMPORT_APPROVED
+  笨・import-approved does not write leads.json directly
+  笨・external-import-approved gated; writes input-sites.csv only
+  笨・external-candidates json path
+  笨・external-candidates csv path
+  笨・buildLeadSearchQueries generates seed queries
+  笨・search queries include 蟾･蜍吝ｺ・  笨・dedupeExternalCandidates removes duplicate website
+  笨・no websiteUrl => needs_review
+  笨・duplicate detection vs existing leads
+  笨・doNotContact blocks import
+  笨・websiteUrl-less candidate not importable
+  笨・contact path analytics totalLeads
+  笨・emailCandidateRate computed
+  笨・contactFormOnlyLeads computed
+  笨・uiServer has contact-path-analytics API
+  笨・uiServer has external-candidates API
+  笨・uiServer has approve-for-import endpoint
+  笨・uiServer does not auto-import external candidates to leads
+  笨・ExternalCandidatesView warning exists
+  笨・.env.example documents API_PRODUCTION_ENABLED
+  笨・.env.example documents WEB_SEARCH_ENGINE_ID
+  笨・Phase 17 external candidates checks passed
+  笨・CLAUDE.md exists at project root
+  笨・WORK_LOG.md exists at project root
+  笨・NEXT_TASKS.md exists at project root
+  笨・CLAUDE.md mentions Growly Sales
+  笨・CLAUDE.md distinguishes Growly SNS analytics app
+  笨・CLAUDE.md mentions workspace path
+  笨・CLAUDE.md documents auto-send prohibition
+  笨・CLAUDE.md documents FETCH_CANDIDATES
+  笨・CLAUDE.md documents CREATE_DRAFTS
+  笨・CLAUDE.md handoff content verified
+  笨・WORK_LOG.md records Phase 17
+  笨・WORK_LOG.md records verify results
+  笨・WORK_LOG.md mentions emailCandidates
+  笨・WORK_LOG.md handoff content verified
+  笨・NEXT_TASKS.md lists Phase 18
+  笨・NEXT_TASKS.md lists Phase 19
+  笨・NEXT_TASKS.md lists Phase 21
+  笨・NEXT_TASKS.md documents Phase 18 gate
+  笨・NEXT_TASKS.md documents Phase 19 gate
+  笨・NEXT_TASKS.md handoff content verified
+  笨・EMAIL plan documents personal email policy
+  笨・EMAIL plan prohibits image OCR
+  笨・EMAIL plan prohibits WHOIS
+  笨・EMAIL plan documents form-only lead operation
+  笨・EMAIL plan proposes contactPathType
+  笨・EMAIL_CANDIDATES_IMPROVEMENT_PLAN verified
+  笨・README links to CLAUDE.md
+  笨・README documents emailCandidates
+  笨・Phase 18-lite handoff checks passed
+  笨・package.json has candidates-preview
+  笨・package.json has fetch-candidates
+  笨・package.json has candidates-audit
+  笨・candidates-preview does not call searchPlaces
+  笨・candidates-preview does not call searchWeb
+  笨・candidates-preview does not fetch live
+  笨・candidates-preview does not persist
+  笨・candidates-preview documents FETCH_CANDIDATES gate
+  笨・candidates-preview is dry-run without external communication
+  笨・fetch-candidates references FETCH_CANDIDATES
+  笨・fetch-candidates requires confirmation
+  笨・fetch-candidates does not directly Lead-import
+  笨・fetch-candidates saves external store
+  笨・fetch-candidates gated by FETCH_CANDIDATES; no direct Lead import
+  笨・candidates-audit uses audit module
+  笨・candidates-audit reports officialSiteUrl
+  笨・candidates-audit script present
+  笨・officialSiteUrl mirrors websiteUrl
+  笨・duplicateKey computed on build
+  笨・category set from industry
+  笨・collectedAt set on build
+  笨・limitNewCandidates defers excess importable candidates
+  笨・limit caps importable
+  笨・audit target is 30
+  笨・audit includes officialSiteUrl per lead
+  笨・CLAUDE documents Phase 21 commands
+  笨・WORK_LOG records Phase 21
+  笨・NEXT_TASKS lists Phase 21
+  笨・Phase 21 candidate collection checks passed
+  笨・additional page limit is 4
+  笶・emailBody has no mechanical impression phrase: 譬ｪ蠑丈ｼ夂､ｾ蠕ｳ逕ｰ蟾･蜍吝ｺ・  笶・findAdditionalContactPageUrls respects max 2
+  笨・additional pages same domain only
+  笨・SNS URLs excluded from additional pages
+  笨・external domain excluded
+  笨・mailto detection works
+  笨・fullwidth @ normalized
+  笨・[at] notation normalized
+  笨・personal email rejected
+  笨・gmail domain rejected
+  笨・yahoo domain rejected
+  笨・no-reply rejected
+  笨・example.com rejected
+  笨・corporate email allowed
+  笨・page email extraction returns allowed candidates
+  笨・emailCandidate sourceUrl captured
+  笨・contactPathType email
+  笨・contactPathType contact_form
+  笨・contactPathType both
+  笨・contactPathType none
+  笨・bothEmailAndFormLeads counted
+  笨・gmailDraftPossibleLeads counted
+  笨・formCopyOnlyLeads counted
+  笨・filter rejects gmail
+  笨・filter keeps corporate
+  笨・Phase 20-lite email improvement unit checks passed
+  笨・UI shows gmailDraftPossibleLeads
+  笨・UI shows formCopyOnlyLeads
+  笨・No WHOIS/OCR usage in source
+  笨・EMAIL plan updated for implementation
+  笨・Phase 20-lite async checks passed
+  笨・gmailDraftAdapter uses drafts.create endpoint
+  笨・gmailDraftAdapter has no send API
+  笨・No auto-send or Gmail send code (0 violations)
+  笨・npm audit: no critical/high vulnerabilities (critical=0, high=0)
+
+Results: 676 passed, 8 failed

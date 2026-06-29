@@ -1,0 +1,2 @@
+companyName,area,industry,contactFormUrl,emailSubject,emailBody,salesAngle,riskLevel,humanReviewStatus,sendStatus
+Export Test Co,宮城県仙台市,工務店,https://export-test.example/contact,テスト件名,テスト本文です。ご担当者様向けの営業文。,,low,approved,not_sent
