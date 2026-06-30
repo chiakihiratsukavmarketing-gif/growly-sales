@@ -2,6 +2,7 @@ import { SectionCard } from './SectionCard.js';
 import { InfoBanner } from './InfoBanner.js';
 import { Daily30DashboardPanel } from './Daily30DashboardPanel.js';
 import { Daily30OperationsPanel } from './Daily30OperationsPanel.js';
+import { Daily30CloudStatusPanel } from './Daily30CloudStatusPanel.js';
 import { Daily30LeadCandidatesPanel } from './Daily30LeadCandidatesPanel.js';
 import { Daily30DraftImportPanel } from './Daily30DraftImportPanel.js';
 
@@ -35,6 +36,8 @@ export function CandidateCollectionView({
       )}
 
       <Daily30OperationsPanel onError={onError} refreshKey={refreshKey} />
+
+      <Daily30CloudStatusPanel onError={onError} refreshKey={refreshKey} />
 
       <Daily30DashboardPanel
         onError={onError}

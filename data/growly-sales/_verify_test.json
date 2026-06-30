@@ -1,7 +1,7 @@
 {
   "leads": [
     {
-      "id": "bf621cb3-88dd-47a2-bcec-38196f1c0a9b",
+      "id": "fb6dc192-5c8e-4b26-8603-287cb8fca5ae",
       "instagramUrl": null,
       "emailCandidates": [
         "info@example.com"
@@ -60,13 +60,13 @@
       "collectionBatchId": null,
       "source": null,
       "daily30PipelineStatus": null,
-      "createdAt": "2026-06-29T14:03:48.754Z",
-      "updatedAt": "2026-06-29T14:03:48.754Z",
+      "createdAt": "2026-06-29T15:05:48.274Z",
+      "updatedAt": "2026-06-29T15:05:48.274Z",
       "companyName": "Verify Test Co",
       "area": "宮城県仙台市",
       "industry": "工務店",
       "websiteUrl": "https://example.com"
     }
   ],
-  "updatedAt": "2026-06-29T14:03:48.758Z"
+  "updatedAt": "2026-06-29T15:05:48.278Z"
 }

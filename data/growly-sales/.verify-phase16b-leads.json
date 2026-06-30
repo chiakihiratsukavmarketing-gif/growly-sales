@@ -1,7 +1,7 @@
 {
   "leads": [
     {
-      "id": "46b74dd8-2564-4590-b38e-c4741218455e",
+      "id": "731f5036-6554-4f66-bd02-72f144c05849",
       "instagramUrl": null,
       "emailCandidates": [],
       "emailCandidateSourceUrls": [],
@@ -34,8 +34,8 @@
       "replyStatus": "replied",
       "manualSentAt": null,
       "manualSendMethod": null,
-      "replyReceivedAt": "2026-06-29T14:03:49.047Z",
-      "repliedAt": "2026-06-29T14:03:49.047Z",
+      "replyReceivedAt": "2026-06-29T15:05:48.472Z",
+      "repliedAt": "2026-06-29T15:05:48.472Z",
       "replyMemo": "希望の返信あり",
       "replySummary": "希望の返信あり",
       "followUpDate": "2026-07-01",
@@ -43,7 +43,7 @@
       "followUpMemo": "",
       "dealStatus": "none",
       "outcomeMemo": "",
-      "communicationMemo": "返信管理UI更新 / replyStatus:none→replied / replySummary:更新 / repliedAt:（なし）→2026-06-29T14:03:49.047Z / followUpDueAt:（なし）→2026-07-01 / nextAction:返信待ち→フォローアップ",
+      "communicationMemo": "返信管理UI更新 / replyStatus:none→replied / replySummary:更新 / repliedAt:（なし）→2026-06-29T15:05:48.472Z / followUpDueAt:（なし）→2026-07-01 / nextAction:返信待ち→フォローアップ",
       "gmailDraftStatus": "none",
       "gmailDraftId": null,
       "gmailDraftCreatedAt": null,
@@ -58,13 +58,13 @@
       "collectionBatchId": null,
       "source": null,
       "daily30PipelineStatus": null,
-      "createdAt": "2026-06-29T14:03:49.043Z",
-      "updatedAt": "2026-06-29T14:03:49.047Z",
+      "createdAt": "2026-06-29T15:05:48.470Z",
+      "updatedAt": "2026-06-29T15:05:48.472Z",
       "companyName": "Reply UI Test",
       "area": "仙台市",
       "industry": "工務店",
       "websiteUrl": "https://reply-ui.test"
     }
   ],
-  "updatedAt": "2026-06-29T14:03:49.047Z"
+  "updatedAt": "2026-06-29T15:05:48.473Z"
 }

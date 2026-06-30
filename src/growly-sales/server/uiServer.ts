@@ -80,9 +80,10 @@ import {
   previewUnsentSignatureRefresh,
   refreshUnsentLeadSignatures,
 } from '../workflow/refreshUnsentLeadSignatures.js';
+import { handleDaily30CloudRoutes } from './daily30CloudRoutes.js';
 
 const UI_DIST = getUiDistDir();
-const PORT = Number(process.env.GROWLY_UI_PORT ?? 3847);
+const PORT = Number(process.env.PORT ?? process.env.GROWLY_UI_PORT ?? 3847);
 
 async function readJsonBody<T>(req: IncomingMessage): Promise<T> {
   const chunks: Buffer[] = [];
@@ -99,7 +100,7 @@ function sendJson(res: ServerResponse, status: number, data: unknown): void {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-growly-daily30-token',
   });
   res.end(JSON.stringify(data));
 }
@@ -146,6 +147,10 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
   }
 
   try {
+    if (await handleDaily30CloudRoutes(req, res, pathname)) {
+      return;
+    }
+
     if (req.method === 'GET' && pathname === '/api/leads') {
       const leads = await loadLeadsForApi('GET /api/leads');
       sendJson(res, 200, { leads, leadsPath });

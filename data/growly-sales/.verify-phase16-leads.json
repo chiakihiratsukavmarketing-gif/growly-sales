@@ -1,7 +1,7 @@
 {
   "leads": [
     {
-      "id": "e571b8bb-badc-4eeb-a54e-b51872bb7a94",
+      "id": "a47484d0-df31-4bcf-bdb1-8a79a54a2a22",
       "instagramUrl": null,
       "emailCandidates": [
         "info@phase16.example"
@@ -34,7 +34,7 @@
       "humanReviewStatus": "approved",
       "sendStatus": "sent",
       "replyStatus": "none",
-      "manualSentAt": "2026-06-29T14:03:49.036Z",
+      "manualSentAt": "2026-06-29T15:05:48.466Z",
       "manualSendMethod": "email",
       "replyReceivedAt": null,
       "repliedAt": null,
@@ -60,13 +60,13 @@
       "collectionBatchId": null,
       "source": null,
       "daily30PipelineStatus": null,
-      "createdAt": "2026-06-29T14:03:49.032Z",
-      "updatedAt": "2026-06-29T14:03:49.036Z",
+      "createdAt": "2026-06-29T15:05:48.463Z",
+      "updatedAt": "2026-06-29T15:05:48.466Z",
       "companyName": "Phase16 Record Co",
       "area": "仙台市",
       "industry": "工務店",
       "websiteUrl": "https://phase16.example"
     }
   ],
-  "updatedAt": "2026-06-29T14:03:49.036Z"
+  "updatedAt": "2026-06-29T15:05:48.466Z"
 }

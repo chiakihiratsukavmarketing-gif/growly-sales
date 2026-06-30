@@ -1,7 +1,7 @@
 {
   "leads": [
     {
-      "id": "5b1f3cef-6963-4d0c-a871-29f4d9422980",
+      "id": "7cfb8828-3145-4aed-b3d3-f637dbbc5956",
       "instagramUrl": null,
       "emailCandidates": [],
       "emailCandidateSourceUrls": [],
@@ -58,13 +58,13 @@
       "collectionBatchId": null,
       "source": null,
       "daily30PipelineStatus": null,
-      "createdAt": "2026-06-29T14:03:49.084Z",
-      "updatedAt": "2026-06-29T14:03:49.089Z",
+      "createdAt": "2026-06-29T15:05:48.488Z",
+      "updatedAt": "2026-06-29T15:05:48.491Z",
       "companyName": "署名古い社",
       "area": "仙台市",
       "industry": "工務店",
       "websiteUrl": "https://stale-sig.test"
     }
   ],
-  "updatedAt": "2026-06-29T14:03:49.089Z"
+  "updatedAt": "2026-06-29T15:05:48.492Z"
 }

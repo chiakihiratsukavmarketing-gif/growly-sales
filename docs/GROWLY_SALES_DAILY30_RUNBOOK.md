@@ -88,10 +88,145 @@ npm run growly-sales:daily30-import-draft-candidates  # IMPORT_DAILY_30_DRAFT_CA
 npm run growly-sales:gmail-create-drafts        # CREATE_DRAFTS（別途）
 ```
 
-## 安全ルール（固定）
+## Cloud 自動収集（Phase 27）
 
-- 自動送信しない
-- 個人メールは除外
+毎朝9時の候補収集のみ（Cloud Scheduler → Cloud Run）:
+
+- `POST /api/cloud/daily30/auto-fetch`
+- 認証: `DAILY30_CLOUD_RUN_TOKEN`（`Authorization: Bearer` または `x-growly-daily30-token`）
+- `dryRun: true` — 外部通信・保存なし
+- `force: true` — 同日再実行（トークン必須）
+- **Gmail・営業文・leads 取り込みは実行しない**
+
+```powershell
+npm run growly-sales:cloud-daily30-dry-run
+npm run growly-sales:cloud-daily30-auto-fetch  # DAILY30_CLOUD_RUN_TOKEN 必須
+```
+
+## Cloud Storage 保存（Phase 28）
+
+Cloud Run ではローカル `data/growly-sales/*.json` に書けないため、GCS を保存先に切り替え可能。
+
+| 環境変数 | 説明 | 例 |
+|----------|------|-----|
+| `GROWLY_STORAGE_BACKEND` | `local`（既定）または `gcs` | `gcs` |
+| `GROWLY_GCS_BUCKET` | GCS バケット名 | `growly-sales-daily30` |
+| `GROWLY_GCS_PREFIX` | オブジェクト prefix | `prod/growly-sales` |
+
+保存対象（gcs 時）:
+
+- `gs://<bucket>/<prefix>/external-candidates.json`
+- `gs://<bucket>/<prefix>/daily30-cloud-run-state.json`
+
+ローカル確認（読み取りのみ・書き込みなし）:
+
+```powershell
+$env:GROWLY_STORAGE_BACKEND="gcs"
+$env:GROWLY_GCS_BUCKET="growly-sales-daily30"
+$env:GROWLY_GCS_PREFIX="prod/growly-sales"
+npm run growly-sales:gcs-storage-check
+```
+
+### Cloud Run 環境変数サンプル（Daily 30 auto-fetch 専用）
+
+```env
+NODE_ENV=production
+PORT=8080
+API_PRODUCTION_ENABLED=true
+GROWLY_STORAGE_BACKEND=gcs
+GROWLY_GCS_BUCKET=growly-sales-daily30
+GROWLY_GCS_PREFIX=prod/growly-sales
+DAILY30_CLOUD_RUN_TOKEN=<Secret Manager から注入>
+GOOGLE_PLACES_API_KEY=<Secret Manager から注入>
+# Web Search 等、収集に必要な API キー
+```
+
+**不要（Daily 30 auto-fetch 用途）:**
+
+- Gmail OAuth / refresh token — 下書き作成・送信は行わない
+- `CREATE_DRAFTS` / `FETCH_DAILY_30` CLI ゲート — Cloud API は `DAILY30_CLOUD_RUN_TOKEN` で認証
+
+サービスアカウントには対象バケットへの `storage.objects.get` / `storage.objects.create` 権限を付与。
+
+Docker イメージには `.env`・credentials・token・ローカル JSON を含めない（`.dockerignore` 参照）。
+
+```powershell
+# イメージビルド例（ローカル）
+docker build -t growly-sales-daily30 .
+```
+
+## Cloud Scheduler 朝9時実行（Phase 29）
+
+**フル手順:** [GROWLY_SALES_CLOUD_SCHEDULER_DEPLOY.md](./GROWLY_SALES_CLOUD_SCHEDULER_DEPLOY.md)
+
+### 概要
+
+```
+Cloud Scheduler (9:00 JST)
+  → POST /api/cloud/daily30/auto-fetch  {"dryRun":false,"force":false}
+  → Cloud Run (growly-sales-daily30)
+  → GCS: external-candidates.json / daily30-cloud-run-state.json
+```
+
+| 項目 | 値 |
+|------|-----|
+| プロジェクト | `growly-scheduler` |
+| リージョン | `asia-northeast1` |
+| Scheduler ジョブ | `growly-daily30-auto-fetch-9am` |
+| cron | `0 9 * * *` / `Asia/Tokyo` |
+| Cloud Run サービス | `growly-sales-daily30` |
+| イメージ | `asia-northeast1-docker.pkg.dev/growly-scheduler/growly-sales/growly-sales-daily30:latest` |
+
+### Secret 名（値は docs に書かない）
+
+- `daily30-cloud-run-token` → `DAILY30_CLOUD_RUN_TOKEN`
+- `google-places-api-key` → `GOOGLE_PLACES_API_KEY`
+
+### ローカル確認
+
+```powershell
+npm run growly-sales:cloud-deploy-check
+npm run growly-sales:cloud-daily30-dry-run
+```
+
+Cloud Shell で一括デプロイ:
+
+```bash
+chmod +x scripts/cloud/growly-daily30/*.sh
+./scripts/cloud/growly-daily30/deploy-all.sh
+```
+
+### 同日二重実行
+
+- `force=false`（Scheduler 既定）で同日 2 回目 → `mode: already_ran`
+- 手動再実行のみ `force=true`
+
+### 安全ルール（Cloud 自動化）
+
+- 自動送信しない / Gmail API send・下書き作成なし
+- 営業文生成・leads 取り込み・humanReviewStatus 自動承認なし
+- Gmail token を Cloud Run に注入しない
+
+## 実行ログ・失敗リカバリー（Phase 30）
+
+### UI パネル
+
+**候補収集**タブ → **Cloud Scheduler（Daily 30 自動収集）** で本日の状態・最終実行ログ・errorCode・recoveryHint・Cloud Logging フィルタを確認。
+
+### errorCode / 復旧
+
+詳細: [GROWLY_SALES_CLOUD_SCHEDULER_DEPLOY.md](./GROWLY_SALES_CLOUD_SCHEDULER_DEPLOY.md) §12–14
+
+- `force=true` は UI ボタンなし — Cloud Shell 手動のみ
+- 同日再実行は原則しない
+
+### Cloud Daily 30 運用開始
+
+1. Cloud Shell で `deploy-all.sh`
+2. dry-run → Scheduler 手動テスト
+3. 毎朝 9:00 自動実行を UI で確認
+4. 候補の Lead 化・営業文・下書き・送信は人間オペレーション（自動化外）
+
 - `needs_review` / `excluded` は下書き候補化しない
 - 署名 Email: `c_hiratsuka@wantreach.jp`
 - 返信本文全文は保存せず `replySummary` のみ

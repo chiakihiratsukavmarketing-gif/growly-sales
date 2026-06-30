@@ -1,7 +1,7 @@
 {
   "leads": [
     {
-      "id": "04444d78-6fa1-480b-8deb-0377e9c8f07f",
+      "id": "5cfe6c71-14bc-4af4-be39-c149cdb4a567",
       "instagramUrl": null,
       "emailCandidates": [],
       "emailCandidateSourceUrls": [],
@@ -32,10 +32,10 @@
       "humanReviewStatus": "approved",
       "sendStatus": "sent",
       "replyStatus": "follow_up_needed",
-      "manualSentAt": "2026-06-29T14:03:48.936Z",
+      "manualSentAt": "2026-06-29T15:05:48.402Z",
       "manualSendMethod": "email",
-      "replyReceivedAt": "2026-06-29T14:03:48.938Z",
-      "repliedAt": "2026-06-29T14:03:48.938Z",
+      "replyReceivedAt": "2026-06-29T15:05:48.404Z",
+      "repliedAt": "2026-06-29T15:05:48.404Z",
       "replyMemo": "返信あり",
       "replySummary": "返信あり",
       "followUpDate": "2026-07-01",
@@ -43,7 +43,7 @@
       "followUpMemo": "フォロー",
       "dealStatus": "won",
       "outcomeMemo": "受注",
-      "communicationMemo": "返信管理UI更新 / replyStatus:none→replied / replySummary:更新 / repliedAt:（なし）→2026-06-29T14:03:48.938Z / nextAction:人間レビュー待ち→フォローアップ",
+      "communicationMemo": "返信管理UI更新 / replyStatus:none→replied / replySummary:更新 / repliedAt:（なし）→2026-06-29T15:05:48.404Z / nextAction:人間レビュー待ち→フォローアップ",
       "gmailDraftStatus": "none",
       "gmailDraftId": null,
       "gmailDraftCreatedAt": null,
@@ -58,13 +58,13 @@
       "collectionBatchId": null,
       "source": null,
       "daily30PipelineStatus": null,
-      "createdAt": "2026-06-29T14:03:48.930Z",
-      "updatedAt": "2026-06-29T14:03:48.947Z",
+      "createdAt": "2026-06-29T15:05:48.399Z",
+      "updatedAt": "2026-06-29T15:05:48.408Z",
       "companyName": "Comm Test Co",
       "area": "仙台市",
       "industry": "工務店",
       "websiteUrl": "https://comm.test"
     }
   ],
-  "updatedAt": "2026-06-29T14:03:48.947Z"
+  "updatedAt": "2026-06-29T15:05:48.408Z"
 }

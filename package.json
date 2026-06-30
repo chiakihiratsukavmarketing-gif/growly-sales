@@ -30,9 +30,14 @@
     "growly-sales:daily30-preview": "tsx src/growly-sales/scripts/run-growly-sales-daily30-preview.ts",
     "growly-sales:daily30-fetch": "tsx src/growly-sales/scripts/run-growly-sales-daily30-fetch.ts",
     "growly-sales:daily30-generate-copy": "tsx src/growly-sales/scripts/run-growly-sales-daily30-generate-copy.ts",
-    "growly-sales:daily30-import-draft-candidates": "tsx src/growly-sales/scripts/run-growly-sales-daily30-import-draft-candidates.ts"
+    "growly-sales:daily30-import-draft-candidates": "tsx src/growly-sales/scripts/run-growly-sales-daily30-import-draft-candidates.ts",
+    "growly-sales:cloud-daily30-dry-run": "tsx src/growly-sales/scripts/run-growly-sales-cloud-daily30-dry-run.ts",
+    "growly-sales:cloud-daily30-auto-fetch": "tsx src/growly-sales/scripts/run-growly-sales-cloud-daily30-auto-fetch.ts",
+    "growly-sales:gcs-storage-check": "tsx src/growly-sales/scripts/run-growly-sales-gcs-storage-check.ts",
+    "growly-sales:cloud-deploy-check": "tsx src/growly-sales/scripts/run-growly-sales-cloud-deploy-check.ts"
   },
   "dependencies": {
+    "@google-cloud/storage": "^7.21.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

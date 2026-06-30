@@ -1,0 +1,43 @@
+# Dependencies
+node_modules
+npm-debug.log*
+
+# Git
+.git
+.gitignore
+
+# Secrets / credentials (never bake into image)
+.env
+.env.*
+!.env.example
+credentials
+credentials.json
+token.json
+**/token*.json
+**/*credentials*
+
+# Local data (Cloud Run uses GCS)
+data/growly-sales/*.json
+data/growly-sales/**/*.json
+
+# Logs & caches
+logs
+*.log
+dist/cache
+.cache
+.vite
+
+# IDE / OS
+.idea
+.vscode
+.DS_Store
+Thumbs.db
+
+# Test / dev artifacts
+coverage
+*.tsbuildinfo
+
+# Agent / docs handoff (not needed at runtime)
+agent-transcripts
+WORK_LOG.md
+NEXT_TASKS.md

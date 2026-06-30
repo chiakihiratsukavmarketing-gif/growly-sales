@@ -2956,6 +2956,396 @@ async function verifyPhase26Daily30OperationsIntegration(): Promise<void> {
   ok('Phase 26 Daily 30 operations integration checks passed');
 }
 
+async function verifyPhase27CloudDaily30AutoFetch(): Promise<void> {
+  const pkg = await readFile(join(PROJECT_ROOT, 'package.json'), 'utf-8');
+  assert(pkg.includes('growly-sales:cloud-daily30-dry-run'), 'package.json has cloud-daily30-dry-run');
+  assert(pkg.includes('growly-sales:cloud-daily30-auto-fetch'), 'package.json has cloud-daily30-auto-fetch');
+
+  const cloudFetch = await readFile(
+    join(SRC_ROOT, 'candidates/runDaily30CloudAutoFetch.ts'),
+    'utf-8'
+  );
+  assert(!cloudFetch.includes('createGmailDraftForLead'), 'cloud auto-fetch does not create Gmail drafts');
+  assert(!cloudFetch.includes('messages.send'), 'cloud auto-fetch does not send email');
+  assert(!cloudFetch.includes('runDaily30CopyPipeline'), 'cloud auto-fetch does not generate copy');
+  assert(!cloudFetch.includes('importDaily30DraftCandidate'), 'cloud auto-fetch does not import leads');
+  assert(!cloudFetch.includes('approveLeadForDraft'), 'cloud auto-fetch does not auto-approve');
+  assert(cloudFetch.includes('dryRun'), 'cloud auto-fetch supports dryRun');
+  assert(cloudFetch.includes('already_ran'), 'cloud auto-fetch supports already_ran');
+  assert(cloudFetch.includes('force'), 'cloud auto-fetch supports force');
+
+  const cloudRoutes = await readFile(join(SRC_ROOT, 'server/daily30CloudRoutes.ts'), 'utf-8');
+  assert(cloudRoutes.includes('/api/cloud/daily30/auto-fetch'), 'cloud route auto-fetch');
+  assert(cloudRoutes.includes('/api/cloud/daily30/status'), 'cloud route status');
+  assert(cloudRoutes.includes('x-growly-daily30-token'), 'cloud route accepts custom header');
+  assert(cloudRoutes.includes('Bearer'), 'cloud route accepts Bearer');
+  assert(!cloudRoutes.includes('DAILY30_CLOUD_RUN_TOKEN'), 'cloud routes do not log token env name in responses');
+
+  const authFile = await readFile(join(SRC_ROOT, 'config/daily30CloudAuth.ts'), 'utf-8');
+  assert(authFile.includes('DAILY30_CLOUD_RUN_TOKEN'), 'cloud auth env key defined');
+  assert(!authFile.includes('console.log'), 'cloud auth does not log');
+
+  const autoFetchCli = await readFile(
+    join(SRC_ROOT, 'scripts/run-growly-sales-cloud-daily30-auto-fetch.ts'),
+    'utf-8'
+  );
+  assert(autoFetchCli.includes('assertDaily30CloudToken'), 'cloud auto-fetch CLI requires token');
+
+  const candidateView = await readFile(join(SRC_ROOT, 'ui/CandidateCollectionView.tsx'), 'utf-8');
+  assert(candidateView.includes('Daily30CloudStatusPanel'), 'CandidateCollectionView shows cloud status');
+
+  const cloudPanel = await readFile(join(SRC_ROOT, 'ui/Daily30CloudStatusPanel.tsx'), 'utf-8');
+  assert(cloudPanel.includes('値は表示しません'), 'cloud panel hides token value');
+  assert(cloudPanel.includes('Scheduler'), 'cloud panel mentions scheduler');
+  assert(cloudPanel.includes('lastRun'), 'cloud panel shows last run');
+
+  const { runDaily30CloudAutoFetch } = await import('../candidates/runDaily30CloudAutoFetch.js');
+  const { isBatchCloudRunCompleted } = await import('../storage/daily30CloudRunState.js');
+  const dry = await runDaily30CloudAutoFetch({ dryRun: true });
+  assert(dry.mode === 'dry_run', 'dryRun returns dry_run mode');
+  assert(dry.ok === true, 'dryRun ok');
+
+  const leads = await loadLeadsFromJson(getLeadsJsonPath());
+  const sentSnapshot = leads
+    .filter((l) => l.sendStatus === 'sent' || l.sendStatus === 'manual_sent')
+    .map((l) => ({
+      id: l.id,
+      sendStatus: l.sendStatus,
+      replyStatus: l.replyStatus,
+    }));
+
+  const { DAILY30_CLOUD_RUN_TOKEN_ENV } = await import('../config/daily30CloudAuth.js');
+  const prevToken = process.env[DAILY30_CLOUD_RUN_TOKEN_ENV];
+  delete process.env[DAILY30_CLOUD_RUN_TOKEN_ENV];
+  const { isDaily30CloudRunTokenConfigured } = await import('../config/daily30CloudAuth.js');
+  assert(!isDaily30CloudRunTokenConfigured(), 'token unset means not configured');
+  if (prevToken) process.env[DAILY30_CLOUD_RUN_TOKEN_ENV] = prevToken;
+
+  const batchId = dry.batchId;
+  const already = await isBatchCloudRunCompleted(batchId);
+  if (already) {
+    const again = await runDaily30CloudAutoFetch({ dryRun: false, force: false });
+    assert(again.mode === 'already_ran', 'duplicate guard returns already_ran without force');
+  }
+
+  const leadsAfter = await loadLeadsFromJson(getLeadsJsonPath());
+  for (const before of sentSnapshot) {
+    const after = leadsAfter.find((l) => l.id === before.id);
+    assert(after, `sent lead preserved: ${before.id}`);
+    assert(after.sendStatus === before.sendStatus, `sendStatus unchanged: ${before.id}`);
+    assert(after.replyStatus === before.replyStatus, `replyStatus unchanged: ${before.id}`);
+  }
+
+  ok('Phase 27 Cloud Daily 30 auto-fetch checks passed');
+}
+
+async function verifyPhase28CloudStorageBackend(): Promise<void> {
+  const pkg = await readFile(join(PROJECT_ROOT, 'package.json'), 'utf-8');
+  assert(pkg.includes('growly-sales:gcs-storage-check'), 'package.json has gcs-storage-check');
+  assert(pkg.includes('@google-cloud/storage'), 'package.json has @google-cloud/storage');
+
+  const dockerignore = await readFile(join(PROJECT_ROOT, '.dockerignore'), 'utf-8');
+  assert(dockerignore.includes('.env'), 'dockerignore excludes .env');
+  assert(dockerignore.includes('credentials'), 'dockerignore excludes credentials');
+  assert(dockerignore.includes('token'), 'dockerignore excludes token files');
+  assert(dockerignore.includes('data/growly-sales/*.json'), 'dockerignore excludes local data JSON');
+
+  const dockerfile = await readFile(join(PROJECT_ROOT, 'Dockerfile'), 'utf-8');
+  assert(!dockerfile.includes('COPY .env'), 'Dockerfile does not COPY .env');
+  assert(!dockerfile.includes('credentials.json'), 'Dockerfile does not COPY credentials');
+  assert(dockerfile.includes('PORT'), 'Dockerfile documents PORT');
+  assert(!dockerfile.toLowerCase().includes('refresh_token'), 'Dockerfile has no refresh_token');
+
+  const uiServer = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
+  assert(uiServer.includes('process.env.PORT'), 'uiServer respects Cloud Run PORT');
+
+  const storageBackend = await readFile(join(SRC_ROOT, 'config/storageBackend.ts'), 'utf-8');
+  assert(storageBackend.includes('GROWLY_STORAGE_BACKEND'), 'storage backend env defined');
+  assert(storageBackend.includes('GROWLY_GCS_BUCKET'), 'GCS bucket env defined');
+  assert(storageBackend.includes('InvalidStorageBackendError'), 'invalid backend error');
+
+  const gcsStorage = await readFile(join(SRC_ROOT, 'storage/gcsJsonStorage.ts'), 'utf-8');
+  assert(gcsStorage.includes('gcsReadJson'), 'GCS readJson');
+  assert(gcsStorage.includes('gcsWriteJson'), 'GCS writeJson');
+  assert(gcsStorage.includes('gcsJsonExists'), 'GCS exists');
+  assert(gcsStorage.includes('gcsBackupBeforeWrite'), 'GCS backupBeforeWrite');
+  assert(!gcsStorage.includes('console.log'), 'GCS adapter does not log secrets');
+
+  const jsonDoc = await readFile(join(SRC_ROOT, 'storage/jsonDocumentStorage.ts'), 'utf-8');
+  assert(jsonDoc.includes('readJsonDocument'), 'unified readJsonDocument');
+  assert(jsonDoc.includes('writeJsonDocument'), 'unified writeJsonDocument');
+
+  const extRepo = await readFile(join(SRC_ROOT, 'storage/externalCandidatesRepository.ts'), 'utf-8');
+  assert(extRepo.includes('readJsonDocument'), 'externalCandidates uses readJsonDocument');
+  assert(extRepo.includes('writeJsonDocument'), 'externalCandidates uses writeJsonDocument');
+  assert(extRepo.includes('isGcsStorageBackend'), 'externalCandidates skips CSV on gcs');
+
+  const cloudState = await readFile(join(SRC_ROOT, 'storage/daily30CloudRunState.ts'), 'utf-8');
+  assert(cloudState.includes('readJsonDocument'), 'cloud run state uses readJsonDocument');
+  assert(cloudState.includes('writeJsonDocument'), 'cloud run state uses writeJsonDocument');
+
+  const runbook = await readFile(
+    join(PROJECT_ROOT, 'docs/GROWLY_SALES_DAILY30_RUNBOOK.md'),
+    'utf-8'
+  );
+  assert(runbook.includes('GROWLY_STORAGE_BACKEND'), 'runbook documents storage backend');
+  assert(runbook.includes('GROWLY_GCS_BUCKET'), 'runbook documents GCS bucket');
+  assert(runbook.includes('gcs-storage-check'), 'runbook documents gcs-storage-check');
+
+  const cloudFetch = await readFile(
+    join(SRC_ROOT, 'candidates/runDaily30CloudAutoFetch.ts'),
+    'utf-8'
+  );
+  assert(!cloudFetch.includes('messages.send'), 'cloud fetch no send');
+  assert(!cloudFetch.includes('users.drafts.create'), 'cloud fetch no drafts.create');
+  assert(!cloudFetch.includes('GMAIL_REFRESH_TOKEN'), 'cloud fetch does not require Gmail token');
+
+  const { getStorageBackend, GcsStorageNotConfiguredError } = await import(
+    '../config/storageBackend.js'
+  );
+  const prevBackend = process.env.GROWLY_STORAGE_BACKEND;
+  const prevBucket = process.env.GROWLY_GCS_BUCKET;
+  delete process.env.GROWLY_STORAGE_BACKEND;
+  assert(getStorageBackend() === 'local', 'default backend is local');
+  process.env.GROWLY_STORAGE_BACKEND = 'gcs';
+  delete process.env.GROWLY_GCS_BUCKET;
+  let gcsError: Error | null = null;
+  try {
+    const { assertGcsStorageConfigured } = await import('../config/storageBackend.js');
+    assertGcsStorageConfigured();
+  } catch (err) {
+    gcsError = err as Error;
+  }
+  assert(gcsError instanceof GcsStorageNotConfiguredError, 'gcs without bucket throws clear error');
+  if (prevBackend) process.env.GROWLY_STORAGE_BACKEND = prevBackend;
+  else delete process.env.GROWLY_STORAGE_BACKEND;
+  if (prevBucket) process.env.GROWLY_GCS_BUCKET = prevBucket;
+  else delete process.env.GROWLY_GCS_BUCKET;
+
+  const leads = await loadLeadsFromJson(getLeadsJsonPath());
+  const sentSnapshot = leads
+    .filter((l) => l.sendStatus === 'sent' || l.sendStatus === 'manual_sent')
+    .map((l) => ({ id: l.id, sendStatus: l.sendStatus, replyStatus: l.replyStatus }));
+
+  const { loadExternalCandidatesFromJson } = await import(
+    '../storage/externalCandidatesRepository.js'
+  );
+  const candidates = await loadExternalCandidatesFromJson();
+  assert(Array.isArray(candidates), 'local backend loads external candidates');
+
+  const { loadDaily30CloudRunState } = await import('../storage/daily30CloudRunState.js');
+  const state = await loadDaily30CloudRunState();
+  assert(state.runs !== undefined, 'local backend loads cloud run state');
+
+  const leadsAfter = await loadLeadsFromJson(getLeadsJsonPath());
+  for (const before of sentSnapshot) {
+    const after = leadsAfter.find((l) => l.id === before.id);
+    assert(after, `sent lead preserved phase28: ${before.id}`);
+    assert(after.sendStatus === before.sendStatus, `sendStatus unchanged phase28: ${before.id}`);
+    assert(after.replyStatus === before.replyStatus, `replyStatus unchanged phase28: ${before.id}`);
+  }
+
+  ok('Phase 28 Cloud Storage backend checks passed');
+}
+
+async function verifyPhase29CloudSchedulerDeploy(): Promise<void> {
+  const pkg = await readFile(join(PROJECT_ROOT, 'package.json'), 'utf-8');
+  assert(pkg.includes('growly-sales:cloud-deploy-check'), 'package.json has cloud-deploy-check');
+
+  const deployDoc = await readFile(
+    join(PROJECT_ROOT, 'docs/GROWLY_SALES_CLOUD_SCHEDULER_DEPLOY.md'),
+    'utf-8'
+  );
+  assert(deployDoc.includes('growly-scheduler'), 'deploy doc has project id');
+  assert(deployDoc.includes('growly-daily30-auto-fetch-9am'), 'deploy doc has scheduler job name');
+  assert(deployDoc.includes('0 9 * * *'), 'deploy doc has cron');
+  assert(deployDoc.includes('Asia/Tokyo'), 'deploy doc has timezone');
+  assert(deployDoc.includes('/api/cloud/daily30/auto-fetch'), 'deploy doc has API path');
+  assert(deployDoc.includes('"dryRun":false,"force":false'), 'deploy doc has scheduler body');
+  assert(deployDoc.includes('daily30-cloud-run-token'), 'deploy doc has token secret name');
+  assert(deployDoc.includes('google-places-api-key'), 'deploy doc has places secret name');
+  assert(!deployDoc.includes('GMAIL_REFRESH'), 'deploy doc has no Gmail refresh token');
+  assert(!deployDoc.includes('refresh_token'), 'deploy doc has no refresh_token');
+  assert(deployDoc.includes('already_ran'), 'deploy doc explains duplicate guard');
+  assert(deployDoc.includes('同日二重実行'), 'deploy doc duplicate guard section');
+
+  const runbook = await readFile(
+    join(PROJECT_ROOT, 'docs/GROWLY_SALES_DAILY30_RUNBOOK.md'),
+    'utf-8'
+  );
+  assert(runbook.includes('GROWLY_SALES_CLOUD_SCHEDULER_DEPLOY.md'), 'runbook links deploy doc');
+  assert(!runbook.match(/DAILY30_CLOUD_RUN_TOKEN=[a-zA-Z0-9+/=]{8,}/), 'runbook has no literal token');
+
+  const cloudConfig = await readFile(join(SRC_ROOT, 'config/cloudDeployConfig.ts'), 'utf-8');
+  assert(cloudConfig.includes("SCHEDULER_CRON = '0 9 * * *'"), 'scheduler cron constant');
+  assert(cloudConfig.includes("SCHEDULER_TIMEZONE = 'Asia/Tokyo'"), 'scheduler timezone');
+  assert(cloudConfig.includes('growly-daily30-auto-fetch-9am'), 'scheduler job name constant');
+  assert(!cloudConfig.includes('GMAIL'), 'cloud config has no Gmail');
+
+  const cloudFetch = await readFile(
+    join(SRC_ROOT, 'candidates/runDaily30CloudAutoFetch.ts'),
+    'utf-8'
+  );
+  assert(cloudFetch.includes('existingCount'), 'dry-run includes existingCount');
+  assert(cloudFetch.includes('[daily30-cloud]'), 'structured cloud logs');
+  assert(!cloudFetch.includes('messages.send'), 'cloud fetch no send');
+  assert(!cloudFetch.includes('users.drafts.create'), 'cloud fetch no drafts.create');
+  assert(!cloudFetch.includes('GMAIL_REFRESH'), 'cloud fetch no gmail token');
+
+  const deployScript = await readFile(
+    join(PROJECT_ROOT, 'scripts/cloud/growly-daily30/06-scheduler.sh'),
+    'utf-8'
+  );
+  assert(deployScript.includes('0 9 * * *'), 'scheduler script cron');
+  assert(deployScript.includes('Asia/Tokyo'), 'scheduler script timezone');
+  assert(deployScript.includes('dryRun":false,"force":false'), 'scheduler script body');
+
+  const cloudRunDeploy = await readFile(
+    join(PROJECT_ROOT, 'scripts/cloud/growly-daily30/05-deploy-cloud-run.sh'),
+    'utf-8'
+  );
+  assert(cloudRunDeploy.includes('GROWLY_STORAGE_BACKEND=gcs'), 'cloud run uses gcs');
+  assert(cloudRunDeploy.includes('daily30-cloud-run-token'), 'cloud run secret ref by name');
+  assert(!cloudRunDeploy.includes('GMAIL'), 'cloud run deploy no gmail secrets');
+
+  const cloudPanel = await readFile(join(SRC_ROOT, 'ui/Daily30CloudStatusPanel.tsx'), 'utf-8');
+  assert(cloudPanel.includes('Cloud Scheduler'), 'panel shows scheduler');
+  assert(cloudPanel.includes('lastRun'), 'panel shows last run');
+  assert(cloudPanel.includes('値は表示しません'), 'panel hides token');
+  assert(!cloudPanel.includes('refresh_token'), 'panel no refresh_token');
+
+  const { buildDaily30CloudStatus } = await import('../candidates/runDaily30CloudAutoFetch.js');
+  const status = await buildDaily30CloudStatus();
+  assert(status.schedulerCron === '0 9 * * *', 'status cron');
+  assert(status.schedulerTimezone === 'Asia/Tokyo', 'status timezone');
+  assert(status.schedulerTargetPath === '/api/cloud/daily30/auto-fetch', 'status target path');
+
+  const leads = await loadLeadsFromJson(getLeadsJsonPath());
+  const sentSnapshot = leads
+    .filter((l) => l.sendStatus === 'sent' || l.sendStatus === 'manual_sent')
+    .map((l) => ({ id: l.id, sendStatus: l.sendStatus, replyStatus: l.replyStatus }));
+
+  const { runDaily30CloudAutoFetch } = await import('../candidates/runDaily30CloudAutoFetch.js');
+  const dry = await runDaily30CloudAutoFetch({ dryRun: true });
+  assert(dry.existingCount !== undefined, 'dry run has existingCount');
+  assert(dry.mode === 'dry_run', 'dry run mode');
+
+  const leadsAfter = await loadLeadsFromJson(getLeadsJsonPath());
+  for (const before of sentSnapshot) {
+    const after = leadsAfter.find((l) => l.id === before.id);
+    assert(after, `sent lead preserved phase29: ${before.id}`);
+    assert(after.sendStatus === before.sendStatus, `sendStatus unchanged phase29: ${before.id}`);
+    assert(after.replyStatus === before.replyStatus, `replyStatus unchanged phase29: ${before.id}`);
+  }
+
+  ok('Phase 29 Cloud Scheduler deploy checks passed');
+}
+
+async function verifyPhase30CloudRunLoggingAndRecovery(): Promise<void> {
+  const errors = await readFile(join(SRC_ROOT, 'candidates/daily30CloudRunErrors.ts'), 'utf-8');
+  assert(errors.includes('TOKEN_MISSING'), 'error TOKEN_MISSING defined');
+  assert(errors.includes('GCS_WRITE_FAILED'), 'error GCS_WRITE_FAILED defined');
+  assert(errors.includes('recoveryHint'), 'errors have recoveryHint');
+  assert(errors.includes('recoverySteps'), 'errors have recoverySteps');
+  assert(errors.includes('sanitizeErrorMessageSafe'), 'sanitize helper exists');
+  assert(!errors.includes('AIzaSy'), 'errors file has no sample api key');
+
+  const state = await readFile(join(SRC_ROOT, 'storage/daily30CloudRunState.ts'), 'utf-8');
+  assert(state.includes('runId'), 'state has runId');
+  assert(state.includes('durationMs'), 'state has durationMs');
+  assert(state.includes('errorCode'), 'state has errorCode');
+  assert(state.includes('history'), 'state has history array');
+
+  const cloudFetch = await readFile(
+    join(SRC_ROOT, 'candidates/runDaily30CloudAutoFetch.ts'),
+    'utf-8'
+  );
+  assert(cloudFetch.includes('logsHint'), 'response has logsHint');
+  assert(cloudFetch.includes('safeMessage'), 'response has safeMessage');
+  assert(cloudFetch.includes('automationStatus'), 'status has automationStatus');
+  assert(!cloudFetch.includes('createGmailDraftForLead'), 'no gmail drafts');
+  assert(!cloudFetch.includes('messages.send'), 'no send');
+  assert(!cloudFetch.includes('users.drafts.create'), 'no drafts.create');
+  assert(!cloudFetch.includes('importDaily30DraftCandidate'), 'no lead import');
+
+  const cloudPanel = await readFile(join(SRC_ROOT, 'ui/Daily30CloudStatusPanel.tsx'), 'utf-8');
+  assert(cloudPanel.includes('automationStatus'), 'panel automation status');
+  assert(cloudPanel.includes('recoveryHint'), 'panel recovery hint');
+  assert(cloudPanel.includes('recoverySteps'), 'panel recovery steps');
+  assert(cloudPanel.includes('cloudLoggingFilter'), 'panel logging filter');
+  assert(cloudPanel.includes('値は表示しません'), 'panel hides secrets');
+  assert(!cloudPanel.includes('force={true}'), 'panel no force rerun button');
+  assert(!cloudPanel.match(/button[^>]*force/i), 'panel no force button');
+  assert(!cloudPanel.includes('onClick'), 'panel no action buttons');
+  assert(!cloudPanel.includes('GOOGLE_PLACES_API_KEY'), 'panel no api key env');
+
+  const deployDoc = await readFile(
+    join(PROJECT_ROOT, 'docs/GROWLY_SALES_CLOUD_SCHEDULER_DEPLOY.md'),
+    'utf-8'
+  );
+  assert(deployDoc.includes('[daily30-cloud]'), 'deploy doc logging filter');
+  assert(deployDoc.includes('force=true'), 'deploy doc force manual only');
+  assert(deployDoc.includes('UI からは実行できません'), 'deploy doc no ui force');
+  assert(deployDoc.includes('Cloud Monitoring'), 'deploy doc monitoring optional');
+
+  const runbook = await readFile(
+    join(PROJECT_ROOT, 'docs/GROWLY_SALES_DAILY30_RUNBOOK.md'),
+    'utf-8'
+  );
+  assert(runbook.includes('Phase 30') || runbook.includes('実行ログ'), 'runbook phase30 section');
+
+  const cloudConfig = await readFile(join(SRC_ROOT, 'config/cloudDeployConfig.ts'), 'utf-8');
+  assert(cloudConfig.includes('CLOUD_LOGGING_FILTER'), 'logging filter constant');
+
+  const {
+    assertErrorMessageSafeDoesNotLeakSecrets,
+    getDaily30CloudErrorDefinition,
+    DAILY30_CLOUD_ERROR_CODES,
+  } = await import('../candidates/daily30CloudRunErrors.js');
+
+  for (const code of DAILY30_CLOUD_ERROR_CODES) {
+    const def = getDaily30CloudErrorDefinition(code);
+    assert(def.recoveryHint.length > 10, `recoveryHint for ${code}`);
+    assert(
+      assertErrorMessageSafeDoesNotLeakSecrets(def.errorMessageSafe),
+      `safe message for ${code}`
+    );
+    assert(
+      assertErrorMessageSafeDoesNotLeakSecrets(def.recoveryHint),
+      `safe recoveryHint for ${code}`
+    );
+  }
+
+  const { runDaily30CloudAutoFetch, buildDaily30CloudStatus } = await import(
+    '../candidates/runDaily30CloudAutoFetch.js'
+  );
+  const dry = await runDaily30CloudAutoFetch({ dryRun: true });
+  assert(dry.runId, 'dry run has runId');
+  assert(dry.status === 'skipped', 'dry run status skipped');
+  assert(dry.durationMs >= 0, 'dry run durationMs');
+  assert(dry.logsHint.includes('[daily30-cloud]'), 'dry run logsHint');
+  assert(!dry.logsHint.includes('Bearer'), 'logsHint no bearer');
+
+  const cloudStatus = await buildDaily30CloudStatus();
+  assert(cloudStatus.cloudLoggingFilter.includes('growly-sales-daily30'), 'status logging filter');
+  assert(cloudStatus.automationStatus, 'status automationStatus');
+
+  const leads = await loadLeadsFromJson(getLeadsJsonPath());
+  const sentSnapshot = leads
+    .filter((l) => l.sendStatus === 'sent' || l.sendStatus === 'manual_sent')
+    .map((l) => ({ id: l.id, sendStatus: l.sendStatus, replyStatus: l.replyStatus }));
+
+  const leadsAfter = await loadLeadsFromJson(getLeadsJsonPath());
+  for (const before of sentSnapshot) {
+    const after = leadsAfter.find((l) => l.id === before.id);
+    assert(after, `sent lead preserved phase30: ${before.id}`);
+    assert(after.sendStatus === before.sendStatus, `sendStatus unchanged phase30: ${before.id}`);
+    assert(after.replyStatus === before.replyStatus, `replyStatus unchanged phase30: ${before.id}`);
+  }
+
+  ok('Phase 30 Cloud run logging and recovery checks passed');
+}
+
 function verifyPhase20LiteEmailImprovement(): void {
   assert(MAX_ADDITIONAL_CONTACT_PAGES === 4, 'additional page limit is 4');
 
@@ -3168,6 +3558,10 @@ async function main(): Promise<void> {
   await verifyPhase24Daily30CopyPipeline();
   await verifyPhase25Daily30DraftImport();
   await verifyPhase26Daily30OperationsIntegration();
+  await verifyPhase27CloudDaily30AutoFetch();
+  await verifyPhase28CloudStorageBackend();
+  await verifyPhase29CloudSchedulerDeploy();
+  await verifyPhase30CloudRunLoggingAndRecovery();
   verifyPhase20LiteEmailImprovement();
   await verifyPhase20LiteEmailImprovementAsync();
   await verifyNoSendCode();

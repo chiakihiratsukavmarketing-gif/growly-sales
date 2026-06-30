@@ -96,6 +96,10 @@ export function getExternalCandidatesCsvPath(): string {
   return join(getGrowlySalesDataDir(), 'external-candidates.csv');
 }
 
+export function getDaily30CloudRunStatePath(): string {
+  return join(getGrowlySalesDataDir(), 'daily30-cloud-run-state.json');
+}
+
 export function getUiDistDir(): string {
   return join(getProjectRoot(), 'dist', 'ui');
 }

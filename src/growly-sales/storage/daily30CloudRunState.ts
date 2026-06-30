@@ -1,0 +1,149 @@
+import { DAILY30_CLOUD_RUN_STATE_JSON } from './jsonDocumentNames.js';
+import { readJsonDocument, writeJsonDocument } from './jsonDocumentStorage.js';
+import type { Daily30CloudErrorCode } from '../candidates/daily30CloudRunErrors.js';
+
+export type Daily30CloudRunMode = 'dry_run' | 'run' | 'already_ran' | 'blocked' | 'failed';
+export type Daily30CloudRunStatus = 'success' | 'failed' | 'skipped' | 'blocked';
+
+export interface Daily30CloudRunStateEntry {
+  runId: string;
+  batchId: string;
+  mode: Daily30CloudRunMode;
+  status: Daily30CloudRunStatus;
+  startedAt: string;
+  finishedAt: string;
+  /** @deprecated use finishedAt — kept for backward compatibility */
+  completedAt: string;
+  durationMs: number;
+  collected: number;
+  emailFound: number;
+  duplicates: number;
+  excluded: number;
+  nextArea?: string;
+  errorCode?: Daily30CloudErrorCode;
+  errorMessageSafe?: string;
+  recoveryHint?: string;
+  storageBackend: string;
+  schedulerConfigured: boolean;
+  cloudRunServiceUrlConfigured: boolean;
+  gcsBucketConfigured: boolean;
+  force: boolean;
+  message?: string;
+}
+
+export interface Daily30CloudRunStateStore {
+  runs: Record<string, Daily30CloudRunStateEntry>;
+  history: Daily30CloudRunStateEntry[];
+  updatedAt: string;
+  note: string;
+}
+
+const EMPTY_STORE: Daily30CloudRunStateStore = {
+  runs: {},
+  history: [],
+  updatedAt: new Date().toISOString(),
+  note: 'Daily 30 Cloud Scheduler 実行記録（同日二重実行ガード・失敗ログ）',
+};
+
+function normalizeEntry(raw: Partial<Daily30CloudRunStateEntry> & { batchId: string }): Daily30CloudRunStateEntry {
+  const finishedAt = raw.finishedAt ?? raw.completedAt ?? new Date().toISOString();
+  const startedAt = raw.startedAt ?? finishedAt;
+  return {
+    runId: raw.runId ?? `${raw.batchId}-legacy`,
+    batchId: raw.batchId,
+    mode: raw.mode ?? 'run',
+    status: raw.status ?? (raw.mode === 'run' ? 'success' : 'skipped'),
+    startedAt,
+    finishedAt,
+    completedAt: finishedAt,
+    durationMs: raw.durationMs ?? 0,
+    collected: raw.collected ?? 0,
+    emailFound: raw.emailFound ?? 0,
+    duplicates: raw.duplicates ?? 0,
+    excluded: raw.excluded ?? 0,
+    nextArea: raw.nextArea,
+    errorCode: raw.errorCode,
+    errorMessageSafe: raw.errorMessageSafe,
+    recoveryHint: raw.recoveryHint,
+    storageBackend: raw.storageBackend ?? 'local',
+    schedulerConfigured: raw.schedulerConfigured ?? false,
+    cloudRunServiceUrlConfigured: raw.cloudRunServiceUrlConfigured ?? false,
+    gcsBucketConfigured: raw.gcsBucketConfigured ?? false,
+    force: raw.force ?? false,
+    message: raw.message,
+  };
+}
+
+export async function loadDaily30CloudRunState(): Promise<Daily30CloudRunStateStore> {
+  try {
+    const raw = await readJsonDocument(DAILY30_CLOUD_RUN_STATE_JSON);
+    if (!raw) return { ...EMPTY_STORE, history: [] };
+    const parsed = JSON.parse(raw) as Daily30CloudRunStateStore;
+    const runs: Record<string, Daily30CloudRunStateEntry> = {};
+    for (const [key, entry] of Object.entries(parsed.runs ?? {})) {
+      runs[key] = normalizeEntry({ ...entry, batchId: entry.batchId ?? key });
+    }
+    const history = (parsed.history ?? Object.values(runs)).map((e) =>
+      normalizeEntry(e)
+    );
+    return {
+      ...EMPTY_STORE,
+      ...parsed,
+      runs,
+      history: history.sort((a, b) => b.finishedAt.localeCompare(a.finishedAt)),
+    };
+  } catch {
+    return { ...EMPTY_STORE, history: [] };
+  }
+}
+
+export async function saveDaily30CloudRunState(
+  store: Daily30CloudRunStateStore
+): Promise<void> {
+  const payload: Daily30CloudRunStateStore = {
+    ...store,
+    updatedAt: new Date().toISOString(),
+  };
+  await writeJsonDocument(DAILY30_CLOUD_RUN_STATE_JSON, JSON.stringify(payload, null, 2));
+}
+
+export async function getCloudRunEntryForBatch(
+  batchId: string
+): Promise<Daily30CloudRunStateEntry | null> {
+  const store = await loadDaily30CloudRunState();
+  return store.runs[batchId] ?? null;
+}
+
+/** 同日の成功した本番収集（mode=run, status=success）が記録済みか */
+export async function isBatchCloudRunCompleted(batchId: string): Promise<boolean> {
+  const entry = await getCloudRunEntryForBatch(batchId);
+  return entry !== null && entry.status === 'success' && entry.mode === 'run';
+}
+
+export function createCloudRunId(batchId: string): string {
+  return `${batchId}-${Date.now()}`;
+}
+
+export async function recordCloudRunEntry(entry: Daily30CloudRunStateEntry): Promise<void> {
+  const store = await loadDaily30CloudRunState();
+  store.history = [entry, ...store.history.filter((h) => h.runId !== entry.runId)].slice(0, 100);
+  if (entry.status === 'success' && entry.mode === 'run') {
+    store.runs[entry.batchId] = entry;
+  }
+  await saveDaily30CloudRunState(store);
+}
+
+/** @deprecated use recordCloudRunEntry */
+export async function recordCloudRunCompleted(
+  entry: Partial<Daily30CloudRunStateEntry> & { batchId: string }
+): Promise<void> {
+  await recordCloudRunEntry(normalizeEntry(entry));
+}
+
+export async function getLatestCloudRunEntry(): Promise<Daily30CloudRunStateEntry | null> {
+  const store = await loadDaily30CloudRunState();
+  if (store.history.length > 0) return store.history[0] ?? null;
+  const entries = Object.values(store.runs);
+  if (entries.length === 0) return null;
+  return [...entries].sort((a, b) => b.finishedAt.localeCompare(a.finishedAt))[0] ?? null;
+}

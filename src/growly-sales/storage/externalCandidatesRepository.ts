@@ -1,8 +1,11 @@
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { writeFile, mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import type { ExternalLeadCandidate, ExternalCandidatesStore } from '../adapters/externalLeadCandidateTypes.js';
 import { enrichExternalLeadCandidates } from '../candidates/enrichCandidateFields.js';
+import { isGcsStorageBackend } from '../config/storageBackend.js';
 import { getExternalCandidatesCsvPath, getExternalCandidatesJsonPath } from '../config/paths.js';
+import { EXTERNAL_CANDIDATES_JSON } from './jsonDocumentNames.js';
+import { readJsonDocument, writeJsonDocument } from './jsonDocumentStorage.js';
 
 const EMPTY_STORE: ExternalCandidatesStore = {
   candidates: [],
@@ -16,18 +19,19 @@ function escapeCsv(value: string): string {
 }
 
 export async function loadExternalCandidatesFromJson(
-  filePath = getExternalCandidatesJsonPath()
+  _filePath = getExternalCandidatesJsonPath()
 ): Promise<ExternalLeadCandidate[]> {
   try {
-    const raw = await readFile(filePath, 'utf-8');
-    const trimmed = raw.trim();
-    if (!trimmed) return [];
-    const parsed = JSON.parse(trimmed) as ExternalCandidatesStore | ExternalLeadCandidate[];
+    const raw = await readJsonDocument(EXTERNAL_CANDIDATES_JSON);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as ExternalCandidatesStore | ExternalLeadCandidate[];
     if (Array.isArray(parsed)) return enrichExternalLeadCandidates(parsed);
     if (parsed?.candidates) return enrichExternalLeadCandidates(parsed.candidates);
     return [];
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    if (!isGcsStorageBackend() && (err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return [];
+    }
     throw err;
   }
 }
@@ -37,13 +41,13 @@ export async function saveExternalCandidatesToJson(
   filePath = getExternalCandidatesJsonPath(),
   note = EMPTY_STORE.note
 ): Promise<void> {
-  await mkdir(dirname(filePath), { recursive: true });
+  void filePath;
   const store: ExternalCandidatesStore = {
     candidates,
     updatedAt: new Date().toISOString(),
     note,
   };
-  await writeFile(filePath, JSON.stringify(store, null, 2), 'utf-8');
+  await writeJsonDocument(EXTERNAL_CANDIDATES_JSON, JSON.stringify(store, null, 2));
 }
 
 export async function saveExternalCandidatesToCsv(
@@ -155,5 +159,7 @@ export async function saveExternalCandidatesToCsv(
 
 export async function persistExternalCandidates(candidates: ExternalLeadCandidate[]): Promise<void> {
   await saveExternalCandidatesToJson(candidates);
-  await saveExternalCandidatesToCsv(candidates);
+  if (!isGcsStorageBackend()) {
+    await saveExternalCandidatesToCsv(candidates);
+  }
 }
