@@ -13,8 +13,22 @@ export interface Daily30LeadCandidatesResponse {
   approvalPending: ExternalLeadCandidate[];
   approvedForLead: ExternalLeadCandidate[];
   approvalBlockHints?: Record<string, Daily30LeadApprovalBlockHint>;
+  humanExcludedCount?: number;
   generatedAt: string;
   note: string;
+}
+
+export interface ExcludeDaily30CandidateApiResponse {
+  ok: true;
+  candidateId: string;
+  pipelineStatus: ExternalLeadCandidate['pipelineStatus'];
+  importStatus: ExternalLeadCandidate['importStatus'];
+  humanReviewStatus: ExternalLeadCandidate['humanReviewStatus'];
+  excludedReason: string;
+  excludedAt: string;
+  candidate: ExternalLeadCandidate;
+  message?: string;
+  generatedAt?: string;
 }
 
 export interface Daily30GenerateCopyResponse {
@@ -76,7 +90,7 @@ export async function runDaily30GenerateCopy(
 export async function excludeDaily30CandidateApi(
   candidateId: string,
   reason: string
-): Promise<ExternalLeadCandidate> {
+): Promise<ExcludeDaily30CandidateApiResponse> {
   const res = await fetch(`${API_BASE}/api/daily30-candidates/exclude`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -87,6 +101,5 @@ export async function excludeDaily30CandidateApi(
       await readApiError(res, 'POST /api/daily30-candidates/exclude', '候補の除外に失敗しました')
     );
   }
-  const data = (await res.json()) as { candidate: ExternalLeadCandidate };
-  return data.candidate;
+  return (await res.json()) as ExcludeDaily30CandidateApiResponse;
 }

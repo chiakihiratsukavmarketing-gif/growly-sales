@@ -35,7 +35,8 @@ export function isDaily30BatchAccepted(c: ExternalLeadCandidate, batchId: string
     c.collectionBatchId === batchId &&
     c.pipelineStatus !== 'duplicate' &&
     c.pipelineStatus !== 'excluded' &&
-    c.importStatus !== 'duplicate'
+    c.importStatus !== 'duplicate' &&
+    c.importStatus !== 'excluded'
   );
 }
 

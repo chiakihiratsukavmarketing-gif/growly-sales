@@ -1,10 +1,23 @@
 import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTypes.js';
 import {
+  countDaily30HumanExcluded,
+  filterDaily30VisibleCandidates,
+  isDaily30CandidateVisibleInLists,
+  isDaily30HumanExcludedCandidate,
+} from '../candidates/daily30CandidateVisibility.js';
+import {
   loadExternalCandidatesFromJson,
   persistExternalCandidates,
   saveExternalCandidatesToJson,
 } from '../storage/externalCandidatesRepository.js';
 import { isGcsStorageBackend } from '../config/storageBackend.js';
+
+export {
+  countDaily30HumanExcluded,
+  filterDaily30VisibleCandidates,
+  isDaily30CandidateVisibleInLists,
+  isDaily30HumanExcludedCandidate,
+} from '../candidates/daily30CandidateVisibility.js';
 
 export class Daily30CandidateExcludeError extends Error {
   constructor(message: string) {
@@ -13,22 +26,22 @@ export class Daily30CandidateExcludeError extends Error {
   }
 }
 
-export function isDaily30HumanExcludedCandidate(candidate: ExternalLeadCandidate): boolean {
-  return candidate.importStatus === 'excluded' || candidate.excludedBy === 'human';
-}
-
-/** 通常の候補一覧に表示する候補（人間除外済みは非表示） */
-export function filterDaily30VisibleCandidates(
-  candidates: ExternalLeadCandidate[]
-): ExternalLeadCandidate[] {
-  return candidates.filter((c) => !isDaily30HumanExcludedCandidate(c));
+export interface ExcludeDaily30CandidateResult {
+  ok: true;
+  candidateId: string;
+  pipelineStatus: ExternalLeadCandidate['pipelineStatus'];
+  importStatus: ExternalLeadCandidate['importStatus'];
+  humanReviewStatus: ExternalLeadCandidate['humanReviewStatus'];
+  excludedReason: string;
+  excludedAt: string;
+  candidate: ExternalLeadCandidate;
 }
 
 export async function excludeDaily30Candidate(
   externalCandidateId: string,
   reason: string,
   jsonPath?: string
-): Promise<ExternalLeadCandidate> {
+): Promise<ExcludeDaily30CandidateResult> {
   const trimmedReason = reason.trim();
   if (!trimmedReason) {
     throw new Daily30CandidateExcludeError('除外理由を入力してください');
@@ -71,5 +84,15 @@ export async function excludeDaily30Candidate(
   } else {
     await persistExternalCandidates(candidates);
   }
-  return updated;
+
+  return {
+    ok: true,
+    candidateId: updated.externalCandidateId,
+    pipelineStatus: updated.pipelineStatus,
+    importStatus: updated.importStatus,
+    humanReviewStatus: updated.humanReviewStatus,
+    excludedReason: updated.excludedReason ?? trimmedReason,
+    excludedAt: updated.excludedAt ?? now,
+    candidate: updated,
+  };
 }

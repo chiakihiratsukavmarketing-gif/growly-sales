@@ -116,19 +116,21 @@ export function Daily30LeadCandidatesPanel({
   async function handleExclude(candidate: ExternalLeadCandidate): Promise<void> {
     const reason = confirmDaily30CandidateExclude(candidate);
     if (!reason) return;
-    setExcludingId(candidate.externalCandidateId);
+    const candidateId = candidate.externalCandidateId;
+    setExcludingId(candidateId);
+    setApprovalPending((prev) => prev.filter((c) => c.externalCandidateId !== candidateId));
+    setApprovedForLead((prev) => prev.filter((c) => c.externalCandidateId !== candidateId));
     try {
-      await excludeDaily30CandidateApi(candidate.externalCandidateId, reason);
-      setApprovalPending((prev) =>
-        prev.filter((c) => c.externalCandidateId !== candidate.externalCandidateId)
-      );
-      setApprovedForLead((prev) =>
-        prev.filter((c) => c.externalCandidateId !== candidate.externalCandidateId)
-      );
+      const result = await excludeDaily30CandidateApi(candidateId, reason);
+      if (!result.ok) {
+        throw new Error('候補の除外に失敗しました');
+      }
       onSuccess?.(`${candidate.companyName} を候補から除外しました`);
       onChanged?.();
+      await load();
     } catch (err) {
       onError(err instanceof Error ? err.message : '候補の除外に失敗しました');
+      await load();
     } finally {
       setExcludingId(null);
     }

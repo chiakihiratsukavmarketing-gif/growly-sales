@@ -131,15 +131,19 @@ export function GmailDraftCandidatesView({
       >
         <div className="gmail-candidate-main">
           <h4 className="pending-company">{candidate.companyName}</h4>
-          <p className="pending-meta">
-            To: {candidate.to} / 件名: {candidate.subject}
-          </p>
-          <EmailSourceDisplay
-            info={emailSourceInfoFromOutreachView({ ...candidate, to: candidate.to })}
-            variant="compact"
-            showWarnings
-            className="gmail-candidate-email-source"
-          />
+          <p className="pending-meta">件名: {candidate.subject}</p>
+          <div className="gmail-candidate-email-block">
+            <p className="pending-meta gmail-candidate-to">
+              <span className="daily30-field-label">メール</span>
+              <span title={candidate.to}>{candidate.to}</span>
+            </p>
+            <EmailSourceDisplay
+              info={emailSourceInfoFromOutreachView({ ...candidate, to: candidate.to })}
+              variant="under-email"
+              showWarnings
+              className="gmail-candidate-email-source"
+            />
+          </div>
           <div className="candidate-badges">
             <LeadStatusBadge kind="human" value={candidate.humanReviewStatus} />
           </div>

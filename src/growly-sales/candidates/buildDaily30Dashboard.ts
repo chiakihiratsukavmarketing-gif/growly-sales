@@ -16,6 +16,10 @@ import {
   type Daily30StoppedReason,
 } from './daily30BatchMetrics.js';
 import type { Daily30CloudRunStateEntry } from '../storage/daily30CloudRunState.js';
+import {
+  countDaily30HumanExcluded,
+  isDaily30CandidateVisibleInLists,
+} from './daily30CandidateVisibility.js';
 
 export interface Daily30Dashboard {
   batchId: string;
@@ -48,6 +52,7 @@ export interface Daily30Dashboard {
   draftImportPendingCount: number;
   needsReviewCount: number;
   excludedCount: number;
+  humanExcludedCount: number;
   shortfall: number;
   emailShortfall: number;
   nextExploreArea: string;
@@ -143,10 +148,13 @@ export function buildDaily30Dashboard(
 
   const emailFoundCount = accepted.filter((c) => c.pipelineStatus === 'email_found').length;
 
-  const leadApprovalPendingCount = accepted.filter(isDaily30LeadApprovalPending).length;
+  const leadApprovalPendingCount = todayAll.filter(isDaily30LeadApprovalPending).length;
 
-  const leadApprovalApprovedCount = accepted.filter(
-    (c) => c.importStatus === 'approved_for_lead'
+  const leadApprovalApprovedCount = todayAll.filter(
+    (c) =>
+      isDaily30CandidateVisibleInLists(c) &&
+      c.importStatus === 'approved_for_lead' &&
+      c.pipelineStatus !== 'excluded'
   ).length;
 
   const copyGeneratedCount = accepted.filter((c) => Boolean(c.copyGeneratedAt)).length;
@@ -159,9 +167,11 @@ export function buildDaily30Dashboard(
 
   const needsReviewCount = accepted.filter((c) => c.pipelineStatus === 'needs_review').length;
 
-  const excludedCount = accepted.filter(
+  const excludedCount = todayAll.filter(
     (c) => c.pipelineStatus === 'excluded' || c.importStatus === 'duplicate'
   ).length;
+
+  const humanExcludedCount = countDaily30HumanExcluded(todayAll);
 
   const approvedForCopyCount = accepted.filter(
     (c) => c.importStatus === 'approved_for_lead' && c.pipelineStatus === 'ready_for_copy'
@@ -231,6 +241,7 @@ export function buildDaily30Dashboard(
     draftImportPendingCount: importPendingCount,
     needsReviewCount,
     excludedCount,
+    humanExcludedCount,
     shortfall,
     emailShortfall,
     nextExploreArea: resolveNextExploreArea(regionCounts, emailShortfall),

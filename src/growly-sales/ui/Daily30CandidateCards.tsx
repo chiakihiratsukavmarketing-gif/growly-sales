@@ -166,7 +166,7 @@ export function Daily30CandidateCard({
           {email ? (
             <EmailSourceDisplay
               info={emailSource}
-              variant="compact"
+              variant="under-email"
               showWarnings
               className="daily30-email-source"
             />

@@ -2495,6 +2495,60 @@ body {
   font-weight: 600;
 }
 
+.email-source-under-email {
+  margin-top: 0.2rem;
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.email-source-head-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  align-items: baseline;
+  margin-bottom: 0.08rem;
+}
+
+.email-source-type-inline {
+  color: var(--text-primary, #111827);
+  font-size: 0.76rem;
+}
+
+.email-source-block {
+  margin-bottom: 0.2rem;
+}
+
+.email-source-block .email-source-link {
+  display: block;
+  margin-left: 0;
+  padding-left: 0;
+}
+
+.email-source-row-site {
+  margin-top: 0.15rem;
+}
+
+.gmail-candidate-email-block {
+  margin-top: 0.15rem;
+}
+
+.gmail-candidate-to {
+  display: flex;
+  gap: 0.35rem;
+  align-items: baseline;
+  margin-bottom: 0.1rem !important;
+}
+
+.gmail-candidate-to .daily30-field-label {
+  margin-bottom: 0;
+}
+
+.daily30-excluded-dev-list {
+  margin: 0.25rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.76rem;
+}
+
 .email-source-confirm-block {
   margin: 0.75rem 0;
   padding: 0.65rem 0.75rem;

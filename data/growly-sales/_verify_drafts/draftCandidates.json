@@ -1,12 +1,12 @@
 {
-  "exportedAt": "2026-07-01T02:48:03.876Z",
+  "exportedAt": "2026-07-01T03:46:59.328Z",
   "totalLeads": 2,
   "candidateCount": 1,
   "excludedCount": 1,
   "note": "Gmail下書きではなく手動確認用エクスポート。自動送信は行いません。",
   "candidates": [
     {
-      "leadId": "309cf425-ae73-481f-93d6-638760d22bf5",
+      "leadId": "551d50c9-f346-435d-a60a-634806bf7909",
       "companyName": "Export Test Co",
       "area": "宮城県仙台市",
       "industry": "工務店",
@@ -25,12 +25,12 @@
       "sourceUrls": [
         "https://export-test.example"
       ],
-      "exportedAt": "2026-07-01T02:48:03.876Z"
+      "exportedAt": "2026-07-01T03:46:59.328Z"
     }
   ],
   "excluded": [
     {
-      "leadId": "f8c02b6f-5291-4659-a053-1361c7d4e446",
+      "leadId": "6ba0dcad-3af2-42c8-89e2-89d117cecbf7",
       "companyName": "Export Test Co",
       "reason": "humanReviewStatus=pending（人間承認待ち）"
     }

@@ -4,7 +4,7 @@ import type { EmailOutreachCandidateView } from '../outreach/outreachPolicy.js';
 
 interface EmailSourceDisplayProps {
   info: EmailSourceDisplayInfo;
-  variant?: 'compact' | 'full' | 'inline';
+  variant?: 'compact' | 'full' | 'inline' | 'under-email';
   showEmail?: boolean;
   showOfficialSite?: boolean;
   showWarnings?: boolean;
@@ -61,6 +61,23 @@ function EmailSourceWarnings({ info }: { info: EmailSourceDisplayInfo }) {
   );
 }
 
+function EmailSourceHeadRow({
+  displayLabel,
+  confirmed,
+}: {
+  displayLabel: string;
+  confirmed: boolean;
+}) {
+  return (
+    <div className="email-source-head-row">
+      <span className="email-source-label">メール取得元</span>
+      <span className={`email-source-type-inline ${confirmed ? '' : 'email-source-missing'}`}>
+        {displayLabel}
+      </span>
+    </div>
+  );
+}
+
 export function EmailSourceDisplay({
   info,
   variant = 'compact',
@@ -72,16 +89,19 @@ export function EmailSourceDisplay({
   if (!info.email && !info.emailSourceUrl && !info.officialSiteUrl) return null;
 
   const displayLabel =
-    variant === 'compact' ? info.emailSourceCompactLabel : info.emailSourceLabel;
+    variant === 'compact' || variant === 'under-email'
+      ? info.emailSourceCompactLabel
+      : info.emailSourceLabel;
+  const confirmed = info.emailSourceConfirmed && Boolean(info.emailSourceUrl);
 
   if (variant === 'inline') {
     return (
       <span className={`email-source-inline ${className}`.trim()}>
         <span className="email-source-inline-label">メール取得元:</span>{' '}
-        {info.emailSourceConfirmed && info.emailSourceUrl ? (
+        {confirmed ? (
           <>
-            <span className="email-source-page-label">{displayLabel}</span>{' '}
-            <EmailSourceLink url={info.emailSourceUrl} />
+            <span className="email-source-type-inline">{displayLabel}</span>{' '}
+            <EmailSourceLink url={info.emailSourceUrl!} />
           </>
         ) : (
           <span className="email-source-missing">未確認</span>
@@ -90,36 +110,40 @@ export function EmailSourceDisplay({
     );
   }
 
+  if (variant === 'under-email') {
+    return (
+      <div className={`email-source-under-email ${className}`.trim()}>
+        <EmailSourceHeadRow displayLabel={confirmed ? displayLabel : '未確認'} confirmed={confirmed} />
+        {confirmed ? (
+          <EmailSourceLink url={info.emailSourceUrl!} />
+        ) : info.officialSiteUrl ? (
+          <span className="email-source-subhint">公式サイトURLのみ確認済み</span>
+        ) : null}
+        {showWarnings ? <EmailSourceWarnings info={info} /> : null}
+      </div>
+    );
+  }
+
   return (
     <div className={`email-source-display email-source-${variant} ${className}`.trim()}>
       {showEmail && info.email ? (
-        <div className="email-source-row">
+        <div className="email-source-row email-source-row-email">
           <span className="email-source-label">メール</span>
           <span className="email-source-value" title={info.email}>
             {info.email}
           </span>
         </div>
       ) : null}
-      <div className="email-source-row">
-        <span className="email-source-label">メール取得元</span>
-        <span className="email-source-value">
-          {info.emailSourceConfirmed && info.emailSourceUrl ? (
-            <>
-              <span className="email-source-page-label">{displayLabel}</span>
-              <EmailSourceLink url={info.emailSourceUrl} />
-            </>
-          ) : (
-            <>
-              <span className="email-source-missing">未確認</span>
-              {info.officialSiteUrl ? (
-                <span className="email-source-subhint">公式サイトURLのみ確認済み</span>
-              ) : null}
-            </>
-          )}
-        </span>
+      <div className="email-source-block">
+        <EmailSourceHeadRow displayLabel={confirmed ? displayLabel : '未確認'} confirmed={confirmed} />
+        {confirmed ? (
+          <EmailSourceLink url={info.emailSourceUrl!} />
+        ) : info.officialSiteUrl ? (
+          <span className="email-source-subhint">公式サイトURLのみ確認済み</span>
+        ) : null}
       </div>
       {showOfficialSite && info.officialSiteUrl ? (
-        <div className="email-source-row">
+        <div className="email-source-row email-source-row-site">
           <span className="email-source-label">公式サイト</span>
           <span className="email-source-value">
             <EmailSourceLink url={info.officialSiteUrl} />

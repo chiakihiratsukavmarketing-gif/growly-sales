@@ -1,4 +1,5 @@
 import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTypes.js';
+import { isDaily30CandidateVisibleInLists } from './daily30CandidateVisibility.js';
 
 function hasWebsiteUrl(candidate: ExternalLeadCandidate): boolean {
   return Boolean(candidate.websiteUrl?.trim() || candidate.officialSiteUrl?.trim());
@@ -26,6 +27,7 @@ function isNotExcludedPipeline(candidate: ExternalLeadCandidate): boolean {
 
 /** Daily 30: Lead化前レビュー対象（email_found・未取り込み・必須フィールドあり） */
 export function isDaily30LeadReviewCandidate(candidate: ExternalLeadCandidate): boolean {
+  if (!isDaily30CandidateVisibleInLists(candidate)) return false;
   if (candidate.pipelineStatus !== 'email_found') return false;
   if (!isNotImported(candidate)) return false;
   if (!isNotExcludedPipeline(candidate)) return false;
@@ -43,6 +45,7 @@ export function isDaily30LeadApprovalPending(candidate: ExternalLeadCandidate): 
 
 /** Lead化承認済み（営業文生成対象） */
 export function isDaily30LeadApproved(candidate: ExternalLeadCandidate): boolean {
+  if (!isDaily30CandidateVisibleInLists(candidate)) return false;
   return (
     candidate.importStatus === 'approved_for_lead' &&
     candidate.pipelineStatus === 'ready_for_copy' &&
@@ -52,6 +55,7 @@ export function isDaily30LeadApproved(candidate: ExternalLeadCandidate): boolean
 
 /** 営業文生成・品質チェックのパイプライン対象 */
 export function isDaily30CopyPipelineTarget(candidate: ExternalLeadCandidate): boolean {
+  if (!isDaily30CandidateVisibleInLists(candidate)) return false;
   if (candidate.importStatus !== 'approved_for_lead') return false;
   if (candidate.pipelineStatus === 'ready_for_draft') return false;
   if (candidate.pipelineStatus === 'duplicate' || candidate.pipelineStatus === 'excluded') {

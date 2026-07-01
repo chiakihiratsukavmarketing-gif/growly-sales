@@ -391,11 +391,12 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
 
     if (req.method === 'GET' && pathname === '/api/daily30-lead-candidates') {
       const candidates = await loadExternalCandidatesFromJson();
+      const visibleCandidates = filterDaily30VisibleCandidates(candidates);
       const leads = await loadLeadsOptionalForDaily30();
-      const reviewCandidates = selectDaily30LeadReviewCandidates(candidates);
-      const approvalPending = selectDaily30LeadApprovalPending(candidates);
-      const approvedForLead = candidates.filter(
-        (c) => c.importStatus === 'approved_for_lead' && !isDaily30HumanExcludedCandidate(c)
+      const reviewCandidates = selectDaily30LeadReviewCandidates(visibleCandidates);
+      const approvalPending = selectDaily30LeadApprovalPending(visibleCandidates);
+      const approvedForLead = visibleCandidates.filter(
+        (c) => c.importStatus === 'approved_for_lead'
       );
       const approvalBlockHints = buildDaily30LeadApprovalBlockHints(
         [...approvalPending, ...reviewCandidates],
@@ -407,6 +408,7 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
         approvalPending,
         approvedForLead,
         approvalBlockHints,
+        humanExcludedCount: candidates.filter(isDaily30HumanExcludedCandidate).length,
         generatedAt: new Date().toISOString(),
         note: 'Lead化候補一覧。leads.json への自動取り込みは行いません。',
       });
@@ -422,9 +424,9 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
         return;
       }
       try {
-        const candidate = await excludeDaily30Candidate(candidateId, reason);
+        const result = await excludeDaily30Candidate(candidateId, reason);
         sendJson(res, 200, {
-          candidate,
+          ...result,
           generatedAt: new Date().toISOString(),
           message: '候補を除外しました（論理削除・既存Leadは削除していません）',
         });

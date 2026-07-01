@@ -18,6 +18,7 @@ export interface Daily30DashboardResponse extends Daily30CloudDashboardPayload {
   plan: { target: number; areas: { prefecture: string; regionGroup: string }[]; note: string };
   approvalBlockHints?: Record<string, Daily30LeadApprovalBlockHint>;
   humanExcludedCount?: number;
+  humanExcludedCandidates?: ExternalLeadCandidate[];
   generatedAt: string;
   note: string;
 }

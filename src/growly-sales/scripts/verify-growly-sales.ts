@@ -4178,6 +4178,104 @@ async function verifyPhase381EmailSourceAndExclude(): Promise<void> {
   ok('Phase 38.1 email source normalization and candidate exclude checks passed');
 }
 
+async function verifyPhase382ExcludeRefreshAndEmailLayout(): Promise<void> {
+  const leadPanel = await readFile(join(SRC_ROOT, 'ui/Daily30LeadCandidatesPanel.tsx'), 'utf-8');
+  const cloudPanel = await readFile(join(SRC_ROOT, 'ui/Daily30CloudResultsPanel.tsx'), 'utf-8');
+  const emailUi = await readFile(join(SRC_ROOT, 'ui/EmailSourceDisplay.tsx'), 'utf-8');
+  const cards = await readFile(join(SRC_ROOT, 'ui/Daily30CandidateCards.tsx'), 'utf-8');
+  const selectSrc = await readFile(join(SRC_ROOT, 'candidates/selectDaily30LeadCandidates.ts'), 'utf-8');
+  const dashSrc = await readFile(join(SRC_ROOT, 'candidates/buildDaily30Dashboard.ts'), 'utf-8');
+  const uiServer = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
+  const excludeWorkflow = await readFile(join(SRC_ROOT, 'workflow/excludeDaily30Candidate.ts'), 'utf-8');
+
+  assert(leadPanel.includes('await load()'), 'lead panel reloads after exclude');
+  assert(leadPanel.includes('setApprovalPending'), 'lead panel optimistic remove on exclude');
+  assert(cloudPanel.includes('await load()'), 'cloud panel reloads after exclude');
+  assert(emailUi.includes('under-email'), 'email source under-email layout exists');
+  assert(emailUi.includes('メール取得元'), 'email source label unified');
+  assert(!emailUi.includes('取得先'), 'old 取得先 label removed from EmailSourceDisplay');
+  assert(cards.includes('variant="under-email"'), 'candidate cards use under-email layout');
+  assert(selectSrc.includes('isDaily30CandidateVisibleInLists'), 'select filters excluded via visibility helper');
+  assert(dashSrc.includes('humanExcludedCount'), 'dashboard tracks humanExcludedCount');
+  assert(uiServer.includes('filterDaily30VisibleCandidates'), 'lead-candidates API filters visible only');
+  assert(uiServer.includes('ok: true') || excludeWorkflow.includes('ok: true'), 'exclude API returns ok:true');
+  assert(excludeWorkflow.includes('humanReviewStatus'), 'exclude saves humanReviewStatus');
+
+  const {
+    isDaily30LeadApprovalPending,
+    selectDaily30LeadApprovalPending,
+  } = await import('../candidates/selectDaily30LeadCandidates.js');
+
+  const base = {
+    externalCandidateId: 'phase382-pending',
+    sourceType: 'google_places' as const,
+    companyName: '承認待ちテスト',
+    area: '宮城県',
+    industry: '工務店',
+    websiteUrl: 'https://phase382.test/',
+    officialSiteUrl: 'https://phase382.test/',
+    phoneNumber: null,
+    address: null,
+    googlePlaceId: null,
+    sourceUrl: null,
+    sourceQuery: 'q',
+    category: '工務店',
+    contactFormUrl: 'https://phase382.test/contact',
+    emailCandidates: ['info@phase382.test'],
+    confidenceScore: 0.8,
+    importStatus: 'preview' as const,
+    riskLevel: 'low' as const,
+    duplicateReason: '',
+    duplicateKey: 'k382',
+    pipelineStatus: 'email_found' as const,
+    prefecture: '宮城県',
+    regionGroup: '宮城' as const,
+    collectionPriority: 1,
+    collectionAreaSource: '宮城県',
+    collectionBatchId: '2099-01-01',
+    emailCandidateSourceUrls: ['https://phase382.test/contact'],
+    emailVerifiedAt: null,
+    generatedEmailSubject: null,
+    generatedEmailBody: null,
+    generatedCustomHook: null,
+    generatedCustomHookReason: null,
+    targetEmail: 'info@phase382.test',
+    emailCandidateSourceUrl: 'https://phase382.test/contact',
+    failureReason: null,
+    copyGeneratedAt: null,
+    qualityCheckedAt: null,
+    humanReviewStatus: null,
+    gmailDraftStatus: null,
+    sendStatus: null,
+    notes: '',
+    collectedAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  assert(isDaily30LeadApprovalPending(base), 'email_found candidate is approval pending');
+  const excluded = {
+    ...base,
+    externalCandidateId: 'phase382-excluded',
+    pipelineStatus: 'excluded' as const,
+    importStatus: 'excluded' as const,
+    humanReviewStatus: 'rejected' as const,
+    excludedAt: new Date().toISOString(),
+    excludedReason: '既存Lead重複',
+    excludedBy: 'human' as const,
+  };
+  assert(!isDaily30LeadApprovalPending(excluded), 'excluded candidate not approval pending');
+  const listed = selectDaily30LeadApprovalPending([base, excluded]);
+  assert(listed.length === 1 && listed[0].externalCandidateId === base.externalCandidateId, 'approval pending list excludes human-excluded');
+
+  const { buildDaily30Dashboard } = await import('../candidates/buildDaily30Dashboard.js');
+  const dash = buildDaily30Dashboard([base, excluded], [], '2099-01-01');
+  assert(dash.leadApprovalPendingCount === 1, 'dashboard leadApprovalPendingCount excludes human-excluded');
+  assert(dash.humanExcludedCount === 1, 'dashboard humanExcludedCount increments');
+
+  ok('Phase 38.2 exclude refresh and email layout checks passed');
+}
+
 function verifyPhase20LiteEmailImprovement(): void {
   assert(MAX_ADDITIONAL_CONTACT_PAGES === 4, 'additional page limit is 4');
 
@@ -4546,6 +4644,7 @@ async function main(): Promise<void> {
   await verifyPhase37PartialSuccessState();
   await verifyEmailSourceDisplay();
   await verifyPhase381EmailSourceAndExclude();
+  await verifyPhase382ExcludeRefreshAndEmailLayout();
   verifyPhase20LiteEmailImprovement();
   await verifyPhase20LiteEmailImprovementAsync();
   await verifyPhaseBLeadInventory();

@@ -100,9 +100,13 @@ export function Daily30CloudResultsPanel({
   async function handleExclude(candidate: ExternalLeadCandidate): Promise<void> {
     const reason = confirmDaily30CandidateExclude(candidate);
     if (!reason) return;
-    setExcludingId(candidate.externalCandidateId);
+    const candidateId = candidate.externalCandidateId;
+    setExcludingId(candidateId);
     try {
-      await excludeDaily30CandidateApi(candidate.externalCandidateId, reason);
+      const result = await excludeDaily30CandidateApi(candidateId, reason);
+      if (!result.ok) {
+        throw new Error('候補の除外に失敗しました');
+      }
       onSuccess?.(`${candidate.companyName} を候補から除外しました`);
       onChanged?.();
       await load();
@@ -271,6 +275,18 @@ export function Daily30CloudResultsPanel({
 
       {humanExcludedCount > 0 ? (
         <p className="hint daily30-excluded-hint">除外済み {humanExcludedCount}件（通常一覧には表示しません）</p>
+      ) : null}
+
+      {(data.humanExcludedCandidates?.length ?? 0) > 0 ? (
+        <DevDetails title={`除外済み候補（${data.humanExcludedCandidates!.length}件）`}>
+          <ul className="hint-list daily30-excluded-dev-list">
+            {data.humanExcludedCandidates!.map((c) => (
+              <li key={c.externalCandidateId}>
+                {c.companyName} — {c.excludedReason ?? '理由未記録'}（{c.excludedAt ?? '—'}）
+              </li>
+            ))}
+          </ul>
+        </DevDetails>
       ) : null}
 
       <section className="daily30-candidate-section">
