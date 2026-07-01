@@ -1,13 +1,17 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTypes.js';
 import { SectionCard } from './SectionCard.js';
 import { InfoBanner } from './InfoBanner.js';
+import { SummaryStatCard } from './SummaryStatCard.js';
 import {
   GENERATE_DAILY_30_COPY_GATE_LABEL,
   approveExternalCandidateForLead,
   fetchDaily30LeadCandidates,
   runDaily30GenerateCopy,
 } from './daily30CopyApi.js';
+import { confirmDaily30LeadApproval } from './confirmDaily30LeadApproval.js';
+import { Daily30CandidateList } from './Daily30CandidateCards.js';
+import { countDaily30LeadCopyWorkflow } from '../candidates/resolveDaily30WorkflowStatus.js';
 
 interface Daily30LeadCandidatesPanelProps {
   onError: (message: string) => void;
@@ -25,10 +29,25 @@ export function Daily30LeadCandidatesPanel({
   const [loading, setLoading] = useState(true);
   const [approvalPending, setApprovalPending] = useState<ExternalLeadCandidate[]>([]);
   const [approvedForLead, setApprovedForLead] = useState<ExternalLeadCandidate[]>([]);
+  const [approvalBlockHints, setApprovalBlockHints] = useState<
+    Record<string, { blockReason: string; duplicateLeadName?: string }>
+  >({});
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [gateInput, setGateInput] = useState('');
   const [generating, setGenerating] = useState(false);
   const [generateMessage, setGenerateMessage] = useState<string | null>(null);
+
+  const workflowCounts = useMemo(
+    () => countDaily30LeadCopyWorkflow([...approvalPending, ...approvedForLead]),
+    [approvalPending, approvedForLead]
+  );
+
+  const copyTargets = useMemo(
+    () => approvedForLead.filter(
+      (c) => c.pipelineStatus === 'ready_for_copy' || c.pipelineStatus === 'needs_review'
+    ),
+    [approvedForLead]
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -36,6 +55,7 @@ export function Daily30LeadCandidatesPanel({
       const data = await fetchDaily30LeadCandidates();
       setApprovalPending(data.approvalPending);
       setApprovedForLead(data.approvedForLead);
+      setApprovalBlockHints(data.approvalBlockHints ?? {});
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Lead化候補の読み込みに失敗しました');
     } finally {
@@ -48,14 +68,20 @@ export function Daily30LeadCandidatesPanel({
   }, [load, refreshKey]);
 
   async function handleApprove(candidate: ExternalLeadCandidate): Promise<void> {
+    if (!confirmDaily30LeadApproval(candidate)) return;
     setApprovingId(candidate.externalCandidateId);
     try {
       const updated = await approveExternalCandidateForLead(candidate.externalCandidateId);
       setApprovalPending((prev) =>
         prev.filter((c) => c.externalCandidateId !== updated.externalCandidateId)
       );
-      setApprovedForLead((prev) => [...prev.filter((c) => c.externalCandidateId !== updated.externalCandidateId), updated]);
-      onSuccess?.(`${updated.companyName} を Lead 化候補として承認しました（leads.json には未取り込み）`);
+      setApprovedForLead((prev) => [
+        ...prev.filter((c) => c.externalCandidateId !== updated.externalCandidateId),
+        updated,
+      ]);
+      onSuccess?.(
+        `${updated.companyName} を Lead 化候補として承認しました（leads.json には未取り込み）`
+      );
       onChanged?.();
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Lead化承認に失敗しました');
@@ -85,66 +111,54 @@ export function Daily30LeadCandidatesPanel({
   }
 
   const gateOk = gateInput.trim() === GENERATE_DAILY_30_COPY_GATE_LABEL;
-  const copyTargets = approvedForLead.filter(
-    (c) => c.pipelineStatus === 'ready_for_copy' || c.pipelineStatus === 'needs_review'
-  );
 
   if (loading) return <p className="loading">Lead化候補を読み込み中…</p>;
 
   return (
-    <SectionCard title="Daily 30 — Lead化承認・営業文生成" className="daily30-lead-candidates-card">
+    <SectionCard title="Lead化承認・営業文" className="daily30-lead-candidates-card">
       <InfoBanner variant="info">
-        email_found 候補を<strong>Lead化候補</strong>として承認します。承認後も leads.json
-        には書き込みません（下書き候補取り込みは別セクション）。営業文生成は{' '}
-        <code>{GENERATE_DAILY_30_COPY_GATE_LABEL}</code> 入力時のみ実行します。
+        メール取得済候補を確認してLead化承認します。承認のみでは leads.json に書き込みません。営業文生成はゲート入力時のみ（送信・下書き作成なし）。
       </InfoBanner>
 
-      <h3 className="subsection-title">Lead化承認待ち（{approvalPending.length}件）</h3>
-      {approvalPending.length === 0 ? (
-        <p className="hint">承認待ちの候補はありません。</p>
-      ) : (
-        <ul className="candidate-list">
-          {approvalPending.map((c) => (
-            <li key={c.externalCandidateId} className="candidate-list-item">
-              <div>
-                <strong>{c.companyName}</strong>
-                <span className="hint"> — {c.area} / {c.emailCandidates[0]}</span>
-              </div>
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                disabled={approvingId === c.externalCandidateId}
-                onClick={() => void handleApprove(c)}
-              >
-                {approvingId === c.externalCandidateId ? '承認中…' : 'Lead化を承認'}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <div className="stats-grid daily30-workflow-stats">
+        <SummaryStatCard value={workflowCounts.approvedLead} label="Lead化承認済み" highlight />
+        <SummaryStatCard
+          value={workflowCounts.copyPending}
+          label="営業文生成待ち"
+          highlight={workflowCounts.copyPending > 0}
+        />
+        <SummaryStatCard value={workflowCounts.copyGenerated} label="営業文生成済み" />
+        <SummaryStatCard
+          value={workflowCounts.qualityPassed}
+          label="品質チェック済み"
+          highlight={workflowCounts.qualityPassed > 0}
+        />
+      </div>
 
-      <h3 className="subsection-title">承認済み（営業文生成対象: {copyTargets.length}件）</h3>
-      {approvedForLead.length === 0 ? (
-        <p className="hint">承認済み候補はありません。</p>
-      ) : (
-        <ul className="candidate-list compact">
-          {approvedForLead.map((c) => (
-            <li key={c.externalCandidateId}>
-              {c.companyName} — {c.pipelineStatus}
-              {c.copyGeneratedAt ? ' / 営業文生成済' : ''}
-              {c.failureReason ? ` / ${c.failureReason}` : ''}
-            </li>
-          ))}
-        </ul>
-      )}
+      <h3 className="subsection-title">Lead化承認待ち（{approvalPending.length}件）</h3>
+      <Daily30CandidateList
+        candidates={approvalPending}
+        showApprove
+        approvingId={approvingId}
+        onApprove={(c) => void handleApprove(c)}
+        approvalBlockHints={approvalBlockHints}
+        emptyMessage="承認待ち候補はありません。セクション1で収集結果を確認してください。"
+      />
+
+      <h3 className="subsection-title">
+        承認済み・営業文対象（{approvedForLead.length}件）
+      </h3>
+      <Daily30CandidateList
+        candidates={approvedForLead}
+        emptyMessage="承認済み候補はありません。"
+      />
 
       <div className="daily30-generate-gate">
-        <label className="hint">
-          営業文生成・品質チェック — 確認のため <code>{GENERATE_DAILY_30_COPY_GATE_LABEL}</code> と入力
-        </label>
+        <h3 className="subsection-title">営業文生成</h3>
+        <p className="hint">対象 {copyTargets.length} 件 — ゲート語句を入力して実行</p>
         <div className="daily30-fetch-row">
           <input
-            className="input"
+            className="input input-sm"
             value={gateInput}
             onChange={(e) => setGateInput(e.target.value)}
             placeholder={GENERATE_DAILY_30_COPY_GATE_LABEL}
@@ -152,15 +166,15 @@ export function Daily30LeadCandidatesPanel({
           />
           <button
             type="button"
-            className="btn btn-primary"
+            className="btn btn-primary btn-sm"
             disabled={!gateOk || generating || copyTargets.length === 0}
             onClick={() => void handleGenerateCopy()}
           >
-            {generating ? '生成中…' : '営業文生成・品質チェック'}
+            {generating ? '生成中…' : '営業文生成'}
           </button>
         </div>
         {copyTargets.length === 0 && (
-          <p className="hint">先に Lead 化承認を行ってください。</p>
+          <p className="hint">先に Lead化承認を行ってください。</p>
         )}
         {generateMessage && <p className="hint success-text">{generateMessage}</p>}
       </div>

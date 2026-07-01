@@ -28,7 +28,7 @@ gcloud run deploy "$SERVICE" \
   --concurrency=1 \
   --timeout=900 \
   --no-allow-unauthenticated \
-  --set-env-vars="NODE_ENV=production,API_PRODUCTION_ENABLED=true,GROWLY_STORAGE_BACKEND=gcs,GROWLY_GCS_BUCKET=growly-sales-daily30,GROWLY_GCS_PREFIX=prod/growly-sales,GROWLY_CLOUD_SCHEDULER_CONFIGURED=true" \
+  --set-env-vars="NODE_ENV=production,API_PRODUCTION_ENABLED=true,GROWLY_STORAGE_BACKEND=gcs,GROWLY_GCS_BUCKET=growly-sales-daily30,GROWLY_GCS_PREFIX=prod/growly-sales,GROWLY_CLOUD_SCHEDULER_CONFIGURED=true,GROWLY_CLOUD_RUN_API_ONLY=true" \
   --set-secrets="DAILY30_CLOUD_RUN_TOKEN=daily30-cloud-run-token:latest,GOOGLE_PLACES_API_KEY=google-places-api-key:latest"
 
 CLOUD_RUN_URL=$(gcloud run services describe "$SERVICE" \

@@ -35,7 +35,7 @@ function saveMemo(key: string, text: string): void {
 }
 
 /** ブラウザ localStorage のみ。leads.json / communicationMemo には保存しない。 */
-export function WeeklyReviewMemoPanel() {
+export function WeeklyReviewMemoPanel({ compact = false }: { compact?: boolean }) {
   const thisWeekKey = useMemo(() => getIsoWeekKey(new Date()), []);
   const lastWeekKey = useMemo(() => {
     const d = new Date();
@@ -57,10 +57,46 @@ export function WeeklyReviewMemoPanel() {
     window.setTimeout(() => setSaved(false), 2000);
   }
 
+  if (compact) {
+    return (
+      <div className="weekly-review-memo-compact">
+        <div className="weekly-toggle weekly-toggle-compact">
+          <button
+            type="button"
+            className={`btn btn-secondary btn-xs ${weekKey === thisWeekKey ? 'active' : ''}`}
+            onClick={() => setWeekKey(thisWeekKey)}
+          >
+            今週
+          </button>
+          <button
+            type="button"
+            className={`btn btn-secondary btn-xs ${weekKey === lastWeekKey ? 'active' : ''}`}
+            onClick={() => setWeekKey(lastWeekKey)}
+          >
+            先週
+          </button>
+        </div>
+        <textarea
+          className="textarea weekly-review-textarea-compact"
+          rows={3}
+          value={memo}
+          onChange={(e) => setMemo(e.target.value)}
+          placeholder="今週の振り返りメモ（このブラウザのみ保存）"
+        />
+        <div className="daily-ops-log-actions">
+          <button type="button" className="btn btn-secondary btn-xs" onClick={handleSave}>
+            保存
+          </button>
+          {saved && <span className="hint success-text">保存しました</span>}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <SectionCard title="週次レビュー用メモ（ローカルのみ）" className="weekly-review-memo-panel">
       <p className="hint">
-        このブラウザにだけ保存されます（leads.json / communicationMemo には書き込みません）。
+        このブラウザにだけ保存されます（サーバーには送信しません）。
       </p>
       <div className="weekly-summary-header">
         <div className="weekly-toggle">

@@ -9,6 +9,7 @@ import { SectionCard } from './SectionCard.js';
 import { InfoBanner } from './InfoBanner.js';
 import { SummaryStatCard } from './SummaryStatCard.js';
 import { fetchDaily30Dashboard, type Daily30DashboardResponse } from './daily30Api.js';
+import { isDevApiErrorMessage } from './displayLabels.js';
 
 interface Daily30OperationsPanelProps {
   onError: (message: string) => void;
@@ -33,7 +34,8 @@ export function Daily30OperationsPanel({ onError, refreshKey = 0 }: Daily30Opera
       setOperations(result.operations ?? null);
       setAreaExpansion(result.areaExpansion);
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Daily 30 運用サマリーの読み込みに失敗しました');
+      const message = err instanceof Error ? err.message : 'Daily 30 運用サマリーの読み込みに失敗しました';
+      if (!isDevApiErrorMessage(message)) onError(message);
     } finally {
       setLoading(false);
     }

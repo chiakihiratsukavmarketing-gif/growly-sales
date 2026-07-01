@@ -20,7 +20,7 @@ const LABELS: Record<string, string> = {
   draft: '下書き',
   sent: '送信済',
   blocked: 'ブロック',
-  none: '—',
+  none: '未確認',
   no_reply: '返信なし',
   replied: '返信あり',
   interested: '興味あり',

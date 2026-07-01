@@ -1,22 +1,50 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Lead } from '../../types/lead.js';
 import { fetchLeads } from './api.js';
-import { fetchSalesAnalytics } from './salesAnalyticsApi.js';
-import { FollowUpList } from './FollowUpList.js';
-import { NextActionList } from './NextActionList.js';
-import { InfoBanner } from './InfoBanner.js';
-import { SectionCard } from './SectionCard.js';
 import { LeadStatusBadge } from './LeadStatusBadge.js';
+import { SectionCard } from './SectionCard.js';
+import { PageHeader } from './common/PageHeader.js';
+import { EmptyState } from './common/EmptyState.js';
+import { SearchAndFilterBar } from './common/SearchAndFilterBar.js';
+import { FilterEmptyState } from './common/FilterEmptyState.js';
+import {
+  classifyFollowUpDue,
+  filterByCompanyName,
+  FOLLOW_UP_FILTER_OPTIONS,
+  matchesFollowUpFilter,
+} from './leadFilterUtils.js';
+import type { SalesFlowTab } from './GrowlySalesDashboard.js';
 
 interface FollowUpDashboardViewProps {
   onError: (message: string) => void;
   refreshKey?: number;
+  onNavigateToTab?: (tab: SalesFlowTab) => void;
 }
 
-export function FollowUpDashboardView({ onError, refreshKey = 0 }: FollowUpDashboardViewProps) {
+function formatDue(lead: Lead): string {
+  if (!lead.followUpDueAt) return '日付未設定';
+  const d = new Date(lead.followUpDueAt);
+  if (Number.isNaN(d.getTime())) return '日付未設定';
+  return d.toLocaleDateString('ja-JP');
+}
+
+const BUCKET_LABELS: Record<string, string> = {
+  today: '今日対応',
+  overdue: '期限切れ',
+  this_week: '今週対応',
+  unset: '日付未設定',
+  no_action: '対応不要',
+};
+
+export function FollowUpDashboardView({
+  onError,
+  refreshKey = 0,
+  onNavigateToTab,
+}: FollowUpDashboardViewProps) {
   const [loading, setLoading] = useState(true);
-  const [analytics, setAnalytics] = useState<Awaited<ReturnType<typeof fetchSalesAnalytics>> | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const today = useMemo(() => {
     const d = new Date();
@@ -24,11 +52,31 @@ export function FollowUpDashboardView({ onError, refreshKey = 0 }: FollowUpDashb
     return d;
   }, []);
 
+  const contactedLeads = useMemo(
+    () =>
+      leads.filter(
+        (l) =>
+          (l.sendStatus === 'sent' || l.sendStatus === 'manual_sent') && !l.doNotContact
+      ),
+    [leads]
+  );
+
+  const filteredLeads = useMemo(() => {
+    let items = contactedLeads;
+    items = items.filter((l) => matchesFollowUpFilter(l, statusFilter, today));
+    items = filterByCompanyName(items, search, (l) => l.companyName);
+    return items;
+  }, [contactedLeads, statusFilter, search, today]);
+
+  const clearFilters = useCallback(() => {
+    setSearch('');
+    setStatusFilter('all');
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [data, allLeads] = await Promise.all([fetchSalesAnalytics(), fetchLeads()]);
-      setAnalytics(data);
+      const allLeads = await fetchLeads();
       setLeads(allLeads);
     } catch (err) {
       onError(err instanceof Error ? err.message : 'フォローアップ情報の読み込みに失敗しました');
@@ -41,92 +89,118 @@ export function FollowUpDashboardView({ onError, refreshKey = 0 }: FollowUpDashb
     void load();
   }, [load, refreshKey]);
 
-  if (loading) return <p className="loading">フォローアップを読み込み中…</p>;
-  if (!analytics) {
-    return <p className="hint">フォローアップ情報を取得できませんでした。</p>;
-  }
+  const grouped = useMemo(() => {
+    const map = new Map<string, Lead[]>();
+    for (const lead of filteredLeads) {
+      const bucket = classifyFollowUpDue(lead, today);
+      const list = map.get(bucket) ?? [];
+      list.push(lead);
+      map.set(bucket, list);
+    }
+    return map;
+  }, [filteredLeads, today]);
 
-  function classifyDue(lead: Lead): 'overdue' | 'today' | 'this_week' | 'unset' {
-    if (!lead.followUpDueAt) return 'unset';
-    const t = Date.parse(lead.followUpDueAt);
-    if (!Number.isFinite(t)) return 'unset';
-    const due = new Date(t);
-    due.setHours(0, 0, 0, 0);
-    const diffDays = Math.floor((due.getTime() - today.getTime()) / (24 * 3600 * 1000));
-    if (diffDays < 0) return 'overdue';
-    if (diffDays === 0) return 'today';
-    if (diffDays <= 7) return 'this_week';
-    return 'this_week';
-  }
+  if (loading) return <p className="loading">次の連絡を読み込み中…</p>;
 
-  const requestedReport = leads.filter(
-    (l) =>
-      (l.sendStatus === 'sent' || l.sendStatus === 'manual_sent') &&
-      l.replyStatus === 'requested_report' &&
-      !l.doNotContact
+  const followTargets = contactedLeads.filter(
+    (l) => l.nextAction === 'フォローアップ' || l.replyStatus === 'requested_report'
   );
-  const followUpTargets = leads.filter((l) => l.nextAction === 'フォローアップ' && !l.doNotContact);
-  const dueBuckets = {
-    today: followUpTargets.filter((l) => classifyDue(l) === 'today'),
-    overdue: followUpTargets.filter((l) => classifyDue(l) === 'overdue'),
-    thisWeek: followUpTargets.filter((l) => classifyDue(l) === 'this_week'),
-    unset: followUpTargets.filter((l) => classifyDue(l) === 'unset'),
-  };
 
-  const followUpActions = (analytics.analytics?.nextActionList ?? []).filter(
-    (item) =>
-      item.reason.includes('follow_up') ||
-      item.reason.includes('followUpDate') ||
-      item.reason.includes('interested')
-  );
+  const showBucketSections = statusFilter === 'all';
 
   return (
     <div className="follow-up-dashboard-view">
-      <InfoBanner variant="info">
-        フォローアップ対象の確認（読み取り専用）。自動送信は行いません。診断希望（requested_report）もここで見える化します。
-      </InfoBanner>
+      <PageHeader
+        title="次の連絡"
+        subtitle="次に連絡すべき Lead を確認します。自動送信は行いません。"
+      />
 
-      {requestedReport.length > 0 && (
-        <SectionCard title={`診断希望（${requestedReport.length}件）`} className="requested-report-card">
-          <InfoBanner variant="warning">
-            replyStatus=requested_report の Lead です。診断レポートは自動生成しません（次アクション整理のみ）。
-          </InfoBanner>
-          <ul className="policy-list compact">
-            {requestedReport.slice(0, 10).map((l) => (
+      <SearchAndFilterBar
+        searchValue={search}
+        onSearchChange={setSearch}
+        filterValue={statusFilter}
+        onFilterChange={setStatusFilter}
+        filterOptions={FOLLOW_UP_FILTER_OPTIONS}
+        resultCount={filteredLeads.length}
+        totalCount={contactedLeads.length}
+        onClear={clearFilters}
+      />
+
+      {contactedLeads.length === 0 ? (
+        <EmptyState
+          title="再連絡予定はありません"
+          nextHint="返信管理でフォロー予定日を設定すると、ここに表示されます。"
+          actionLabel="返信管理で設定する"
+          onAction={() => onNavigateToTab?.('reply-management')}
+        />
+      ) : filteredLeads.length === 0 ? (
+        <FilterEmptyState onClear={clearFilters} />
+      ) : showBucketSections ? (
+        <>
+          {(['today', 'overdue', 'this_week', 'unset', 'no_action'] as const).map((bucket) => {
+            const items = grouped.get(bucket) ?? [];
+            if (items.length === 0 && bucket !== 'unset') return null;
+            return (
+              <FollowBucket
+                key={bucket}
+                title={BUCKET_LABELS[bucket]}
+                items={items}
+                emptyLabel={`${BUCKET_LABELS[bucket]}はありません`}
+                highlight={bucket === 'overdue'}
+              />
+            );
+          })}
+        </>
+      ) : (
+        <SectionCard title={`${BUCKET_LABELS[statusFilter] ?? '一覧'}（${filteredLeads.length}件）`}>
+          <ul className="follow-up-filtered-list">
+            {filteredLeads.map((l) => (
               <li key={l.id}>
-                <strong>{l.companyName}</strong> / <LeadStatusBadge kind="send" value={l.replyStatus} />
+                <strong>{l.companyName}</strong>
+                <span className="follow-up-meta">
+                  {' '}
+                  · 予定 {formatDue(l)} · {l.nextAction || '—'}
+                </span>
               </li>
             ))}
           </ul>
         </SectionCard>
       )}
 
-      <SectionCard title="followUpDueAt アラート" className="followup-due-alerts">
-        <p className="hint">今日以前（期限切れ/今日対応）を優先してください。</p>
-        <div className="stats-grid">
-          <div className="stat-card highlight">
-            <div className="stat-value">{dueBuckets.today.length}</div>
-            <div className="stat-label">今日対応</div>
-          </div>
-          <div className="stat-card highlight">
-            <div className="stat-value">{dueBuckets.overdue.length}</div>
-            <div className="stat-label">期限超過</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-value">{dueBuckets.thisWeek.length}</div>
-            <div className="stat-label">今週対応</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-value">{dueBuckets.unset.length}</div>
-            <div className="stat-label">期限未設定</div>
-          </div>
-        </div>
-      </SectionCard>
-
-      <FollowUpList items={analytics.analytics?.followUpList ?? []} />
-      <SectionCard title="フォローアップ優先アクション" className="analytics-section">
-        <NextActionList items={followUpActions} />
-      </SectionCard>
+      {followTargets.length > 0 && statusFilter === 'all' && search === '' && (
+        <p className="hint">
+          フォロー対象 {followTargets.length} 件（日付未設定は返信管理タブから予定日を設定できます）
+        </p>
+      )}
     </div>
+  );
+}
+
+function FollowBucket({
+  title,
+  items,
+  emptyLabel,
+  highlight,
+}: {
+  title: string;
+  items: Lead[];
+  emptyLabel: string;
+  highlight?: boolean;
+}) {
+  return (
+    <SectionCard title={`${title}（${items.length}件）`} className={highlight ? 'follow-bucket-attn' : ''}>
+      {items.length === 0 ? (
+        <p className="hint">{emptyLabel}</p>
+      ) : (
+        <ul className="follow-up-simple-list">
+          {items.map((l) => (
+            <li key={l.id}>
+              <strong>{l.companyName}</strong>
+              <span className="follow-up-meta"> · 予定 {formatDue(l)} · {l.nextAction || '—'}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </SectionCard>
   );
 }

@@ -1,7 +1,7 @@
 {
   "leads": [
     {
-      "id": "731f5036-6554-4f66-bd02-72f144c05849",
+      "id": "51040b17-26a6-49ed-8c49-189ce729308e",
       "instagramUrl": null,
       "emailCandidates": [],
       "emailCandidateSourceUrls": [],
@@ -14,7 +14,7 @@
       "caseStudyUrl": null,
       "companyProfileUrl": null,
       "sourceUrls": [
-        "https://reply-ui.test"
+        "https://follow-unset.test"
       ],
       "leadScore": "UNKNOWN",
       "salesAngle": "",
@@ -27,23 +27,23 @@
       "emailBody": "",
       "reviewStatus": "pending",
       "reviewComment": "",
-      "nextAction": "フォローアップ",
+      "nextAction": "対象外",
       "collectionStatus": "pending",
       "humanReviewStatus": "pending",
       "sendStatus": "sent",
       "replyStatus": "replied",
       "manualSentAt": null,
       "manualSendMethod": null,
-      "replyReceivedAt": "2026-06-29T15:05:48.472Z",
-      "repliedAt": "2026-06-29T15:05:48.472Z",
-      "replyMemo": "希望の返信あり",
-      "replySummary": "希望の返信あり",
-      "followUpDate": "2026-07-01",
-      "followUpDueAt": "2026-07-01",
+      "replyReceivedAt": null,
+      "repliedAt": null,
+      "replyMemo": "テスト",
+      "replySummary": "テスト",
+      "followUpDate": null,
+      "followUpDueAt": null,
       "followUpMemo": "",
       "dealStatus": "none",
       "outcomeMemo": "",
-      "communicationMemo": "返信管理UI更新 / replyStatus:none→replied / replySummary:更新 / repliedAt:（なし）→2026-06-29T15:05:48.472Z / followUpDueAt:（なし）→2026-07-01 / nextAction:返信待ち→フォローアップ",
+      "communicationMemo": "返信管理UI更新 / nextAction:フォローアップ→対象外",
       "gmailDraftStatus": "none",
       "gmailDraftId": null,
       "gmailDraftCreatedAt": null,
@@ -58,13 +58,13 @@
       "collectionBatchId": null,
       "source": null,
       "daily30PipelineStatus": null,
-      "createdAt": "2026-06-29T15:05:48.470Z",
-      "updatedAt": "2026-06-29T15:05:48.472Z",
-      "companyName": "Reply UI Test",
+      "createdAt": "2026-07-01T01:33:53.846Z",
+      "updatedAt": "2026-07-01T01:33:53.847Z",
+      "companyName": "Follow Up Unset Co",
       "area": "仙台市",
       "industry": "工務店",
-      "websiteUrl": "https://reply-ui.test"
+      "websiteUrl": "https://follow-unset.test"
     }
   ],
-  "updatedAt": "2026-06-29T15:05:48.473Z"
+  "updatedAt": "2026-07-01T01:33:53.847Z"
 }

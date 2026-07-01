@@ -14,25 +14,42 @@ import {
   type Daily30AreaSpec,
 } from './daily30AreaConfig.js';
 import {
+  DAILY_30_MAX_COLLECTED_CANDIDATES,
+  DAILY_30_MAX_DURATION_MS,
   DAILY_30_MAX_EMAIL_CHECKS,
-  DAILY_30_TARGET,
+  DAILY_30_MAX_PLACES_RESULTS,
+  DAILY_30_TARGET_EMAIL_FOUND,
 } from './daily30CandidateStatus.js';
+import {
+  countDaily30BatchMetrics,
+  resolveDaily30StoppedReason,
+  type Daily30StoppedReason,
+} from './daily30BatchMetrics.js';
 import { applyDaily30DuplicateStatus } from './daily30Dedupe.js';
 import { enrichCandidateEmailFromWebsite } from './enrichCandidateEmailFromWebsite.js';
 
 export interface Daily30FetchStats {
   batchId: string;
   target: number;
+  targetEmailFound: number;
   queriesRun: number;
   placesResults: number;
   webResults: number;
   rawCandidates: number;
   acceptedNew: number;
-  duplicates: number;
+  collected: number;
+  totalCollected: number;
   emailFound: number;
+  formOnly: number;
+  noEmail: number;
   emailNotFound: number;
+  excluded: number;
+  duplicates: number;
   emailChecksRun: number;
   areasUsed: string[];
+  reachedTarget: boolean;
+  stoppedReason: Daily30StoppedReason;
+  durationMs: number;
 }
 
 function extractCompanyNameFromWebResult(title: string, url: string): string {
@@ -46,13 +63,17 @@ function extractCompanyNameFromWebResult(title: string, url: string): string {
   }
 }
 
-function isAcceptedToday(candidate: ExternalLeadCandidate, batchId: string): boolean {
-  return (
-    candidate.collectionBatchId === batchId &&
-    candidate.pipelineStatus !== 'duplicate' &&
-    candidate.pipelineStatus !== 'excluded' &&
-    candidate.importStatus !== 'duplicate'
-  );
+function upsertCandidate(
+  list: ExternalLeadCandidate[],
+  updated: ExternalLeadCandidate
+): ExternalLeadCandidate[] {
+  const idx = list.findIndex((c) => c.externalCandidateId === updated.externalCandidateId);
+  if (idx >= 0) {
+    const next = [...list];
+    next[idx] = updated;
+    return next;
+  }
+  return [...list, updated];
 }
 
 async function fetchAreaCandidates(
@@ -125,6 +146,58 @@ async function fetchAreaCandidates(
   return { raw, queriesRun: queries.length, placesResults, webResults };
 }
 
+function shouldStopCollection(input: {
+  metrics: ReturnType<typeof countDaily30BatchMetrics>;
+  startedMs: number;
+  placesResults: number;
+}): Daily30StoppedReason | null {
+  if (input.metrics.reachedTarget) return 'target_email_found_reached';
+  if (input.metrics.totalCollected >= DAILY_30_MAX_COLLECTED_CANDIDATES) {
+    return 'max_candidates_reached';
+  }
+  if (Date.now() - input.startedMs >= DAILY_30_MAX_DURATION_MS) return 'max_duration_reached';
+  if (input.placesResults >= DAILY_30_MAX_PLACES_RESULTS) return 'max_places_requests_reached';
+  return null;
+}
+
+async function verifyPendingBatchCandidates(input: {
+  workingCandidates: ExternalLeadCandidate[];
+  batchId: string;
+  verifyEmails: boolean;
+  startedMs: number;
+  placesResults: number;
+  emailChecksRun: number;
+}): Promise<{ workingCandidates: ExternalLeadCandidate[]; emailChecksRun: number }> {
+  let { workingCandidates, emailChecksRun } = input;
+  if (!input.verifyEmails) return { workingCandidates, emailChecksRun };
+
+  const pending = workingCandidates.filter(
+    (c) =>
+      c.collectionBatchId === input.batchId &&
+      !c.emailVerifiedAt &&
+      c.pipelineStatus !== 'duplicate' &&
+      c.pipelineStatus !== 'excluded' &&
+      c.websiteUrl
+  );
+
+  for (const candidate of pending) {
+    const metrics = countDaily30BatchMetrics(workingCandidates, input.batchId);
+    const stop = shouldStopCollection({
+      metrics,
+      startedMs: input.startedMs,
+      placesResults: input.placesResults,
+    });
+    if (stop) break;
+    if (emailChecksRun >= DAILY_30_MAX_EMAIL_CHECKS) break;
+
+    const verified = await enrichCandidateEmailFromWebsite(candidate);
+    emailChecksRun++;
+    workingCandidates = upsertCandidate(workingCandidates, verified);
+  }
+
+  return { workingCandidates, emailChecksRun };
+}
+
 export async function fetchDaily30Candidates(
   profile: TargetProfile,
   existingLeads: Lead[],
@@ -135,20 +208,81 @@ export async function fetchDaily30Candidates(
     throw new Error('API_PRODUCTION_ENABLED is not true');
   }
 
+  const startedMs = Date.now();
   const batchId = options?.batchId ?? todayBatchId();
   const verifyEmails = options?.verifyEmails !== false;
 
-  const alreadyToday = existingCandidates.filter((c) => isAcceptedToday(c, batchId)).length;
-  let needed = Math.max(0, DAILY_30_TARGET - alreadyToday);
-
-  const allNewRaw: ExternalLeadCandidate[] = [];
+  let workingCandidates = [...existingCandidates];
+  const initialCount = workingCandidates.length;
   let queriesRun = 0;
   let placesResults = 0;
   let webResults = 0;
   const areasUsed: string[] = [];
+  let emailChecksRun = 0;
+  let stoppedReason: Daily30StoppedReason = 'source_exhausted';
+  let areasExhausted = false;
+
+  const beforeMetrics = countDaily30BatchMetrics(workingCandidates, batchId);
+  if (beforeMetrics.reachedTarget) {
+    stoppedReason = 'target_email_found_reached';
+    return {
+      candidates: workingCandidates,
+      stats: buildFetchStats({
+        batchId,
+        workingCandidates,
+        initialCount,
+        queriesRun,
+        placesResults,
+        webResults,
+        areasUsed,
+        emailChecksRun,
+        stoppedReason,
+        startedMs,
+      }),
+    };
+  }
+
+  ({ workingCandidates, emailChecksRun } = await verifyPendingBatchCandidates({
+    workingCandidates,
+    batchId,
+    verifyEmails,
+    startedMs,
+    placesResults,
+    emailChecksRun,
+  }));
+
+  let earlyStop = shouldStopCollection({
+    metrics: countDaily30BatchMetrics(workingCandidates, batchId),
+    startedMs,
+    placesResults,
+  });
+  if (earlyStop) {
+    stoppedReason = earlyStop;
+    return {
+      candidates: workingCandidates,
+      stats: buildFetchStats({
+        batchId,
+        workingCandidates,
+        initialCount,
+        queriesRun,
+        placesResults,
+        webResults,
+        areasUsed,
+        emailChecksRun,
+        stoppedReason,
+        startedMs,
+      }),
+    };
+  }
 
   for (const area of DAILY_30_AREA_EXPANSION) {
-    if (needed <= 0) break;
+    const metricsBeforeArea = countDaily30BatchMetrics(workingCandidates, batchId);
+    const limitStop = shouldStopCollection({ metrics: metricsBeforeArea, startedMs, placesResults });
+    if (limitStop) {
+      stoppedReason = limitStop;
+      break;
+    }
+
     areasUsed.push(area.prefecture);
 
     const { raw, queriesRun: q, placesResults: p, webResults: w } = await fetchAreaCandidates(
@@ -161,72 +295,128 @@ export async function fetchDaily30Candidates(
     webResults += w;
 
     const deduped = dedupeExternalCandidates(raw);
-    const withDupes = applyDaily30DuplicateStatus(deduped, existingLeads, [
-      ...existingCandidates,
-      ...allNewRaw,
-    ]);
-
+    const withDupes = applyDaily30DuplicateStatus(deduped, existingLeads, workingCandidates);
     const accepted = withDupes.filter(
       (c) => c.pipelineStatus !== 'duplicate' && c.importStatus !== 'duplicate'
     );
-    allNewRaw.push(...accepted.slice(0, needed));
-    needed = Math.max(0, DAILY_30_TARGET - alreadyToday - allNewRaw.length);
-  }
 
-  let emailChecksRun = 0;
-  let emailFound = 0;
-  let emailNotFound = 0;
-  const enriched: ExternalLeadCandidate[] = [];
+    const metrics = countDaily30BatchMetrics(workingCandidates, batchId);
+    const room = DAILY_30_MAX_COLLECTED_CANDIDATES - metrics.totalCollected;
+    const toAdd = enrichExternalLeadCandidates(accepted.slice(0, Math.max(0, room)));
 
-  for (const candidate of allNewRaw) {
-    if (verifyEmails && emailChecksRun < DAILY_30_MAX_EMAIL_CHECKS && candidate.websiteUrl) {
-      const verified = await enrichCandidateEmailFromWebsite(candidate);
-      emailChecksRun++;
-      if (verified.pipelineStatus === 'email_found') emailFound++;
-      else if (verified.pipelineStatus === 'email_not_found') emailNotFound++;
-      enriched.push(verified);
-    } else {
-      enriched.push(candidate);
+    for (const c of toAdd) {
+      workingCandidates = upsertCandidate(workingCandidates, c);
+    }
+
+    ({ workingCandidates, emailChecksRun } = await verifyPendingBatchCandidates({
+      workingCandidates,
+      batchId,
+      verifyEmails,
+      startedMs,
+      placesResults,
+      emailChecksRun,
+    }));
+
+    const afterArea = shouldStopCollection({
+      metrics: countDaily30BatchMetrics(workingCandidates, batchId),
+      startedMs,
+      placesResults,
+    });
+    if (afterArea) {
+      stoppedReason = afterArea;
+      break;
     }
   }
 
-  const duplicatesInBatch = enriched.filter(
-    (c) => c.pipelineStatus === 'duplicate' || c.importStatus === 'duplicate'
-  ).length;
+  if (areasUsed.length >= DAILY_30_AREA_EXPANSION.length) {
+    areasExhausted = true;
+  }
 
-  const mergedMap = new Map(existingCandidates.map((c) => [c.externalCandidateId, c]));
-  for (const c of enrichExternalLeadCandidates(enriched)) {
-    mergedMap.set(c.externalCandidateId, c);
+  const finalMetrics = countDaily30BatchMetrics(workingCandidates, batchId);
+  if (finalMetrics.reachedTarget) {
+    stoppedReason = 'target_email_found_reached';
+  } else if (stoppedReason === 'source_exhausted') {
+    stoppedReason = resolveDaily30StoppedReason({
+      metrics: finalMetrics,
+      durationMs: Date.now() - startedMs,
+      placesResults,
+      areasExhausted,
+      areasUsedCount: areasUsed.length,
+      totalAreas: DAILY_30_AREA_EXPANSION.length,
+    });
   }
 
   return {
-    candidates: Array.from(mergedMap.values()),
-    stats: {
+    candidates: workingCandidates,
+    stats: buildFetchStats({
       batchId,
-      target: DAILY_30_TARGET,
+      workingCandidates,
+      initialCount,
       queriesRun,
       placesResults,
       webResults,
-      rawCandidates: allNewRaw.length,
-      acceptedNew: enriched.filter((c) => isAcceptedToday(c, batchId)).length,
-      duplicates: duplicatesInBatch,
-      emailFound,
-      emailNotFound,
-      emailChecksRun,
       areasUsed,
-    },
+      emailChecksRun,
+      stoppedReason,
+      startedMs,
+    }),
+  };
+}
+
+function buildFetchStats(input: {
+  batchId: string;
+  workingCandidates: ExternalLeadCandidate[];
+  initialCount: number;
+  queriesRun: number;
+  placesResults: number;
+  webResults: number;
+  areasUsed: string[];
+  emailChecksRun: number;
+  stoppedReason: Daily30StoppedReason;
+  startedMs: number;
+}): Daily30FetchStats {
+  const metrics = countDaily30BatchMetrics(input.workingCandidates, input.batchId);
+  const acceptedNew = Math.max(0, input.workingCandidates.length - input.initialCount);
+  const emailNotFound = metrics.noEmail + metrics.formOnly;
+
+  return {
+    batchId: input.batchId,
+    target: DAILY_30_TARGET_EMAIL_FOUND,
+    targetEmailFound: DAILY_30_TARGET_EMAIL_FOUND,
+    queriesRun: input.queriesRun,
+    placesResults: input.placesResults,
+    webResults: input.webResults,
+    rawCandidates: acceptedNew,
+    acceptedNew,
+    collected: metrics.totalCollected,
+    totalCollected: metrics.totalCollected,
+    emailFound: metrics.emailFound,
+    formOnly: metrics.formOnly,
+    noEmail: metrics.noEmail,
+    emailNotFound,
+    excluded: metrics.excluded,
+    duplicates: metrics.duplicates,
+    emailChecksRun: input.emailChecksRun,
+    areasUsed: input.areasUsed,
+    reachedTarget: metrics.reachedTarget,
+    stoppedReason: input.stoppedReason,
+    durationMs: Date.now() - input.startedMs,
   };
 }
 
 /** dry-run: エリア拡大プランのみ（外部APIなし） */
 export function buildDaily30FetchPlan(): {
   target: number;
+  targetEmailFound: number;
+  maxCollectedCandidates: number;
   areas: Daily30AreaSpec[];
   note: string;
 } {
   return {
-    target: DAILY_30_TARGET,
+    target: DAILY_30_TARGET_EMAIL_FOUND,
+    targetEmailFound: DAILY_30_TARGET_EMAIL_FOUND,
+    maxCollectedCandidates: DAILY_30_MAX_COLLECTED_CANDIDATES,
     areas: [...DAILY_30_AREA_EXPANSION],
-    note: '宮城で不足時に福島→北関東（茨城→栃木→群馬）へ拡大。FETCH_DAILY_30 明示時のみ実行。',
+    note: '宮城で email_found 不足時に福島→北関東（茨城→栃木→群馬）へ拡大。FETCH_DAILY_30 明示時のみ実行。',
   };
 }

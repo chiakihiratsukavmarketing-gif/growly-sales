@@ -33,12 +33,36 @@ export function isOutreachNextAction(value: string): value is OutreachNextAction
   return (OUTREACH_NEXT_ACTIONS as readonly string[]).includes(value);
 }
 
+/** 返信管理UIで保存可能な nextAction（既存4種 + 要確認） */
+export const REPLY_MANAGEMENT_NEXT_ACTIONS = [
+  ...OUTREACH_NEXT_ACTIONS,
+  '要確認',
+] as const;
+
+export type ReplyManagementNextAction = (typeof REPLY_MANAGEMENT_NEXT_ACTIONS)[number];
+
+export function isReplyManagementNextAction(value: string): value is ReplyManagementNextAction {
+  return (REPLY_MANAGEMENT_NEXT_ACTIONS as readonly string[]).includes(value);
+}
+
+/** 保存済み nextAction を優先（フォロー日未設定・フォロー対象の判定用） */
+export function resolveNextActionForLead(lead: Lead): string {
+  const stored = lead.nextAction?.trim();
+  if (stored && isReplyManagementNextAction(stored)) {
+    return stored;
+  }
+  return inferNextActionForLead(lead);
+}
+
 export function inferNextActionForLead(lead: Lead): OutreachNextAction {
   if (lead.doNotContact || lead.replyStatus === 'declined' || lead.replyStatus === 'not_interested') {
     return '対象外';
   }
   if (lead.replyStatus === 'requested_report') {
     return '診断レポート作成';
+  }
+  if (lead.replyStatus === 'no_reply' || lead.replyStatus === 'bounced') {
+    return '対象外';
   }
   if (
     lead.replyStatus === 'replied' ||
@@ -66,11 +90,24 @@ export function isFollowUpOnlySentLead(lead: Lead): boolean {
 
 export function isAwaitingReplyLead(lead: Lead): boolean {
   return (
-    lead.sendStatus === 'sent' &&
+    (lead.sendStatus === 'sent' || lead.sendStatus === 'manual_sent') &&
     lead.replyStatus === 'none' &&
     !lead.doNotContact &&
     inferNextActionForLead(lead) === '返信待ち'
   );
+}
+
+export function needsFollowUpDateSetup(lead: Lead): boolean {
+  return (
+    !lead.doNotContact &&
+    (lead.sendStatus === 'sent' || lead.sendStatus === 'manual_sent') &&
+    resolveNextActionForLead(lead) === 'フォローアップ' &&
+    !lead.followUpDueAt?.trim()
+  );
+}
+
+export function isReplyManagementListLead(lead: Lead): boolean {
+  return isAwaitingReplyLead(lead) || needsFollowUpDateSetup(lead);
 }
 
 export function countAwaitingReplyLeads(leads: Lead[]): number {
@@ -108,11 +145,11 @@ export function applyReplyManagementUpdate(lead: Lead, update: ReplyManagementUp
 
   if (update.replyStatus !== undefined) {
     next.replyStatus = update.replyStatus;
-    if (update.replyStatus !== 'none' && !update.repliedAt) {
+    if (update.replyStatus !== 'none' && update.replyStatus !== 'no_reply' && !update.repliedAt) {
       next.repliedAt = now;
       next.replyReceivedAt = now;
     }
-    if (update.replyStatus === 'none') {
+    if (update.replyStatus === 'none' || update.replyStatus === 'no_reply') {
       next.repliedAt = null;
       next.replyReceivedAt = null;
     }
@@ -131,6 +168,9 @@ export function applyReplyManagementUpdate(lead: Lead, update: ReplyManagementUp
   if (update.followUpDueAt !== undefined) {
     next.followUpDueAt = update.followUpDueAt;
     next.followUpDate = update.followUpDueAt;
+  } else if (update.nextAction === '対象外') {
+    next.followUpDueAt = null;
+    next.followUpDate = null;
   }
 
   if (update.communicationMemo !== undefined) {

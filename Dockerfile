@@ -20,6 +20,7 @@ RUN npm run growly-sales:ui:build
 ENV NODE_ENV=production
 # Cloud Run sets PORT; uiServer reads PORT then GROWLY_UI_PORT
 ENV GROWLY_STORAGE_BACKEND=gcs
+ENV GROWLY_CLOUD_RUN_API_ONLY=true
 
 EXPOSE 8080
 

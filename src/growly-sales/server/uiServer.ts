@@ -2,10 +2,12 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { loadTargetProfile } from '../config/targetProfile.js';
+import { loadOfferProfile } from '../config/offerProfile.js';
 import { isExternalFetchConfigured } from '../config/env.js';
 import { buildDaily30Dashboard, describeDaily30AreaExpansion } from '../candidates/buildDaily30Dashboard.js';
 import { fetchDaily30Candidates, buildDaily30FetchPlan } from '../candidates/fetchDaily30Candidates.js';
 import { FETCH_DAILY_30_CONFIRM_TOKEN, GENERATE_DAILY_30_COPY_CONFIRM_TOKEN, IMPORT_DAILY_30_DRAFT_CANDIDATES_CONFIRM_TOKEN } from '../scripts/externalCandidateCliTokens.js';
+import { REPLY_MANAGEMENT_API_STATUSES } from '../workflow/replyManagementValidation.js';
 import {
   getDraftsDir,
   getGrowlySalesPathInfo,
@@ -16,6 +18,13 @@ import { computeDraftStats } from '../drafts/selectDraftCandidates.js';
 import { buildDraftCandidatesPayload } from '../drafts/buildUiDraftCandidates.js';
 import { exportDraftCandidates } from '../drafts/exportDraftCandidates.js';
 import { LeadsFileNotFoundError, loadLeadsForApi } from '../storage/loadLeadsForApi.js';
+import { loadLeadsOptionalForDaily30 } from '../storage/loadLeadsOptionalForDaily30.js';
+import {
+  buildDaily30CloudDashboardPayload,
+  buildGrowlyStorageStatusPayload,
+  Daily30GcsReadError,
+} from '../candidates/buildDaily30CloudDashboard.js';
+import { getCloudRunEntryForBatch } from '../storage/daily30CloudRunState.js';
 import { buildSalesAnalytics } from '../analytics/buildSalesAnalytics.js';
 import { buildOperationSummary } from '../analytics/buildOperationSummary.js';
 import { checkLocalMvpReadiness } from '../mvp/checkLocalMvpReadiness.js';
@@ -38,18 +47,18 @@ import { loadExternalCandidatesFromJson, persistExternalCandidates } from '../st
 import { approveExternalCandidateForImport } from '../workflow/importApprovedExternalCandidates.js';
 import { approveExternalCandidateForLead } from '../workflow/approveExternalCandidateForLead.js';
 import { runDaily30CopyPipeline } from '../candidates/runDaily30CopyPipeline.js';
+import { buildDaily30ReadyForDraftApiPayload } from '../candidates/buildDaily30ReadyForDraftApiPayload.js';
 import { buildDaily30DraftPipelineProgress } from '../candidates/buildDaily30DraftPipelineProgress.js';
 import { buildDaily30OperationsSummary } from '../candidates/buildDaily30OperationsSummary.js';
-import { getDaily30DraftImportBlockReason } from '../candidates/getDaily30DraftImportBlockReason.js';
 import {
   importDaily30DraftCandidateAsLead,
   importDaily30DraftCandidatesBulk,
-  selectDaily30ReadyForDraftImportCandidates,
 } from '../workflow/importDaily30DraftCandidates.js';
 import {
   selectDaily30LeadApprovalPending,
   selectDaily30LeadReviewCandidates,
 } from '../candidates/selectDaily30LeadCandidates.js';
+import { buildDaily30LeadApprovalBlockHints } from '../candidates/getDaily30LeadApprovalBlockReason.js';
 import {
   markDealStatus,
   markFollowUpNeeded,
@@ -306,22 +315,18 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
       return;
     }
 
+    if (req.method === 'GET' && pathname === '/api/storage-status') {
+      sendJson(res, 200, {
+        ...buildGrowlyStorageStatusPayload(),
+        generatedAt: new Date().toISOString(),
+      });
+      return;
+    }
+
     if (req.method === 'GET' && pathname === '/api/daily30-ready-for-draft') {
       const candidates = await loadExternalCandidatesFromJson();
-      const leads = await loadLeadsForApi('GET /api/daily30-ready-for-draft');
-      const readyForDraft = selectDaily30ReadyForDraftImportCandidates(candidates);
-      const items = readyForDraft.map((candidate) => ({
-        candidate,
-        importBlockReason: getDaily30DraftImportBlockReason(candidate, leads, candidates),
-        qualityCheckPassed: !candidate.failureReason,
-      }));
-      const draftPipeline = buildDaily30DraftPipelineProgress(candidates, leads);
-      sendJson(res, 200, {
-        items,
-        draftPipeline,
-        generatedAt: new Date().toISOString(),
-        note: 'ready_for_draft 取り込み候補。Gmail下書き作成は取り込み後に CREATE_DRAFTS で実行。',
-      });
+      const leads = await loadLeadsOptionalForDaily30();
+      sendJson(res, 200, buildDaily30ReadyForDraftApiPayload(candidates, leads));
       return;
     }
 
@@ -381,13 +386,20 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
 
     if (req.method === 'GET' && pathname === '/api/daily30-lead-candidates') {
       const candidates = await loadExternalCandidatesFromJson();
+      const leads = await loadLeadsOptionalForDaily30();
       const reviewCandidates = selectDaily30LeadReviewCandidates(candidates);
       const approvalPending = selectDaily30LeadApprovalPending(candidates);
       const approvedForLead = candidates.filter((c) => c.importStatus === 'approved_for_lead');
+      const approvalBlockHints = buildDaily30LeadApprovalBlockHints(
+        [...approvalPending, ...reviewCandidates],
+        leads,
+        candidates
+      );
       sendJson(res, 200, {
         reviewCandidates,
         approvalPending,
         approvedForLead,
+        approvalBlockHints,
         generatedAt: new Date().toISOString(),
         note: 'Lead化候補一覧。leads.json への自動取り込みは行いません。',
       });
@@ -406,7 +418,7 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
         return;
       }
       try {
-        const leads = await loadLeadsForApi('POST /api/daily30-generate-copy');
+        const leads = await loadLeadsOptionalForDaily30();
         const { stats } = await runDaily30CopyPipeline();
         const candidates = await loadExternalCandidatesFromJson();
         const dashboard = buildDaily30Dashboard(candidates, leads);
@@ -429,20 +441,28 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
     }
 
     if (req.method === 'GET' && pathname === '/api/daily30-dashboard') {
-      const leads = await loadLeadsForApi('GET /api/daily30-dashboard');
-      const candidates = await loadExternalCandidatesFromJson();
-      const dashboard = buildDaily30Dashboard(candidates, leads);
+      const leads = await loadLeadsOptionalForDaily30();
+      const cloudDashboard = await buildDaily30CloudDashboardPayload(leads);
+      const candidates = cloudDashboard.candidates;
+      const cloudRunEntry = await getCloudRunEntryForBatch(cloudDashboard.batchId);
+      const dashboard = buildDaily30Dashboard(
+        candidates,
+        leads,
+        cloudDashboard.batchId,
+        cloudRunEntry
+      );
       const draftPipeline = buildDaily30DraftPipelineProgress(candidates, leads, dashboard.batchId);
       const operations = buildDaily30OperationsSummary(candidates, leads, dashboard.batchId);
       const plan = buildDaily30FetchPlan();
       sendJson(res, 200, {
+        ...cloudDashboard,
         dashboard,
         draftPipeline,
         operations,
         areaExpansion: describeDaily30AreaExpansion(),
         plan,
         generatedAt: new Date().toISOString(),
-        note: 'Daily 30 集計のみ。Gmail送信は行いません。下書き作成は CREATE_DRAFTS ゲートのみ。',
+        note: 'Daily 30 集計。Gmail送信・下書き自動作成は行いません。',
       });
       return;
     }
@@ -712,6 +732,20 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
     }
 
     if (req.method === 'GET') {
+      const isCloudRun = Boolean(process.env.K_SERVICE?.trim());
+      const apiOnly =
+        process.env.GROWLY_CLOUD_RUN_API_ONLY === 'true' ||
+        (isCloudRun &&
+          process.env.NODE_ENV === 'production' &&
+          process.env.GROWLY_STORAGE_BACKEND?.trim().toLowerCase() === 'gcs');
+
+      if (pathname === '/' && apiOnly) {
+        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end(
+          'Growly Sales Daily 30 Cloud API is running.\nUse /api/cloud/daily30/status or /api/cloud/daily30/auto-fetch.\n'
+        );
+        return;
+      }
       if (pathname === '/' || pathname === '/index.html') {
         await serveStatic(res, join(UI_DIST, 'index.html'), 'text/html; charset=utf-8');
         return;
@@ -739,6 +773,17 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
       sendApiError(res, 404, err.api, err.message, err.path, 'npm run growly-sales:day1 を実行するか、パスを確認してください');
       return;
     }
+    if (err instanceof Daily30GcsReadError) {
+      sendApiError(
+        res,
+        503,
+        pathname,
+        err.message,
+        undefined,
+        'gcloud auth application-default login と GROWLY_GCS_* 設定を確認してください'
+      );
+      return;
+    }
     console.error(`[${pathname}]`, err);
     sendApiError(
       res,
@@ -764,6 +809,7 @@ export function startUiServer(): void {
     console.log(`  Leads path:   ${info.leadsPath}`);
     console.log(`  Drafts path:  ${info.draftsDir}`);
     console.log(`  CWD:          ${info.cwd}`);
+    console.log(`  Reply API:    ${REPLY_MANAGEMENT_API_STATUSES.join(', ')}`);
     console.log('  自動送信なし / ローカルJSON保存のみ');
   });
 }

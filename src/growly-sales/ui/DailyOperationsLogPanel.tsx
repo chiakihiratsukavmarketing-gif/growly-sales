@@ -41,7 +41,7 @@ export function DailyOperationsLogPanel() {
   return (
     <SectionCard title="今日の営業メモ（ローカルのみ）" className="daily-ops-log-panel">
       <p className="hint">
-        このブラウザにだけ保存されます（communicationMemo や leads.json には書き込みません）。
+        このブラウザにだけ保存されます（サーバーには送信しません）。
         日付: {todayKey()}
       </p>
       <textarea

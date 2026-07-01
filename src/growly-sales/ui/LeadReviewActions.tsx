@@ -32,29 +32,27 @@ export function LeadReviewActions({ lead, onUpdated, onError }: LeadReviewAction
   }
 
   return (
-    <section className="review-actions">
-      <h3>人間承認アクション</h3>
-      <p className="hint">
-        承認は「Gmail下書き作成候補にしてよい」という意味です。自動送信は行いません。
-      </p>
+    <section className="review-actions review-actions-compact">
+      <h3>人間承認</h3>
+      <p className="hint">承認は下書き候補化の許可です。自動送信はしません。</p>
 
       <label className="field-label" htmlFor="review-comment">
-        コメント / 理由（修正依頼・却下・連絡禁止時）
+        コメント（修正・却下・連絡禁止時）
       </label>
       <textarea
         id="review-comment"
-        className="textarea"
-        rows={3}
+        className="textarea textarea-review-comment"
+        rows={2}
         value={comment}
         onChange={(e) => setComment(e.target.value)}
         placeholder="修正点や却下理由を入力"
         disabled={busy}
       />
 
-      <div className="action-buttons">
+      <div className="action-buttons action-buttons-compact">
         <button
           type="button"
-          className="btn btn-primary"
+          className="btn btn-primary btn-sm"
           disabled={busy || lead.doNotContact}
           onClick={() => void runAction(() => approveLead(lead.id))}
         >
@@ -62,7 +60,7 @@ export function LeadReviewActions({ lead, onUpdated, onError }: LeadReviewAction
         </button>
         <button
           type="button"
-          className="btn btn-warn"
+          className="btn btn-warn btn-sm"
           disabled={busy || lead.doNotContact}
           onClick={() => void runAction(() => needsRevisionLead(lead.id, comment))}
         >
@@ -70,7 +68,7 @@ export function LeadReviewActions({ lead, onUpdated, onError }: LeadReviewAction
         </button>
         <button
           type="button"
-          className="btn btn-danger"
+          className="btn btn-danger btn-sm"
           disabled={busy || lead.doNotContact}
           onClick={() => void runAction(() => rejectLeadApi(lead.id, comment))}
         >
@@ -78,7 +76,7 @@ export function LeadReviewActions({ lead, onUpdated, onError }: LeadReviewAction
         </button>
         <button
           type="button"
-          className="btn btn-danger-outline"
+          className="btn btn-danger-outline btn-sm"
           disabled={busy}
           onClick={() => void runAction(() => doNotContactLead(lead.id, comment))}
         >
@@ -132,7 +130,7 @@ function EmailDraftEditor({ lead, busy, onUpdated, onError }: EmailDraftEditorPr
   const disabled = busy || saving || lead.doNotContact;
 
   return (
-    <div className="email-editor">
+    <div className="email-editor email-editor-compact">
       <h3>メール文編集</h3>
       <label className="field-label" htmlFor="email-subject">
         件名
@@ -150,8 +148,8 @@ function EmailDraftEditor({ lead, busy, onUpdated, onError }: EmailDraftEditorPr
       </label>
       <textarea
         id="email-body"
-        className="textarea email-body"
-        rows={12}
+        className="textarea email-body email-body-compact"
+        rows={6}
         value={emailBody}
         onChange={(e) => setEmailBody(e.target.value)}
         disabled={disabled}
@@ -182,7 +180,7 @@ function EmailDraftEditor({ lead, busy, onUpdated, onError }: EmailDraftEditorPr
 
       <button
         type="button"
-        className="btn btn-primary"
+        className="btn btn-primary btn-sm"
         disabled={disabled}
         onClick={() => void handleSave()}
       >

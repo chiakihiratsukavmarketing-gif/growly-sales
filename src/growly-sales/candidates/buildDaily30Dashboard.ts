@@ -4,17 +4,35 @@ import {
   DAILY_30_AREA_EXPANSION,
   todayBatchId,
 } from './daily30AreaConfig.js';
-import { DAILY_30_TARGET } from './daily30CandidateStatus.js';
+import { DAILY_30_TARGET, DAILY_30_TARGET_EMAIL_FOUND } from './daily30CandidateStatus.js';
 import { isExternalFetchConfigured } from '../config/env.js';
 import {
   isDaily30LeadApprovalPending,
 } from './selectDaily30LeadCandidates.js';
 import { isDaily30ReadyForDraftImportCandidate } from './getDaily30DraftImportBlockReason.js';
+import {
+  countDaily30BatchMetrics,
+  isDaily30BatchAccepted,
+  type Daily30StoppedReason,
+} from './daily30BatchMetrics.js';
+import type { Daily30CloudRunStateEntry } from '../storage/daily30CloudRunState.js';
 
 export interface Daily30Dashboard {
   batchId: string;
   target: number;
+  targetEmailFound: number;
+  /** 収集実行時点の email_found 件数（GCS state 優先・Lead化後も減らない） */
+  emailFoundAtCollection: number;
+  formOnlyAtCollection: number;
+  noEmailAtCollection: number;
+  totalCollectedAtCollection: number;
+  collectionMetricsLoaded: boolean;
+  collectionRunStatus: string | null;
+  stoppedReason: Daily30StoppedReason | null;
   collectedToday: number;
+  totalCollected: number;
+  formOnlyCount: number;
+  noEmailCount: number;
   miyagiCount: number;
   fukushimaCount: number;
   northKantoCount: number;
@@ -23,25 +41,19 @@ export interface Daily30Dashboard {
   duplicateExcludedCount: number;
   emailFoundCount: number;
   leadApprovalPendingCount: number;
+  leadApprovalApprovedCount: number;
   copyGeneratedCount: number;
   qualityCheckPassedCount: number;
   readyForDraftCount: number;
+  draftImportPendingCount: number;
   needsReviewCount: number;
   excludedCount: number;
   shortfall: number;
+  emailShortfall: number;
   nextExploreArea: string;
   nextAction: string;
   fetchConfigured: boolean;
   safetyNote: string;
-}
-
-function isTodayAccepted(c: ExternalLeadCandidate, batchId: string): boolean {
-  return (
-    c.collectionBatchId === batchId &&
-    c.pipelineStatus !== 'duplicate' &&
-    c.pipelineStatus !== 'excluded' &&
-    c.importStatus !== 'duplicate'
-  );
 }
 
 function countByRegion(candidates: ExternalLeadCandidate[], batchId: string): {
@@ -49,7 +61,9 @@ function countByRegion(candidates: ExternalLeadCandidate[], batchId: string): {
   fukushima: number;
   northKanto: number;
 } {
-  const today = candidates.filter((c) => isTodayAccepted(c, batchId));
+  const today = candidates.filter(
+    (c) => c.collectionBatchId === batchId && c.pipelineStatus === 'email_found'
+  );
   return {
     miyagi: today.filter((c) => c.regionGroup === '宮城').length,
     fukushima: today.filter((c) => c.regionGroup === '福島').length,
@@ -59,16 +73,16 @@ function countByRegion(candidates: ExternalLeadCandidate[], batchId: string): {
 
 function resolveNextExploreArea(
   counts: { miyagi: number; fukushima: number; northKanto: number },
-  shortfall: number
+  emailShortfall: number
 ): string {
-  if (shortfall <= 0) return '本日の目標達成（追加収集は任意）';
-  if (counts.miyagi < DAILY_30_TARGET) return '宮城県（優先）';
-  if (counts.fukushima + counts.miyagi < DAILY_30_TARGET) return '福島県';
+  if (emailShortfall <= 0) return '本日のメール目標達成（追加収集は任意）';
+  if (counts.miyagi < DAILY_30_TARGET_EMAIL_FOUND) return '宮城県（優先）';
+  if (counts.miyagi + counts.fukushima < DAILY_30_TARGET_EMAIL_FOUND) return '福島県';
   return '北関東（茨城県 → 栃木県 → 群馬県）';
 }
 
 function buildNextAction(input: {
-  shortfall: number;
+  emailShortfall: number;
   emailFound: number;
   leadApprovalPending: number;
   approvedForCopy: number;
@@ -77,9 +91,9 @@ function buildNextAction(input: {
   needsReview: number;
   fetchConfigured: boolean;
 }): string {
-  if (input.shortfall > 0) {
+  if (input.emailShortfall > 0) {
     return input.fetchConfigured
-      ? '候補収集タブで FETCH_DAILY_30 を入力して収集を実行'
+      ? '候補収集タブで FETCH_DAILY_30 を入力してメール取得済み30件まで収集'
       : 'APIキー設定後、FETCH_DAILY_30 で収集を実行';
   }
   if (input.leadApprovalPending > 0) {
@@ -103,10 +117,12 @@ function buildNextAction(input: {
 export function buildDaily30Dashboard(
   candidates: ExternalLeadCandidate[],
   _leads: Lead[],
-  batchId = todayBatchId()
+  batchId = todayBatchId(),
+  cloudRunEntry: Daily30CloudRunStateEntry | null = null
 ): Daily30Dashboard {
   const todayAll = candidates.filter((c) => c.collectionBatchId === batchId);
-  const accepted = todayAll.filter((c) => isTodayAccepted(c, batchId));
+  const accepted = todayAll.filter((c) => isDaily30BatchAccepted(c, batchId));
+  const batchMetrics = countDaily30BatchMetrics(candidates, batchId);
   const regionCounts = countByRegion(candidates, batchId);
 
   const withEmailCount = accepted.filter(
@@ -129,6 +145,10 @@ export function buildDaily30Dashboard(
 
   const leadApprovalPendingCount = accepted.filter(isDaily30LeadApprovalPending).length;
 
+  const leadApprovalApprovedCount = accepted.filter(
+    (c) => c.importStatus === 'approved_for_lead'
+  ).length;
+
   const copyGeneratedCount = accepted.filter((c) => Boolean(c.copyGeneratedAt)).length;
 
   const qualityCheckPassedCount = accepted.filter(
@@ -149,31 +169,74 @@ export function buildDaily30Dashboard(
 
   const importPendingCount = accepted.filter(isDaily30ReadyForDraftImportCandidate).length;
 
-  const collectedToday = accepted.length;
-  const shortfall = Math.max(0, DAILY_30_TARGET - collectedToday);
+  const collectedToday = batchMetrics.totalCollected;
+
+  const hasCloudRunMetrics =
+    cloudRunEntry !== null &&
+    cloudRunEntry.batchId === batchId &&
+    cloudRunEntry.mode === 'run';
+  const staleFormMetrics =
+    hasCloudRunMetrics &&
+    cloudRunEntry!.formOnly === 0 &&
+    cloudRunEntry!.noEmail === 0 &&
+    (batchMetrics.formOnly > 0 || batchMetrics.noEmail > 0);
+
+  const emailFoundAtCollection = hasCloudRunMetrics
+    ? cloudRunEntry!.emailFound
+    : batchMetrics.emailFound;
+  const formOnlyAtCollection = hasCloudRunMetrics
+    ? staleFormMetrics
+      ? batchMetrics.formOnly
+      : cloudRunEntry!.formOnly
+    : batchMetrics.formOnly;
+  const noEmailAtCollection = hasCloudRunMetrics
+    ? staleFormMetrics
+      ? batchMetrics.noEmail
+      : cloudRunEntry!.noEmail
+    : batchMetrics.noEmail;
+  const totalCollectedAtCollection = hasCloudRunMetrics
+    ? cloudRunEntry!.totalCollected
+    : batchMetrics.totalCollected;
+
+  const emailShortfall = Math.max(0, DAILY_30_TARGET_EMAIL_FOUND - emailFoundAtCollection);
+  const shortfall = emailShortfall;
 
   return {
     batchId,
     target: DAILY_30_TARGET,
+    targetEmailFound: DAILY_30_TARGET_EMAIL_FOUND,
+    emailFoundAtCollection,
+    formOnlyAtCollection,
+    noEmailAtCollection,
+    totalCollectedAtCollection,
+    collectionMetricsLoaded: hasCloudRunMetrics,
+    collectionRunStatus: hasCloudRunMetrics ? cloudRunEntry!.status : null,
+    stoppedReason: hasCloudRunMetrics ? cloudRunEntry!.stoppedReason ?? null : null,
     collectedToday,
+    totalCollected: batchMetrics.totalCollected,
+    formOnlyCount: batchMetrics.formOnly,
+    noEmailCount: batchMetrics.noEmail,
     miyagiCount: regionCounts.miyagi,
     fukushimaCount: regionCounts.fukushima,
     northKantoCount: regionCounts.northKanto,
     withEmailCount,
     withoutEmailCount,
     duplicateExcludedCount,
-    emailFoundCount,
+    emailFoundCount: batchMetrics.emailFound,
     leadApprovalPendingCount,
+    leadApprovalApprovedCount,
     copyGeneratedCount,
     qualityCheckPassedCount,
     readyForDraftCount,
+    draftImportPendingCount: importPendingCount,
     needsReviewCount,
     excludedCount,
     shortfall,
-    nextExploreArea: resolveNextExploreArea(regionCounts, shortfall),
+    emailShortfall,
+    nextExploreArea: resolveNextExploreArea(regionCounts, emailShortfall),
     nextAction: buildNextAction({
-      shortfall,
-      emailFound: emailFoundCount,
+      emailShortfall,
+      emailFound: emailFoundAtCollection,
       leadApprovalPending: leadApprovalPendingCount,
       approvedForCopy: approvedForCopyCount,
       readyForDraft: readyForDraftCount,

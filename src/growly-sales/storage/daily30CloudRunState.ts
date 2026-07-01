@@ -1,9 +1,11 @@
 import { DAILY30_CLOUD_RUN_STATE_JSON } from './jsonDocumentNames.js';
 import { readJsonDocument, writeJsonDocument } from './jsonDocumentStorage.js';
 import type { Daily30CloudErrorCode } from '../candidates/daily30CloudRunErrors.js';
+import type { Daily30StoppedReason } from '../candidates/daily30BatchMetrics.js';
+import { DAILY_30_TARGET_EMAIL_FOUND } from '../candidates/daily30CandidateStatus.js';
 
 export type Daily30CloudRunMode = 'dry_run' | 'run' | 'already_ran' | 'blocked' | 'failed';
-export type Daily30CloudRunStatus = 'success' | 'failed' | 'skipped' | 'blocked';
+export type Daily30CloudRunStatus = 'success' | 'partial_success' | 'failed' | 'skipped' | 'blocked';
 
 export interface Daily30CloudRunStateEntry {
   runId: string;
@@ -15,8 +17,15 @@ export interface Daily30CloudRunStateEntry {
   /** @deprecated use finishedAt — kept for backward compatibility */
   completedAt: string;
   durationMs: number;
+  /** @deprecated use totalCollected — 総収集候補（互換） */
   collected: number;
+  targetEmailFound: number;
   emailFound: number;
+  totalCollected: number;
+  formOnly: number;
+  noEmail: number;
+  reachedTarget: boolean;
+  stoppedReason?: Daily30StoppedReason;
   duplicates: number;
   excluded: number;
   nextArea?: string;
@@ -48,17 +57,39 @@ const EMPTY_STORE: Daily30CloudRunStateStore = {
 function normalizeEntry(raw: Partial<Daily30CloudRunStateEntry> & { batchId: string }): Daily30CloudRunStateEntry {
   const finishedAt = raw.finishedAt ?? raw.completedAt ?? new Date().toISOString();
   const startedAt = raw.startedAt ?? finishedAt;
+  const totalCollected = raw.totalCollected ?? raw.collected ?? 0;
+  const emailFound = raw.emailFound ?? 0;
+  const targetEmailFound = raw.targetEmailFound ?? DAILY_30_TARGET_EMAIL_FOUND;
+  const reachedTarget = raw.reachedTarget ?? emailFound >= targetEmailFound;
+  const mode = raw.mode ?? 'run';
+  const status: Daily30CloudRunStatus =
+    raw.status ??
+    (mode === 'run'
+      ? reachedTarget
+        ? 'success'
+        : 'partial_success'
+      : mode === 'failed'
+        ? 'failed'
+        : 'skipped');
+  const normalizedStatus: Daily30CloudRunStatus =
+    status === 'success' && !reachedTarget && mode === 'run' ? 'partial_success' : status;
   return {
     runId: raw.runId ?? `${raw.batchId}-legacy`,
     batchId: raw.batchId,
-    mode: raw.mode ?? 'run',
-    status: raw.status ?? (raw.mode === 'run' ? 'success' : 'skipped'),
+    mode,
+    status: normalizedStatus,
     startedAt,
     finishedAt,
     completedAt: finishedAt,
     durationMs: raw.durationMs ?? 0,
-    collected: raw.collected ?? 0,
-    emailFound: raw.emailFound ?? 0,
+    collected: totalCollected,
+    targetEmailFound,
+    emailFound,
+    totalCollected,
+    formOnly: raw.formOnly ?? 0,
+    noEmail: raw.noEmail ?? 0,
+    reachedTarget,
+    stoppedReason: raw.stoppedReason,
     duplicates: raw.duplicates ?? 0,
     excluded: raw.excluded ?? 0,
     nextArea: raw.nextArea,
@@ -114,10 +145,14 @@ export async function getCloudRunEntryForBatch(
   return store.runs[batchId] ?? null;
 }
 
-/** 同日の成功した本番収集（mode=run, status=success）が記録済みか */
+/** 同日の本番収集（mode=run, success または partial_success）が記録済みか */
 export async function isBatchCloudRunCompleted(batchId: string): Promise<boolean> {
   const entry = await getCloudRunEntryForBatch(batchId);
-  return entry !== null && entry.status === 'success' && entry.mode === 'run';
+  return (
+    entry !== null &&
+    entry.mode === 'run' &&
+    (entry.status === 'success' || entry.status === 'partial_success')
+  );
 }
 
 export function createCloudRunId(batchId: string): string {
@@ -127,7 +162,10 @@ export function createCloudRunId(batchId: string): string {
 export async function recordCloudRunEntry(entry: Daily30CloudRunStateEntry): Promise<void> {
   const store = await loadDaily30CloudRunState();
   store.history = [entry, ...store.history.filter((h) => h.runId !== entry.runId)].slice(0, 100);
-  if (entry.status === 'success' && entry.mode === 'run') {
+  if (
+    (entry.status === 'success' || entry.status === 'partial_success') &&
+    entry.mode === 'run'
+  ) {
     store.runs[entry.batchId] = entry;
   }
   await saveDaily30CloudRunState(store);

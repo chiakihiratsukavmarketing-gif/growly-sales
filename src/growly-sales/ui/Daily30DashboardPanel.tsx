@@ -8,6 +8,7 @@ import {
   runDaily30Fetch,
   type Daily30DashboardResponse,
 } from './daily30Api.js';
+import { isDevApiErrorMessage } from './displayLabels.js';
 
 interface Daily30DashboardPanelProps {
   onError: (message: string) => void;
@@ -32,7 +33,8 @@ export function Daily30DashboardPanel({
       const result = await fetchDaily30Dashboard();
       setData(result);
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Daily 30 ダッシュボードの読み込みに失敗しました');
+      const message = err instanceof Error ? err.message : 'Daily 30 ダッシュボードの読み込みに失敗しました';
+      if (!isDevApiErrorMessage(message)) onError(message);
     } finally {
       setLoading(false);
     }
@@ -95,16 +97,18 @@ export function Daily30DashboardPanel({
       {draftPipeline && <p className="hint">{draftPipeline.todayProgressLabel}</p>}
 
       <div className="stats-grid">
-        <SummaryStatCard value={dashboard.target} label="今日の収集目標" highlight />
-        <SummaryStatCard value={dashboard.collectedToday} label="今日の収集数" highlight />
-        <SummaryStatCard value={dashboard.emailFoundCount} label="email_found" />
+        <SummaryStatCard value={dashboard.targetEmailFound} label="メール取得目標" highlight />
+        <SummaryStatCard value={dashboard.emailFoundCount} label="メール取得済み" highlight />
+        <SummaryStatCard value={dashboard.totalCollected} label="総収集候補" />
+        <SummaryStatCard value={dashboard.formOnlyCount} label="フォームのみ" />
+        <SummaryStatCard value={dashboard.noEmailCount} label="導線なし" />
         <SummaryStatCard value={dashboard.leadApprovalPendingCount} label="Lead化承認待ち" highlight />
         <SummaryStatCard value={dashboard.copyGeneratedCount} label="営業文生成済み" />
         <SummaryStatCard value={dashboard.qualityCheckPassedCount} label="品質チェック通過" />
         <SummaryStatCard value={dashboard.readyForDraftCount} label="ready_for_draft" highlight />
         <SummaryStatCard value={dashboard.needsReviewCount} label="needs_review" />
         <SummaryStatCard value={dashboard.excludedCount} label="excluded" />
-        <SummaryStatCard value={dashboard.shortfall} label="今日不足" />
+        <SummaryStatCard value={dashboard.emailShortfall} label="メール不足" />
         <SummaryStatCard value={dashboard.miyagiCount} label="宮城で収集" />
         <SummaryStatCard value={dashboard.fukushimaCount} label="福島で収集" />
         <SummaryStatCard value={dashboard.northKantoCount} label="北関東で収集" />
@@ -113,7 +117,7 @@ export function Daily30DashboardPanel({
         <SummaryStatCard value={dashboard.duplicateExcludedCount} label="重複除外" />
       </div>
 
-      <InfoBanner variant={dashboard.shortfall > 0 ? 'warning' : 'success'}>
+      <InfoBanner variant={dashboard.emailShortfall > 0 ? 'warning' : 'success'}>
         <strong>次に探索するエリア:</strong> {dashboard.nextExploreArea}
         <br />
         <strong>次にやること:</strong> {dashboard.nextAction}

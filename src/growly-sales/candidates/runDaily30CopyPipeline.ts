@@ -1,8 +1,7 @@
 import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTypes.js';
 import { loadOfferProfile } from '../config/offerProfile.js';
 import { loadTargetProfile } from '../config/targetProfile.js';
-import { loadLeadsFromJson } from '../storage/jsonLeadRepository.js';
-import { getLeadsJsonPath } from '../config/paths.js';
+import { loadLeadsOptionalForDaily30 } from '../storage/loadLeadsOptionalForDaily30.js';
 import {
   loadExternalCandidatesFromJson,
   persistExternalCandidates,
@@ -26,7 +25,7 @@ export async function runDaily30CopyPipeline(): Promise<{
 }> {
   const [candidates, leads, target, offer] = await Promise.all([
     loadExternalCandidatesFromJson(),
-    loadLeadsFromJson(getLeadsJsonPath()),
+    loadLeadsOptionalForDaily30(),
     loadTargetProfile(),
     loadOfferProfile(),
   ]);

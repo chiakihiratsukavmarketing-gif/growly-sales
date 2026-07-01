@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Lead } from '../../types/lead.js';
 import type { CreateGmailDraftForLeadResult } from '../workflow/createGmailDraftForLead.js';
 import { approveLead } from './api.js';
@@ -9,10 +9,18 @@ import {
 } from './gmailDraftCandidatesApi.js';
 import { LeadStatusBadge } from './LeadStatusBadge.js';
 import { SectionCard } from './SectionCard.js';
-import { InfoBanner } from './InfoBanner.js';
 import { GmailDraftCreateDialog } from './GmailDraftCreateDialog.js';
 import { GmailDraftCreateResultPanel } from './GmailDraftCreateResultPanel.js';
 import { ApproveDraftDialog } from './ApproveDraftDialog.js';
+import { PageHeader } from './common/PageHeader.js';
+import { EmptyState } from './common/EmptyState.js';
+import { SearchAndFilterBar } from './common/SearchAndFilterBar.js';
+import { FilterEmptyState } from './common/FilterEmptyState.js';
+import {
+  DRAFT_CANDIDATE_FILTER_OPTIONS,
+  filterByCompanyName,
+  matchesDraftCandidateFilter,
+} from './leadFilterUtils.js';
 import type { SalesFlowTab } from './GrowlySalesDashboard.js';
 
 interface GmailDraftCandidatesViewProps {
@@ -37,6 +45,8 @@ export function GmailDraftCandidatesView({
   const [approving, setApproving] = useState(false);
   const [createResult, setCreateResult] = useState<CreateGmailDraftForLeadResult | null>(null);
   const [approveSuccess, setApproveSuccess] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -53,6 +63,23 @@ export function GmailDraftCandidatesView({
   useEffect(() => {
     void load();
   }, [load, refreshKey]);
+
+  const allCandidates = data?.candidates ?? [];
+
+  const filteredCandidates = useMemo(() => {
+    let items = allCandidates;
+    items = items.filter((c) => matchesDraftCandidateFilter(c, statusFilter));
+    items = filterByCompanyName(items, search, (c) => c.companyName);
+    return items;
+  }, [allCandidates, statusFilter, search]);
+
+  const pendingCandidates = filteredCandidates.filter((c) => c.humanReviewStatus === 'pending');
+  const approvedCandidates = filteredCandidates.filter((c) => c.humanReviewStatus === 'approved');
+
+  const clearFilters = useCallback(() => {
+    setSearch('');
+    setStatusFilter('all');
+  }, []);
 
   async function handleConfirmCreate(): Promise<void> {
     if (!dialogCandidate) return;
@@ -79,7 +106,7 @@ export function GmailDraftCandidatesView({
     try {
       const updated = await approveLead(approveCandidate.leadId);
       setApproveCandidate(null);
-      setApproveSuccess(`${updated.companyName} を承認しました。CREATE_DRAFTS で下書き作成できます。`);
+      setApproveSuccess(`${updated.companyName} を承認しました。Gmail下書きを作成できます。`);
       onDraftCreated?.(updated);
       await load();
     } catch (err) {
@@ -93,8 +120,7 @@ export function GmailDraftCandidatesView({
   if (loading) return <p className="loading">Gmail下書き候補を読み込み中…</p>;
   if (!data) return null;
 
-  const pendingCandidates = data.candidates.filter((c) => c.humanReviewStatus === 'pending');
-  const approvedCandidates = data.candidates.filter((c) => c.humanReviewStatus === 'approved');
+  const totalCandidates = allCandidates.length;
 
   function renderCandidateCard(candidate: GmailDraftCandidateDetail, isPending: boolean) {
     return (
@@ -107,19 +133,11 @@ export function GmailDraftCandidatesView({
           <p className="pending-meta">
             To: {candidate.to} / 件名: {candidate.subject}
           </p>
-          <p className="pending-subject">customHook: {candidate.customHook || '—'}</p>
           <div className="candidate-badges">
             <LeadStatusBadge kind="human" value={candidate.humanReviewStatus} />
-            <LeadStatusBadge kind="send" value={candidate.sendStatus} />
-            <span className="badge badge-neutral">{candidate.gmailDraftStatus}</span>
           </div>
-          {isPending && (
-            <InfoBanner variant="warning">
-              内容確認が必要です。承認後にのみ Gmail 下書きを作成できます（自動送信なし）。
-            </InfoBanner>
-          )}
           {!candidate.canCreate && candidate.blockReason && (
-            <p className="hint warning-text">作成不可: {candidate.blockReason}</p>
+            <p className="hint warning-text">{candidate.blockReason}</p>
           )}
         </div>
         <div className="gmail-candidate-actions">
@@ -136,7 +154,7 @@ export function GmailDraftCandidatesView({
             </>
           ) : (
             <>
-              <p className="pending-hint">送信はされません</p>
+              <p className="pending-hint">Gmailでの送信は人間が行います</p>
               <button
                 type="button"
                 className="btn btn-primary"
@@ -157,13 +175,10 @@ export function GmailDraftCandidatesView({
 
   return (
     <div className="gmail-draft-candidates-view">
-      <InfoBanner variant="warning">
-        Gmail下書きは1社ずつ作成します。users.drafts.create のみ — 自動送信は行いません。承認待ち（pending）は承認後に作成可能です。
-      </InfoBanner>
-      <p className="hint">
-        候補 {data.totalCount}件（承認待ち {pendingCandidates.length} / 作成可能 {approvedCandidates.length}）/
-        取得: {new Date(data.generatedAt).toLocaleString('ja-JP')}
-      </p>
+      <PageHeader
+        title="下書き候補"
+        subtitle="承認済み Lead の Gmail 下書きを作成します。自動送信は行いません。"
+      />
 
       {approveSuccess && <div className="alert alert-success">{approveSuccess}</div>}
 
@@ -179,28 +194,47 @@ export function GmailDraftCandidatesView({
         />
       )}
 
+      {totalCandidates > 0 && (
+        <SearchAndFilterBar
+          searchValue={search}
+          onSearchChange={setSearch}
+          filterValue={statusFilter}
+          onFilterChange={setStatusFilter}
+          filterOptions={DRAFT_CANDIDATE_FILTER_OPTIONS}
+          resultCount={filteredCandidates.length}
+          totalCount={totalCandidates}
+          onClear={clearFilters}
+        />
+      )}
+
+      {totalCandidates === 0 && (
+        <EmptyState
+          title="Gmail下書きに進める候補はありません"
+          reason="未送信かつメールアドレスがあり、営業文が揃った Lead が承認済みになるとここに表示されます。送信済み・下書き済みは重複表示しません。"
+          actionLabel="Lead一覧で候補を確認する"
+          onAction={() => onNavigateToTab?.('leads')}
+        />
+      )}
+
+      {totalCandidates > 0 && filteredCandidates.length === 0 && (
+        <FilterEmptyState onClear={clearFilters} />
+      )}
+
       {pendingCandidates.length > 0 && (
-        <SectionCard
-          title={`承認待ち（${pendingCandidates.length}件）`}
-          className="gmail-pending-review-section"
-        >
-          <div className="gmail-candidate-list">
+        <SectionCard title={`承認待ち（${pendingCandidates.length}件）`} className="gmail-pending-review-section">
+          <div className="gmail-candidate-list draft-candidate-filtered-list">
             {pendingCandidates.map((c) => renderCandidateCard(c, true))}
           </div>
         </SectionCard>
       )}
 
-      <SectionCard title={`Gmail下書き作成候補（${approvedCandidates.length}件）`}>
-        {approvedCandidates.length === 0 && pendingCandidates.length === 0 ? (
-          <p className="hint">現在、Gmail下書き作成候補はありません。</p>
-        ) : approvedCandidates.length === 0 ? (
-          <p className="hint">承認済みの候補はありません。上の承認待ち Lead を確認してください。</p>
-        ) : (
-          <div className="gmail-candidate-list">
+      {approvedCandidates.length > 0 && (
+        <SectionCard title={`Gmail下書き作成（${approvedCandidates.length}件）`}>
+          <div className="gmail-candidate-list draft-candidate-filtered-list">
             {approvedCandidates.map((c) => renderCandidateCard(c, false))}
           </div>
-        )}
-      </SectionCard>
+        </SectionCard>
+      )}
 
       {dialogCandidate && (
         <GmailDraftCreateDialog

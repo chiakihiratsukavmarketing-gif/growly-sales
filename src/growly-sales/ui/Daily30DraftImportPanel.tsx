@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Daily30ReadyForDraftItem } from './daily30ImportApi.js';
+import type { Daily30ReadyForDraftItem, Daily30ReadyForDraftResponse } from './daily30ImportApi.js';
 import { SectionCard } from './SectionCard.js';
 import { InfoBanner } from './InfoBanner.js';
 import {
@@ -27,6 +27,8 @@ export function Daily30DraftImportPanel({
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<Daily30ReadyForDraftItem[]>([]);
   const [pipeline, setPipeline] = useState<Daily30DraftPipelineProgress | null>(null);
+  const [counts, setCounts] = useState<Daily30ReadyForDraftResponse['counts'] | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
   const [importingId, setImportingId] = useState<string | null>(null);
   const [bulkGateInput, setBulkGateInput] = useState('');
   const [bulkImporting, setBulkImporting] = useState(false);
@@ -38,8 +40,17 @@ export function Daily30DraftImportPanel({
       const data = await fetchDaily30ReadyForDraft();
       setItems(data.items);
       setPipeline(data.draftPipeline);
+      setCounts(data.counts);
+      setWarnings(data.warnings ?? []);
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'ready_for_draft 候補の読み込みに失敗しました');
+      const message = err instanceof Error ? err.message : '取り込み候補の読み込みに失敗しました';
+      setItems([]);
+      setPipeline(null);
+      setCounts(null);
+      setWarnings([]);
+      if (!message.includes('Not found') || !message.includes('/api/')) {
+        onError(message);
+      }
     } finally {
       setLoading(false);
     }
@@ -90,16 +101,35 @@ export function Daily30DraftImportPanel({
   if (loading) return <p className="loading">Daily 30 下書き候補取り込みを読み込み中…</p>;
 
   return (
-    <SectionCard title="Daily 30 — 下書き候補取り込み" className="daily30-draft-import-card">
+    <SectionCard title="下書き候補取り込み" className="daily30-draft-import-card">
       <InfoBanner variant="info">
-        <code>ready_for_draft</code> 候補を leads.json に取り込み、既存の下書き候補タブへ接続します。
-        取り込みは <strong>leads.json への保存のみ</strong>（Gmail API は使いません）。
-        Gmail 下書き作成は下書き候補タブで <code>CREATE_DRAFTS</code> を別途入力してください。
+        品質チェック通過候補を leads.json に取り込みます。Gmail下書きは別途下書き候補タブで作成します。
       </InfoBanner>
+
+      {counts && (
+        <div className="stats-grid daily30-workflow-stats">
+          <SummaryStatCard value={counts.approvedLead} label="Lead化承認済み" />
+          <SummaryStatCard value={counts.generatedCopy} label="営業文生成済み" />
+          <SummaryStatCard value={counts.readyForDraft} label="下書き待ち" highlight />
+          <SummaryStatCard value={counts.importPending} label="取り込み可能" highlight />
+        </div>
+      )}
+
+      {warnings.length > 0 && (
+        <InfoBanner variant="warning">
+          <strong>確認事項（{warnings.length}件）</strong>
+          <ul className="hint-list daily30-warnings-list">
+            {warnings.slice(0, 5).map((w) => (
+              <li key={w}>{w}</li>
+            ))}
+            {warnings.length > 5 ? <li>…他 {warnings.length - 5} 件</li> : null}
+          </ul>
+        </InfoBanner>
+      )}
 
       {pipeline && (
         <div className="stats-grid">
-          <SummaryStatCard value={pipeline.readyForDraftCount} label="ready_for_draft" highlight />
+          <SummaryStatCard value={pipeline.readyForDraftCount} label="下書き待ち" highlight />
           <SummaryStatCard value={pipeline.leadsImportPendingCount} label="取り込み待ち" highlight />
           <SummaryStatCard value={pipeline.gmailDraftTabVisibleCount} label="下書き候補タブ表示" />
           <SummaryStatCard value={pipeline.humanReviewPendingCount} label="承認待ち" />
@@ -111,7 +141,7 @@ export function Daily30DraftImportPanel({
 
       <h3 className="subsection-title">取り込み候補（{items.length}件）</h3>
       {items.length === 0 ? (
-        <p className="hint">ready_for_draft の取り込み待ち候補はありません。</p>
+        <p className="hint">ready_for_draft の取り込み待ちはありません。</p>
       ) : (
         <ul className="candidate-list daily30-draft-import-list">
           {items.map((item) => {
@@ -141,11 +171,11 @@ export function Daily30DraftImportPanel({
                 </div>
                 <button
                   type="button"
-                  className="btn btn-primary btn-sm"
+                  className="btn btn-primary btn-xs"
                   disabled={!canImport || importingId === c.externalCandidateId}
                   onClick={() => void handleImport(item)}
                 >
-                  {importingId === c.externalCandidateId ? '取り込み中…' : '下書き候補として取り込む'}
+                  {importingId === c.externalCandidateId ? '取り込み中…' : '取り込む'}
                 </button>
               </li>
             );
@@ -154,12 +184,10 @@ export function Daily30DraftImportPanel({
       )}
 
       <div className="daily30-bulk-import-gate">
-        <label className="hint">
-          一括取り込み（leads.json のみ）— <code>{IMPORT_DAILY_30_DRAFT_CANDIDATES_GATE_LABEL}</code> と入力
-        </label>
+        <p className="hint">一括取り込み — ゲート語句を入力</p>
         <div className="daily30-fetch-row">
           <input
-            className="input"
+            className="input input-sm"
             value={bulkGateInput}
             onChange={(e) => setBulkGateInput(e.target.value)}
             placeholder={IMPORT_DAILY_30_DRAFT_CANDIDATES_GATE_LABEL}
@@ -167,11 +195,11 @@ export function Daily30DraftImportPanel({
           />
           <button
             type="button"
-            className="btn btn-primary"
+            className="btn btn-primary btn-sm"
             disabled={!bulkGateOk || bulkImporting || importable.length === 0}
             onClick={() => void handleBulkImport()}
           >
-            {bulkImporting ? '一括取り込み中…' : `一括取り込み（${importable.length}件）`}
+            {bulkImporting ? '取り込み中…' : `一括取り込み（${importable.length}件）`}
           </button>
         </div>
         {bulkMessage && <p className="hint success-text">{bulkMessage}</p>}

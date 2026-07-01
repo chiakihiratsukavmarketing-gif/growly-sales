@@ -14,6 +14,20 @@ export function parseApiError(
 ): string {
   if (body && typeof body === 'object' && 'error' in body) {
     const err = body as ApiErrorResponse;
+    return err.error?.trim() || fallbackMessage;
+  }
+  return fallbackMessage;
+}
+
+/** 開発者向け詳細（折りたたみ表示用） */
+export function parseApiErrorDev(
+  api: string,
+  status: number,
+  body: unknown,
+  fallbackMessage: string
+): string {
+  if (body && typeof body === 'object' && 'error' in body) {
+    const err = body as ApiErrorResponse;
     const parts = [
       err.error || fallbackMessage,
       err.api ? `API: ${err.api}` : `API: ${api}`,

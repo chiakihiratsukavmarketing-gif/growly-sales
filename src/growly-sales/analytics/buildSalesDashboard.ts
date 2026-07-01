@@ -43,6 +43,7 @@ export interface SalesDashboardMetrics {
   formOnlyLeadCount: number;
   followUpTargetCount: number;
   pendingGmailSendRecordCount: number;
+  humanReviewPendingCount: number;
 }
 
 export interface OutreachSenderConfig {
@@ -297,6 +298,7 @@ export function buildSalesDashboard(leads: Lead[], offer?: OfferProfile): SalesD
   const formOnlyLeadCount = leads.filter(isFormCopyOnlyLead).length;
   const followUpTargetCount = leads.filter((l) => inferNextActionForLead(l) === 'フォローアップ').length;
   const pendingGmailSendRecordCount = leads.filter(isPendingGmailSendRecordLead).length;
+  const humanReviewPendingCount = leads.filter((l) => l.humanReviewStatus === 'pending').length;
   const requestedReportLeads = leads.filter(
     (l) =>
       (l.sendStatus === 'sent' || l.sendStatus === 'manual_sent') &&
@@ -334,6 +336,7 @@ export function buildSalesDashboard(leads: Lead[], offer?: OfferProfile): SalesD
       formOnlyLeadCount,
       followUpTargetCount,
       pendingGmailSendRecordCount,
+      humanReviewPendingCount,
     },
     outreachSender: {
       fromEmail: getOutreachFromEmail(),

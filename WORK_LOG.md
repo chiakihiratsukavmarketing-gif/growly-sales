@@ -8,7 +8,50 @@
 
 ---
 
-## 2026-06-25 — Phase 21: 30件候補収集フロー
+## 2026-07-01 — Phase 35〜36.6: UI polish（ダッシュボード・候補収集・Lead一覧）
+
+**種別:** UIのみ（機能・API・Cloud/Gmailロジック変更なし）
+
+### 完了 Phase
+
+| Phase | 内容 |
+|-------|------|
+| **35** | ダッシュボード1画面レイアウト（1366×768向けコンパクトグリッド） |
+| **36** | 候補収集タブ polish（バッジ統一・カード圧縮・文言短縮・DevDetails分離） |
+| **36.5** | ダッシュボード視認性・密度再調整（フォント拡大・余白圧縮・キュー強調） |
+| **36.6** | Lead一覧 右詳細パネル修正（2カラム幅・ellipsis・sticky廃止・コンパクト化） |
+
+### 主な変更ファイル
+
+- `SalesDashboardView.tsx` / `DashboardCompactChecklist.tsx` / `GrowlySalesDashboard.tsx`
+- `Daily30CandidateCards.tsx` / `daily30StatusLabels.ts` / `CandidateCollectionView.tsx`
+- `Daily30CloudResultsPanel.tsx` / `Daily30LeadCandidatesPanel.tsx` / `Daily30DraftImportPanel.tsx`
+- `LeadListView.tsx` / `LeadDetailPanel.tsx` / `LeadReviewActions.tsx`
+- `styles.css` / `verify-growly-sales.ts`（Phase 35〜36.6 verify 追加）
+
+### 実データ確認（GCS経由・localhost:3847）
+
+| 項目 | 値 |
+|------|-----|
+| メール取得済み | 10 / 30 |
+| 総収集候補 | 30件 |
+| Lead化承認待ち | 10件（候補収集）/ 43件（Lead一覧棚卸し） |
+| ダッシュボード 1366×768 | 7列サイクル・横スクロールなし |
+| Lead一覧 2カラム | 左 774px + 右 380px・重なりなし |
+
+### 検証
+
+| 項目 | 結果 |
+|------|------|
+| ui:build | ✅ |
+| verify | ✅ Phase 35〜36.6 pass / **1552 passed, 23 failed**（既存失敗のみ） |
+| 自動送信・Gmail send | 変更なし |
+
+### 次回（運用）
+
+- **明日 9:00** Cloud Daily 30 本番運用チェック（下記 NEXT_TASKS 手順）
+
+---
 
 **種別:** 設計・実装・dry-run確認（実fetch未実行）
 
@@ -265,4 +308,4 @@
 | **20-lite** | **emailCandidates改善実装** | ✅ |
 | **19** | **Gmail下書き実作成テスト**（森のめぐみ工房1件成功） | ✅ |
 
-次回作業: [NEXT_TASKS.md](./NEXT_TASKS.md) — **Phase 20**
+次回作業: [NEXT_TASKS.md](./NEXT_TASKS.md) — **明日9時 Daily 30 本番運用チェック**

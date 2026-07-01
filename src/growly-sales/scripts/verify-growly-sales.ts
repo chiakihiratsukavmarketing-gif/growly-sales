@@ -1342,10 +1342,10 @@ async function verifyPilotPhase(): Promise<void> {
 
   assert(dashboard.includes('PilotModeBanner'), 'UI has pilot mode banner');
   assert(pilotBanner.includes(PILOT_MODE_LABEL), 'UI shows local manual MVP / pilot mode label');
-  assert(pilotBanner.includes(PILOT_MODE_EXTERNAL_API), 'UI shows external API unused');
-  assert(pilotBanner.includes(PILOT_MODE_GMAIL), 'UI shows Gmail unused');
+  assert(pilotBanner.includes(PILOT_MODE_EXTERNAL_API), 'UI shows external API chip');
+  assert(pilotBanner.includes(PILOT_MODE_GMAIL), 'UI shows Gmail chip');
   assert(pilotBanner.includes(PILOT_MODE_SEND_DISABLED), 'UI shows no auto-send');
-  assert(pilotBanner.includes(PILOT_MODE_STORAGE), 'UI shows local JSON storage');
+  assert(pilotBanner.includes('fetchGrowlyStorageStatus'), 'UI loads storage status dynamically');
   assert(uiServer.includes('/api/pilot-summary'), 'uiServer has pilot-summary API');
 
   const leads = [
@@ -2013,9 +2013,12 @@ async function verifyPhase16BReplyManagementUi(): Promise<void> {
     buildReplyManagementDiffMemo,
     assertReplyManagementEligible,
     REPLY_MANAGEMENT_UI_STATUSES,
+    REPLY_MANAGEMENT_API_STATUSES,
+    isReplyManagementApiStatus,
   } = await import('../workflow/replyManagementValidation.js');
 
   assert(inferNextActionFromReplyStatus('none') === '返信待ち', 'none maps to 返信待ち');
+  assert(inferNextActionFromReplyStatus('no_reply') === '対象外', 'no_reply maps to 対象外');
   assert(inferNextActionFromReplyStatus('replied') === 'フォローアップ', 'replied maps to フォローアップ');
   assert(inferNextActionFromReplyStatus('interested') === 'フォローアップ', 'interested maps to フォローアップ');
   assert(inferNextActionFromReplyStatus('requested_report') === '診断レポート作成', 'requested_report maps correctly');
@@ -2024,6 +2027,9 @@ async function verifyPhase16BReplyManagementUi(): Promise<void> {
   assert(isValidFollowUpDueAt('2026-06-30'), 'valid followUpDueAt accepted');
   assert(!isValidFollowUpDueAt('06/30/2026'), 'invalid followUpDueAt rejected');
   assert(REPLY_MANAGEMENT_UI_STATUSES.length === 6, 'UI has 6 reply statuses');
+  assert(REPLY_MANAGEMENT_API_STATUSES.includes('no_reply'), 'API allows no_reply');
+  assert(isReplyManagementApiStatus('no_reply'), 'isReplyManagementApiStatus accepts no_reply');
+  assert(!REPLY_MANAGEMENT_UI_STATUSES.includes('no_reply'), 'no_reply is API-only one-click status');
 
   const tmpJson = join(PROJECT_ROOT, 'data/growly-sales/.verify-phase16b-leads.json');
   const tmpCsv = join(PROJECT_ROOT, 'data/growly-sales/.verify-phase16b-leads.csv');
@@ -2055,6 +2061,55 @@ async function verifyPhase16BReplyManagementUi(): Promise<void> {
   assert(updated.replySummary === '希望の返信あり', 'reply-management updates replySummary');
   assert(updated.nextAction === 'フォローアップ', 'reply-management infers nextAction');
   assert(updated.communicationMemo.includes('返信管理UI更新'), 'reply-management appends diff memo');
+
+  const noReplyLead = createEmptyLead({
+    companyName: 'No Reply Co',
+    area: '仙台市',
+    industry: '工務店',
+    websiteUrl: 'https://no-reply.test',
+    sourceUrls: ['https://no-reply.test'],
+    sendStatus: 'sent',
+    replyStatus: 'none',
+    nextAction: '返信待ち',
+  });
+  await saveLeadsToJson(tmpJson, [noReplyLead]);
+  await saveLeadsToCsv(tmpCsv, [noReplyLead]);
+  const noReplyUpdated = await updateLeadReplyManagement(
+    noReplyLead.id,
+    { replyStatus: 'no_reply' },
+    tmpJson,
+    tmpCsv
+  );
+  assert(noReplyUpdated.replyStatus === 'no_reply', 'reply-management accepts no_reply');
+  assert(noReplyUpdated.nextAction === '対象外', 'no_reply infers 対象外 nextAction');
+  const { isAwaitingReplyLead, needsFollowUpDateSetup, resolveNextActionForLead } = await import(
+    '../workflow/replyManagement.js'
+  );
+  assert(!isAwaitingReplyLead(noReplyUpdated), 'no_reply lead excluded from awaiting reply');
+
+  const followUpLead = createEmptyLead({
+    companyName: 'Follow Up Unset Co',
+    area: '仙台市',
+    industry: '工務店',
+    websiteUrl: 'https://follow-unset.test',
+    sourceUrls: ['https://follow-unset.test'],
+    sendStatus: 'sent',
+    replyStatus: 'replied',
+    replySummary: 'テスト',
+    nextAction: 'フォローアップ',
+  });
+  await saveLeadsToJson(tmpJson, [followUpLead]);
+  await saveLeadsToCsv(tmpCsv, [followUpLead]);
+  assert(needsFollowUpDateSetup(followUpLead), 'replied follow-up lead needs date setup');
+  const noActionUpdated = await updateLeadReplyManagement(
+    followUpLead.id,
+    { nextAction: '対象外' },
+    tmpJson,
+    tmpCsv
+  );
+  assert(noActionUpdated.nextAction === '対象外', 'reply-management saves 対象外 nextAction');
+  assert(!needsFollowUpDateSetup(noActionUpdated), '対象外 clears follow-up date setup requirement');
+  assert(resolveNextActionForLead(noActionUpdated) === '対象外', 'resolveNextAction respects saved 対象外');
 
   let blocked = false;
   try {
@@ -2097,8 +2152,9 @@ async function verifyPhase16CGmailDraftCreateUi(): Promise<void> {
   const adapter = await readFile(join(SRC_ROOT, 'integrations/gmail/gmailDraftAdapter.ts'), 'utf-8');
 
   assert(draftView.includes('Gmail下書きを作成'), 'GmailDraftCandidatesView has create button');
-  assert(draftView.includes('送信はされません'), 'GmailDraftCandidatesView warns no send');
-  assert(draftView.includes('CREATE_DRAFTS'), 'GmailDraftCandidatesView has CREATE_DRAFTS gate');
+  assert(draftView.includes('自動送信は行いません'), 'GmailDraftCandidatesView warns no send');
+  const draftDialog = await readFile(join(SRC_ROOT, 'ui/GmailDraftCreateDialog.tsx'), 'utf-8');
+  assert(draftDialog.includes('CREATE_DRAFTS'), 'GmailDraftCreateDialog has CREATE_DRAFTS gate');
   assert(draftResultPanel.includes('送信記録タブへ移動'), 'Gmail draft result navigates to send records');
   assert(draftView.includes('onNavigateToTab'), 'GmailDraftCandidatesView wires tab navigation');
   assert(uiServer.includes('create-gmail-draft'), 'uiServer has create-gmail-draft API');
@@ -2322,16 +2378,22 @@ async function verifyPhase19DailySalesLoop(): Promise<void> {
   }
 
   const replyView = await readFile(join(SRC_ROOT, 'ui/ReplyManagementView.tsx'), 'utf-8');
-  assert(replyView.includes('返信待ち'), 'ReplyManagementView has awaiting reply routine');
-  assert(replyView.includes('何も更新しなくてOK'), 'ReplyManagementView documents no-update path');
+  assert(replyView.includes('SearchAndFilterBar'), 'ReplyManagementView has search filter bar');
+  assert(replyView.includes('pane-list-scroll'), 'ReplyManagementView has scrollable list pane');
+  assert(replyView.includes('返信なしで確認済みにする'), 'ReplyManagementView documents no-update path');
+  assert(replyView.includes('REPLY_NEXT_STEP_OPTIONS'), 'ReplyManagementView has next step options');
+  assert(replyView.includes('次の対応'), 'ReplyManagementView shows next step field');
+  const filterUtils = await readFile(join(SRC_ROOT, 'ui/leadFilterUtils.ts'), 'utf-8');
+  assert(filterUtils.includes('Gmail確認待ち'), 'reply filters include Gmail確認待ち label');
+  assert(filterUtils.includes('matchesCompanySearch'), 'leadFilterUtils has company search');
 
   const candidateView = await readFile(join(SRC_ROOT, 'ui/CandidateCollectionView.tsx'), 'utf-8');
-  assert(candidateView.includes('email-outreach-candidates'), 'CandidateCollectionView documents email-outreach-candidates');
-  assert(candidateView.includes('CREATE_DRAFTS'), 'CandidateCollectionView documents CREATE_DRAFTS');
+  assert(candidateView.includes('候補を集める'), 'CandidateCollectionView documents collection step');
+  assert(candidateView.includes('Daily30DraftImportPanel'), 'CandidateCollectionView documents draft import');
 
   const dashboardView = await readFile(join(SRC_ROOT, 'ui/SalesDashboardView.tsx'), 'utf-8');
-  assert(dashboardView.includes('DailyChecklistPanel'), 'SalesDashboardView uses DailyChecklistPanel');
-  assert(dashboardView.includes('最優先アクション（1件）'), 'SalesDashboardView shows single top action');
+  assert(dashboardView.includes('DashboardCompactChecklist'), 'SalesDashboardView uses compact checklist');
+  assert(dashboardView.includes('今日の最優先'), 'SalesDashboardView shows single top action');
 
   const logPanel = await readFile(join(SRC_ROOT, 'ui/DailyOperationsLogPanel.tsx'), 'utf-8');
   assert(logPanel.includes('localStorage'), 'DailyOperationsLogPanel uses localStorage only');
@@ -3346,6 +3408,593 @@ async function verifyPhase30CloudRunLoggingAndRecovery(): Promise<void> {
   ok('Phase 30 Cloud run logging and recovery checks passed');
 }
 
+async function verifyPhase31GcsLocalUiDashboard(): Promise<void> {
+  const uiServer = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
+  assert(uiServer.includes('/api/daily30-dashboard'), 'daily30-dashboard route');
+  assert(uiServer.includes('/api/daily30-ready-for-draft'), 'daily30-ready-for-draft route');
+  assert(uiServer.includes('/api/storage-status'), 'storage-status route');
+  assert(uiServer.includes('loadLeadsOptionalForDaily30'), 'optional leads for daily30');
+  assert(uiServer.includes('buildDaily30CloudDashboardPayload'), 'cloud dashboard payload');
+  assert(uiServer.includes('GROWLY_CLOUD_RUN_API_ONLY'), 'cloud run api only root');
+  assert(uiServer.includes('K_SERVICE'), 'cloud run detection uses K_SERVICE');
+
+  const cloudDash = await readFile(join(SRC_ROOT, 'candidates/buildDaily30CloudDashboard.ts'), 'utf-8');
+  assert(cloudDash.includes('emailFoundCandidates'), 'email found candidates in payload');
+  assert(cloudDash.includes('loadExternalCandidatesFromJson'), 'uses external candidates repo');
+  assert(cloudDash.includes('ok: false'), 'gcs read failure degrades with ok:false');
+  assert(cloudDash.includes('gcsReadError'), 'gcsReadError returned on failure');
+
+  const resultsPanel = await readFile(join(SRC_ROOT, 'ui/Daily30CloudResultsPanel.tsx'), 'utf-8');
+  const candidateCards = await readFile(join(SRC_ROOT, 'ui/Daily30CandidateCards.tsx'), 'utf-8');
+  assert(resultsPanel.includes('Cloud Daily 30'), 'cloud results panel title');
+  assert(resultsPanel.includes('email_found'), 'email found section');
+  assert(resultsPanel.includes('全候補'), 'shows all candidates section');
+  assert(resultsPanel.includes('Daily30CandidateList'), 'uses candidate card list');
+  assert(candidateCards.includes('target="_blank"'), 'clickable urls in cards');
+  assert(candidateCards.includes('Lead化承認'), 'lead approve button in cards');
+  assert(!resultsPanel.includes('force=true'), 'no force rerun in panel');
+  assert(!resultsPanel.includes('GOOGLE_PLACES_API_KEY'), 'no api key in panel');
+
+  const pilot = await readFile(join(SRC_ROOT, 'ui/PilotModeBanner.tsx'), 'utf-8');
+  assert(pilot.includes('fetchGrowlyStorageStatus'), 'pilot banner reads storage status');
+  assert(pilot.includes('Cloud Storage'), 'pilot banner gcs label');
+
+  const runbook = await readFile(join(PROJECT_ROOT, 'docs/GROWLY_SALES_DAILY30_RUNBOOK.md'), 'utf-8');
+  assert(runbook.includes('GROWLY_STORAGE_BACKEND=gcs'), 'runbook gcs env sample');
+
+  const { buildDaily30CloudDashboardPayload } = await import('../candidates/buildDaily30CloudDashboard.js');
+  const { loadLeadsOptionalForDaily30 } = await import('../storage/loadLeadsOptionalForDaily30.js');
+  const prevBackend = process.env.GROWLY_STORAGE_BACKEND;
+  const prevBucket = process.env.GROWLY_GCS_BUCKET;
+  process.env.GROWLY_STORAGE_BACKEND = 'local';
+  delete process.env.GROWLY_GCS_BUCKET;
+  try {
+    const leads = await loadLeadsOptionalForDaily30();
+    const payload = await buildDaily30CloudDashboardPayload(leads);
+    assert(payload.ok === true, 'dashboard payload ok');
+    assert(Array.isArray(payload.candidates), 'candidates array');
+    assert(Array.isArray(payload.emailFoundCandidates), 'emailFoundCandidates array');
+    assert(payload.storageBackend === 'local', 'verify uses local storage backend');
+  } finally {
+    if (prevBackend) process.env.GROWLY_STORAGE_BACKEND = prevBackend;
+    else delete process.env.GROWLY_STORAGE_BACKEND;
+    if (prevBucket) process.env.GROWLY_GCS_BUCKET = prevBucket;
+    else delete process.env.GROWLY_GCS_BUCKET;
+  }
+
+  const cloudFetch = await readFile(join(SRC_ROOT, 'candidates/runDaily30CloudAutoFetch.ts'), 'utf-8');
+  assert(!cloudFetch.includes('messages.send'), 'no gmail send');
+  assert(!cloudFetch.includes('users.drafts.create'), 'no drafts create');
+
+  const leadsBefore = await loadLeadsFromJson(getLeadsJsonPath()).catch(() => []);
+  const sentSnapshot = (Array.isArray(leadsBefore) ? leadsBefore : [])
+    .filter((l) => l.sendStatus === 'sent' || l.sendStatus === 'manual_sent')
+    .map((l) => ({ id: l.id, sendStatus: l.sendStatus, replyStatus: l.replyStatus }));
+
+  const leadsAfter = await loadLeadsFromJson(getLeadsJsonPath()).catch(() => []);
+  for (const before of sentSnapshot) {
+    const after = (Array.isArray(leadsAfter) ? leadsAfter : []).find((l) => l.id === before.id);
+    if (after) {
+      assert(after.sendStatus === before.sendStatus, `sendStatus unchanged phase31: ${before.id}`);
+      assert(after.replyStatus === before.replyStatus, `replyStatus unchanged phase31: ${before.id}`);
+    }
+  }
+
+  ok('Phase 31 GCS local UI dashboard checks passed');
+}
+
+async function verifyPhase33EmailFoundCollection(): Promise<void> {
+  const fetchSrc = await readFile(join(SRC_ROOT, 'candidates/fetchDaily30Candidates.ts'), 'utf-8');
+  assert(fetchSrc.includes('reachedTarget'), 'fetch uses reachedTarget');
+  assert(fetchSrc.includes('DAILY_30_TARGET_EMAIL_FOUND'), 'fetch targets email_found count');
+  assert(fetchSrc.includes('DAILY_30_MAX_COLLECTED_CANDIDATES'), 'fetch has max collected guard');
+  assert(fetchSrc.includes('DAILY_30_MAX_DURATION_MS'), 'fetch has max duration guard');
+  assert(fetchSrc.includes('stoppedReason'), 'fetch returns stoppedReason');
+  assert(!fetchSrc.includes('needed <= 0'), 'fetch does not stop on collected-only threshold');
+
+  const metricsSrc = await readFile(join(SRC_ROOT, 'candidates/daily30BatchMetrics.ts'), 'utf-8');
+  assert(metricsSrc.includes('isDaily30FormOnlyCandidate'), 'form-only classifier exists');
+  assert(metricsSrc.includes('isDaily30EmailFoundCandidate'), 'email-found classifier exists');
+
+  const cloudFetch = await readFile(join(SRC_ROOT, 'candidates/runDaily30CloudAutoFetch.ts'), 'utf-8');
+  assert(cloudFetch.includes('partial_success'), 'cloud run supports partial_success');
+  assert(cloudFetch.includes('targetEmailFound'), 'cloud response includes targetEmailFound');
+  assert(cloudFetch.includes('Daily 30 email-found target completed'), 'success message for email target');
+  assert(cloudFetch.includes('partially completed — email-found target not reached'), 'partial message documented');
+  assert(!cloudFetch.includes('messages.send'), 'phase33 no gmail send');
+  assert(!cloudFetch.includes('users.drafts.create'), 'phase33 no drafts create');
+  assert(!cloudFetch.includes('runDaily30CopyPipeline'), 'phase33 no copy pipeline');
+
+  const stateFile = await readFile(join(SRC_ROOT, 'storage/daily30CloudRunState.ts'), 'utf-8');
+  assert(stateFile.includes('targetEmailFound'), 'state json has targetEmailFound');
+  assert(stateFile.includes('totalCollected'), 'state json has totalCollected');
+  assert(stateFile.includes('formOnly'), 'state json has formOnly');
+  assert(stateFile.includes('reachedTarget'), 'state json has reachedTarget');
+  assert(stateFile.includes('stoppedReason'), 'state json has stoppedReason');
+  assert(stateFile.includes('partial_success'), 'duplicate guard includes partial_success');
+
+  const candidateView = await readFile(join(SRC_ROOT, 'ui/CandidateCollectionView.tsx'), 'utf-8');
+  assert(candidateView.includes('収集時メール取得'), 'UI separates collection-time email KPI');
+  assert(candidateView.includes('Lead化承認待ち'), 'UI shows lead approval pending');
+  assert(!candidateView.includes('今日の収集'), 'UI removed misleading collected KPI label');
+  assert(candidateView.includes('総収集候補'), 'UI shows total collected helper');
+  assert(candidateView.includes('フォームのみ'), 'UI shows form-only helper');
+
+  const {
+    DAILY_30_TARGET_EMAIL_FOUND,
+    DAILY_30_MAX_COLLECTED_CANDIDATES,
+  } = await import('../candidates/daily30CandidateStatus.js');
+  assert(DAILY_30_TARGET_EMAIL_FOUND === 30, 'email-found target is 30');
+  assert(DAILY_30_MAX_COLLECTED_CANDIDATES === 120, 'max collected candidates is 120');
+
+  const { countDaily30BatchMetrics } = await import('../candidates/daily30BatchMetrics.js');
+  const { buildDaily30Dashboard } = await import('../candidates/buildDaily30Dashboard.js');
+  const batchId = '2026-06-30';
+  const emailCandidate = {
+    externalCandidateId: 'phase33-email',
+    sourceType: 'google_places' as const,
+    companyName: 'メールあり工務店',
+    area: '宮城県',
+    industry: '工務店',
+    websiteUrl: 'https://email.test',
+    officialSiteUrl: 'https://email.test',
+    phoneNumber: null,
+    address: null,
+    googlePlaceId: null,
+    sourceUrl: null,
+    sourceQuery: 'q',
+    category: '工務店',
+    contactFormUrl: null,
+    emailCandidates: ['info@email.test'],
+    confidenceScore: 0.8,
+    importStatus: 'preview' as const,
+    riskLevel: 'low' as const,
+    duplicateReason: '',
+    duplicateKey: 'k1',
+    pipelineStatus: 'email_found' as const,
+    prefecture: '宮城県',
+    regionGroup: '宮城' as const,
+    collectionPriority: 1,
+    collectionAreaSource: '宮城県',
+    collectionBatchId: batchId,
+    emailCandidateSourceUrls: [],
+    emailVerifiedAt: null,
+    generatedEmailSubject: null,
+    generatedEmailBody: null,
+    generatedCustomHook: null,
+    generatedCustomHookReason: null,
+    targetEmail: null,
+    emailCandidateSourceUrl: null,
+    failureReason: null,
+    copyGeneratedAt: null,
+    qualityCheckedAt: null,
+    humanReviewStatus: null,
+    gmailDraftStatus: null,
+    sendStatus: null,
+    notes: '',
+    collectedAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  const formOnlyCandidate = {
+    ...emailCandidate,
+    externalCandidateId: 'phase33-form',
+    companyName: 'フォームのみ工務店',
+    websiteUrl: 'https://form.test',
+    officialSiteUrl: 'https://form.test',
+    emailCandidates: [],
+    pipelineStatus: 'email_not_found' as const,
+    contactFormUrl: 'https://form.test/contact',
+  };
+  const metrics = countDaily30BatchMetrics([emailCandidate, formOnlyCandidate], batchId);
+  assert(metrics.emailFound === 1, 'only email_found counts toward email KPI');
+  assert(metrics.formOnly === 1, 'form-only tracked separately');
+  assert(metrics.totalCollected === 2, 'form-only still in total collected');
+  assert(!metrics.reachedTarget, 'one email_found is not target reached');
+
+  const dashboard = buildDaily30Dashboard([emailCandidate, formOnlyCandidate], [], batchId);
+  assert(dashboard.emailShortfall === 29, 'shortfall based on email_found not total collected');
+
+  const { buildDaily30FetchPlan } = await import('../candidates/fetchDaily30Candidates.js');
+  const plan = buildDaily30FetchPlan();
+  assert(plan.targetEmailFound === 30, 'fetch plan documents email target');
+
+  const cloudPanel = await readFile(join(SRC_ROOT, 'ui/Daily30CloudResultsPanel.tsx'), 'utf-8');
+  assert(!cloudPanel.includes('GOOGLE_PLACES_API_KEY'), 'no api key in cloud results UI');
+  assert(!cloudPanel.includes('DAILY30_CLOUD_RUN_TOKEN'), 'no token in cloud results UI');
+
+  ok('Phase 33 Email Found 30 collection checks passed');
+}
+
+async function verifyPhase34LeadApprovalCopyFlow(): Promise<void> {
+  const cards = await readFile(join(SRC_ROOT, 'ui/Daily30CandidateCards.tsx'), 'utf-8');
+  assert(cards.includes('Lead化承認'), 'candidate cards have lead approve button');
+  assert(cards.includes('resolveDaily30WorkflowStatus'), 'candidate cards show workflow status');
+
+  const cloudPanel = await readFile(join(SRC_ROOT, 'ui/Daily30CloudResultsPanel.tsx'), 'utf-8');
+  assert(cloudPanel.includes('confirmDaily30LeadApproval'), 'cloud panel requires human confirm');
+  assert(cloudPanel.includes('showApprove'), 'cloud panel enables approve on email_found');
+
+  const leadPanel = await readFile(join(SRC_ROOT, 'ui/Daily30LeadCandidatesPanel.tsx'), 'utf-8');
+  assert(leadPanel.includes('confirmDaily30LeadApproval'), 'lead panel requires human confirm');
+  assert(leadPanel.includes('GENERATE_DAILY_30_COPY_GATE_LABEL'), 'lead panel has copy gate');
+  assert(leadPanel.includes('営業文生成待ち'), 'lead panel shows copy pending count');
+  assert(leadPanel.includes('Daily30CandidateList'), 'lead panel uses candidate cards');
+
+  const approveWorkflow = await readFile(
+    join(SRC_ROOT, 'workflow/approveExternalCandidateForLead.ts'),
+    'utf-8'
+  );
+  assert(approveWorkflow.includes("importStatus: 'approved_for_lead'"), 'approval sets importStatus');
+  assert(approveWorkflow.includes("pipelineStatus: 'ready_for_copy'"), 'approval sets ready_for_copy');
+  assert(!approveWorkflow.includes('saveLeadsToJson'), 'approval does not write leads.json');
+  assert(!approveWorkflow.includes('users.drafts.create'), 'approval does not create drafts');
+
+  const copyPipeline = await readFile(join(SRC_ROOT, 'candidates/runDaily30CopyPipeline.ts'), 'utf-8');
+  assert(copyPipeline.includes('qualityCheckDaily30Copy'), 'copy pipeline runs quality check');
+  assert(copyPipeline.includes("pipelineStatus: 'ready_for_draft'"), 'QC pass sets ready_for_draft');
+  assert(!copyPipeline.includes('messages.send'), 'copy pipeline does not send email');
+  assert(!copyPipeline.includes('users.drafts.create'), 'copy pipeline does not create drafts');
+
+  const uiServer = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
+  assert(uiServer.includes('/api/daily30-ready-for-draft'), 'ready-for-draft route exists');
+  assert(uiServer.includes('buildDaily30ReadyForDraftApiPayload'), 'ready-for-draft uses payload builder');
+  assert(uiServer.includes(GENERATE_DAILY_30_COPY_CONFIRM_TOKEN), 'generate-copy gate in uiServer');
+  assert(uiServer.includes(IMPORT_DAILY_30_DRAFT_CANDIDATES_CONFIRM_TOKEN), 'import gate in uiServer');
+
+  const candidateView = await readFile(join(SRC_ROOT, 'ui/CandidateCollectionView.tsx'), 'utf-8');
+  assert(candidateView.includes('GENERATE_DAILY_30_COPY'), 'flow steps mention copy gate');
+  assert(candidateView.includes('IMPORT_DAILY_30_DRAFT_CANDIDATES'), 'flow steps mention import gate');
+  assert(candidateView.includes('Lead化承認・営業文生成'), 'section 2 title updated');
+
+  const { resolveDaily30WorkflowStatus } = await import('../candidates/resolveDaily30WorkflowStatus.js');
+  const pending = {
+    externalCandidateId: 'p34-pending',
+    pipelineStatus: 'email_found' as const,
+    importStatus: 'preview' as const,
+    companyName: '未承認工務店',
+    emailCandidates: ['info@pending.test'],
+    emailCandidateSourceUrls: ['https://pending.test/contact'],
+    websiteUrl: 'https://pending.test',
+    officialSiteUrl: 'https://pending.test',
+  };
+  assert(resolveDaily30WorkflowStatus(pending as never).label === '未承認', 'pending shows 未承認');
+
+  const approved = {
+    ...pending,
+    externalCandidateId: 'p34-approved',
+    importStatus: 'approved_for_lead' as const,
+    pipelineStatus: 'ready_for_copy' as const,
+    companyName: '承認済工務店',
+  };
+  assert(
+    resolveDaily30WorkflowStatus(approved as never).label === '営業文生成待ち',
+    'approved shows copy pending'
+  );
+
+  const { buildDaily30ReadyForDraftApiPayload } = await import(
+    '../candidates/buildDaily30ReadyForDraftApiPayload.js'
+  );
+  const payload = buildDaily30ReadyForDraftApiPayload([], []);
+  assert(payload.ok === true, 'ready-for-draft payload ok');
+  assert(Array.isArray(payload.readyForDraftCandidates), 'readyForDraftCandidates array');
+  assert(Array.isArray(payload.approvedLeadCandidates), 'approvedLeadCandidates array');
+  assert(typeof payload.counts.readyForDraft === 'number', 'counts.readyForDraft');
+
+  const leads = await loadLeadsFromJson(getLeadsJsonPath()).catch(() => []);
+  const sentSnapshot = (Array.isArray(leads) ? leads : [])
+    .filter((l) => l.sendStatus === 'sent' || l.sendStatus === 'manual_sent')
+    .map((l) => ({ id: l.id, sendStatus: l.sendStatus, replyStatus: l.replyStatus }));
+
+  const leadsAfter = await loadLeadsFromJson(getLeadsJsonPath()).catch(() => []);
+  for (const before of sentSnapshot) {
+    const after = (Array.isArray(leadsAfter) ? leadsAfter : []).find((l) => l.id === before.id);
+    assert(after, `sent lead preserved phase34: ${before.id}`);
+    assert(after.sendStatus === before.sendStatus, `sendStatus unchanged phase34: ${before.id}`);
+  }
+
+  const draftPanel = await readFile(join(SRC_ROOT, 'ui/Daily30DraftImportPanel.tsx'), 'utf-8');
+  assert(!draftPanel.includes('GOOGLE_PLACES_API_KEY'), 'no secrets in draft panel');
+  assert(draftPanel.includes('CREATE_DRAFTS'), 'draft panel references CREATE_DRAFTS gate');
+
+  ok('Phase 34 Lead approval and copy flow checks passed');
+}
+
+async function verifyPhase35OneScreenDashboard(): Promise<void> {
+  const dashboardView = await readFile(join(SRC_ROOT, 'ui/SalesDashboardView.tsx'), 'utf-8');
+  assert(dashboardView.includes('dashboard-one-screen'), 'dashboard uses one-screen layout class');
+  assert(dashboardView.includes('dashboard-hero-compact'), 'dashboard has compact hero');
+  assert(dashboardView.includes('dashboard-cycle-strip'), 'dashboard has cycle strip');
+  assert(dashboardView.includes('dashboard-queue-grid'), 'dashboard has compact queue grid');
+  assert(dashboardView.includes('dashboard-weekly-compact'), 'dashboard has compact weekly summary');
+  assert(dashboardView.includes('DashboardCompactChecklist'), 'dashboard uses compact checklist');
+  assert(!dashboardView.includes('DailyChecklistPanel'), 'full checklist panel removed from dashboard');
+  assert(!dashboardView.includes('btn-lg'), 'dashboard removed large hero button');
+  assert(dashboardView.includes('週次レビューを開く'), 'weekly review collapsed behind toggle');
+
+  const styles = await readFile(join(SRC_ROOT, 'ui/styles.css'), 'utf-8');
+  assert(styles.includes('.dashboard-one-screen'), 'styles define dashboard-one-screen');
+  assert(styles.includes('.dashboard-cycle-strip-row'), 'styles define cycle strip row');
+  assert(styles.includes('.dashboard-queue-mini'), 'styles define queue mini cards');
+  assert(styles.includes('.weekly-review-textarea-compact'), 'weekly textarea height limited');
+
+  const shell = await readFile(join(SRC_ROOT, 'ui/GrowlySalesDashboard.tsx'), 'utf-8');
+  assert(shell.includes('dashboard-sidebar-compact'), 'sidebar compact class');
+  assert(shell.includes('dashboard-header-compact'), 'header compact class');
+  assert(shell.includes('tab-scroll-dashboard'), 'dashboard tab scroll class');
+  assert(shell.includes("activeTab !== 'dashboard'"), 'pilot banner hidden on dashboard tab duplicate');
+
+  const pilot = await readFile(join(SRC_ROOT, 'ui/PilotModeBanner.tsx'), 'utf-8');
+  assert(pilot.includes('compact'), 'pilot banner supports compact mode');
+  assert(!pilot.includes('GOOGLE_PLACES_API_KEY'), 'no secrets in pilot banner');
+
+  const compactChecklist = await readFile(join(SRC_ROOT, 'ui/DashboardCompactChecklist.tsx'), 'utf-8');
+  assert(compactChecklist.includes('要対応'), 'compact checklist shows attention summary');
+
+  ok('Phase 35 one-screen dashboard layout checks passed');
+}
+
+async function verifyPhase36UiPolish(): Promise<void> {
+  const styles = await readFile(join(SRC_ROOT, 'ui/styles.css'), 'utf-8');
+  assert(styles.includes('.status-badge'), 'Phase 36 unified status badges');
+  assert(styles.includes('.daily30-candidate-card-compact'), 'Phase 36 compact candidate cards');
+  assert(styles.includes('.candidate-collection-view'), 'Phase 36 candidate collection spacing');
+  assert(styles.includes('dashboard-cycle-step-label'), 'cycle step label ellipsis');
+
+  const statusLabels = await readFile(join(SRC_ROOT, 'ui/daily30StatusLabels.ts'), 'utf-8');
+  assert(statusLabels.includes('メール取得済'), 'Japanese pipeline status labels');
+  assert(statusLabels.includes('cloudRunStatusLabel'), 'cloud run status labels');
+
+  const candidateCards = await readFile(join(SRC_ROOT, 'ui/Daily30CandidateCards.tsx'), 'utf-8');
+  assert(candidateCards.includes('daily30StatusLabels'), 'candidate cards use shared labels');
+  assert(candidateCards.includes('status-badge'), 'candidate cards use status-badge');
+  assert(candidateCards.includes('btn-xs'), 'Lead approve button is compact');
+
+  const cloudPanel = await readFile(join(SRC_ROOT, 'ui/Daily30CloudResultsPanel.tsx'), 'utf-8');
+  assert(cloudPanel.includes('cloudRunStatusLabel'), 'cloud panel uses shared run labels');
+  assert(cloudPanel.includes('DevDetails'), 'run meta hidden in dev details');
+  assert(cloudPanel.includes('メール取得済候補'), 'email found section Japanese title');
+  assert(!cloudPanel.includes('IMPORT_DAILY_30_DRAFT_CANDIDATES'), 'no gate code in main UI');
+
+  const collectionView = await readFile(join(SRC_ROOT, 'ui/CandidateCollectionView.tsx'), 'utf-8');
+  assert(collectionView.includes('メール取得済み候補を確認してLead化します'), 'short collection subtitle');
+  assert(!collectionView.includes('Daily 30 実運用フロー'), 'flow moved out of main view');
+
+  const dashboard = await readFile(join(SRC_ROOT, 'ui/SalesDashboardView.tsx'), 'utf-8');
+  assert(dashboard.includes('返信待ち'), 'short cycle label for replies');
+  assert(dashboard.includes('下書き可'), 'short cycle label for drafts');
+
+  const leadPanel = await readFile(join(SRC_ROOT, 'ui/Daily30LeadCandidatesPanel.tsx'), 'utf-8');
+  assert(leadPanel.includes('営業文生成'), 'generate copy button label');
+  assert(leadPanel.includes('btn-sm'), 'generate button compact size');
+
+  const draftPanel = await readFile(join(SRC_ROOT, 'ui/Daily30DraftImportPanel.tsx'), 'utf-8');
+  assert(draftPanel.includes('下書き待ち'), 'draft import Japanese stat label');
+  assert(draftPanel.includes('取り込む'), 'short import button label');
+
+  ok('Phase 36 UI polish checks passed');
+}
+
+async function verifyPhase365DashboardReadability(): Promise<void> {
+  const styles = await readFile(join(SRC_ROOT, 'ui/styles.css'), 'utf-8');
+  assert(styles.includes('Phase 36.5'), 'Phase 36.5 readability styles');
+  assert(styles.includes('.dashboard-readable'), 'dashboard-readable class styles');
+  assert(styles.includes('.dashboard-shell-readable'), 'shell readable padding styles');
+  assert(styles.includes('.dashboard-hero-cta-btn'), 'hero CTA button styles');
+  assert(styles.includes('.dashboard-dev-details'), 'compact dev details margin');
+  assert(styles.includes('flex: 0 1 auto'), 'dashboard scroll area does not stretch empty');
+
+  const dashboard = await readFile(join(SRC_ROOT, 'ui/SalesDashboardView.tsx'), 'utf-8');
+  assert(dashboard.includes('dashboard-readable'), 'dashboard view uses readable class');
+  assert(dashboard.includes('dashboard-hero-cta-btn'), 'hero CTA uses readable button class');
+  assert(!dashboard.includes('btn-sm dashboard-hero-cta'), 'hero CTA no longer extra-small');
+
+  const shell = await readFile(join(SRC_ROOT, 'ui/GrowlySalesDashboard.tsx'), 'utf-8');
+  assert(shell.includes('dashboard-shell-readable'), 'shell uses readable class');
+
+  const devDetails = await readFile(join(SRC_ROOT, 'ui/common/DevDetails.tsx'), 'utf-8');
+  assert(devDetails.includes('className'), 'DevDetails supports className for dashboard margin');
+
+  ok('Phase 36.5 dashboard readability checks passed');
+}
+
+async function verifyPhase366LeadListPanel(): Promise<void> {
+  const styles = await readFile(join(SRC_ROOT, 'ui/styles.css'), 'utf-8');
+  assert(styles.includes('Phase 36.6'), 'Phase 36.6 lead list layout styles');
+  assert(styles.includes('.leads-two-pane'), 'leads two-pane grid');
+  assert(styles.includes('table-layout: fixed'), 'lead table fixed layout');
+  assert(styles.includes('.lead-detail-compact'), 'compact lead detail panel');
+  assert(styles.includes('position: static'), 'detail sticky removed in leads workspace');
+  assert(styles.includes('.textarea-review-comment'), 'review comment textarea height limit');
+  assert(styles.includes('.email-body-compact'), 'compact email body textarea');
+
+  const shell = await readFile(join(SRC_ROOT, 'ui/GrowlySalesDashboard.tsx'), 'utf-8');
+  assert(shell.includes('leads-two-pane'), 'leads tab uses two-pane class');
+
+  const listView = await readFile(join(SRC_ROOT, 'ui/LeadListView.tsx'), 'utf-8');
+  assert(listView.includes('lead-table-fixed'), 'lead table fixed class');
+  assert(listView.includes('lead-cell-ellipsis'), 'lead cells use ellipsis');
+
+  const detail = await readFile(join(SRC_ROOT, 'ui/LeadDetailPanel.tsx'), 'utf-8');
+  assert(detail.includes('lead-detail-compact'), 'detail panel compact class');
+  assert(detail.includes('shortenUrl'), 'URLs shortened in detail panel');
+
+  const review = await readFile(join(SRC_ROOT, 'ui/LeadReviewActions.tsx'), 'utf-8');
+  assert(review.includes('review-actions-compact'), 'compact review actions');
+  assert(review.includes('btn-sm'), 'review buttons use compact size');
+  assert(review.includes('textarea-review-comment'), 'review comment textarea class');
+
+  ok('Phase 36.6 Lead list detail panel layout checks passed');
+}
+
+async function verifyPhase37PartialSuccessState(): Promise<void> {
+  const cloudFetch = await readFile(join(SRC_ROOT, 'candidates/runDaily30CloudAutoFetch.ts'), 'utf-8');
+  assert(cloudFetch.includes('partial_success'), 'cloud run records partial_success');
+  assert(cloudFetch.includes('ensureDaily30StoppedReasonForRun'), 'state entry ensures stoppedReason');
+  assert(cloudFetch.includes('Daily 30 email-found target completed'), 'success message');
+  assert(
+    cloudFetch.includes('Daily 30 partially completed — email-found target not reached'),
+    'partial_success message'
+  );
+  assert(cloudFetch.includes('buildFetchFailedMessage'), 'failed message helper');
+  assert(!cloudFetch.includes('messages.send'), 'phase37 no gmail send');
+  assert(!cloudFetch.includes('users.drafts.create'), 'phase37 no drafts create');
+
+  const stateFile = await readFile(join(SRC_ROOT, 'storage/daily30CloudRunState.ts'), 'utf-8');
+  assert(stateFile.includes('partial_success'), 'duplicate guard includes partial_success');
+  assert(stateFile.includes("status === 'success' && !reachedTarget"), 'normalize fixes mislabeled success');
+
+  const metricsSrc = await readFile(join(SRC_ROOT, 'candidates/daily30BatchMetrics.ts'), 'utf-8');
+  assert(metricsSrc.includes('area_expansion_not_completed'), 'new stoppedReason type');
+  assert(metricsSrc.includes('collected_limit_reached_before_email_target'), 'legacy stop reason type');
+  assert(metricsSrc.includes('ensureDaily30StoppedReasonForRun'), 'stoppedReason backfill helper');
+
+  const fetchSrc = await readFile(join(SRC_ROOT, 'candidates/fetchDaily30Candidates.ts'), 'utf-8');
+  assert(fetchSrc.includes('areasUsedCount'), 'fetch passes areasUsed to stoppedReason resolver');
+  assert(!fetchSrc.includes('needed <= 0'), 'fetch does not stop on collected-only threshold');
+  const { DAILY_30_MAX_COLLECTED_CANDIDATES } = await import('../candidates/daily30CandidateStatus.js');
+  assert(DAILY_30_MAX_COLLECTED_CANDIDATES === 120, 'max collected candidates is 120');
+
+  const {
+    ensureDaily30StoppedReasonForRun,
+    countDaily30BatchMetrics,
+  } = await import('../candidates/daily30BatchMetrics.js');
+  const partialReason = ensureDaily30StoppedReasonForRun({
+    reachedTarget: false,
+    emailFound: 9,
+    targetEmailFound: 30,
+    totalCollected: 30,
+    durationMs: 60_000,
+    totalAreas: 5,
+  });
+  assert(
+    partialReason === 'area_expansion_not_completed',
+    'email 9/30 with areas remaining yields area_expansion_not_completed'
+  );
+  const successReason = ensureDaily30StoppedReasonForRun({
+    reachedTarget: true,
+    emailFound: 30,
+    targetEmailFound: 30,
+    totalCollected: 45,
+    durationMs: 60_000,
+  });
+  assert(successReason === 'target_email_found_reached', 'target reached reason');
+
+  const { buildDaily30Dashboard } = await import('../candidates/buildDaily30Dashboard.js');
+  const batchId = '2026-07-01';
+  const approvedCandidate = {
+    externalCandidateId: 'phase37-approved',
+    sourceType: 'google_places' as const,
+    companyName: '承認済工務店',
+    area: '茨城県',
+    industry: '工務店',
+    websiteUrl: 'https://approved.test',
+    officialSiteUrl: 'https://approved.test',
+    phoneNumber: null,
+    address: null,
+    googlePlaceId: null,
+    sourceUrl: null,
+    sourceQuery: 'q',
+    category: '工務店',
+    contactFormUrl: null,
+    emailCandidates: ['info@approved.test'],
+    confidenceScore: 0.8,
+    importStatus: 'approved_for_lead' as const,
+    riskLevel: 'low' as const,
+    duplicateReason: '',
+    duplicateKey: 'k-approved',
+    pipelineStatus: 'ready_for_copy' as const,
+    prefecture: '茨城県',
+    regionGroup: '北関東' as const,
+    collectionPriority: 3,
+    collectionAreaSource: '茨城県',
+    collectionBatchId: batchId,
+    emailCandidateSourceUrls: ['https://approved.test/contact'],
+  };
+  const pendingCandidate = {
+    ...approvedCandidate,
+    externalCandidateId: 'phase37-pending',
+    companyName: '承認待ち工務店',
+    importStatus: 'preview' as const,
+    pipelineStatus: 'email_found' as const,
+    duplicateKey: 'k-pending',
+    emailCandidates: ['info@pending.test'],
+    emailCandidateSourceUrls: ['https://pending.test/contact'],
+    websiteUrl: 'https://pending.test',
+    officialSiteUrl: 'https://pending.test',
+  };
+  const formOnlyCandidate = {
+    ...pendingCandidate,
+    externalCandidateId: 'phase37-form',
+    companyName: 'フォームのみ',
+    pipelineStatus: 'email_not_found' as const,
+    emailCandidates: [],
+    emailCandidateSourceUrls: [],
+    contactFormUrl: 'https://form.test/contact',
+    importStatus: 'preview' as const,
+    duplicateKey: 'k-form',
+  };
+  const cloudEntry = {
+    runId: 'phase37-run',
+    batchId,
+    mode: 'run' as const,
+    status: 'partial_success' as const,
+    startedAt: '2026-07-01T00:00:00.000Z',
+    finishedAt: '2026-07-01T00:03:00.000Z',
+    completedAt: '2026-07-01T00:03:00.000Z',
+    durationMs: 180_000,
+    collected: 30,
+    targetEmailFound: 30,
+    emailFound: 9,
+    totalCollected: 30,
+    formOnly: 0,
+    noEmail: 0,
+    reachedTarget: false,
+    stoppedReason: 'area_expansion_not_completed' as const,
+    duplicates: 0,
+    excluded: 0,
+    storageBackend: 'gcs',
+    schedulerConfigured: true,
+    cloudRunServiceUrlConfigured: true,
+    gcsBucketConfigured: true,
+    force: false,
+  };
+  const candidates = [approvedCandidate, pendingCandidate, formOnlyCandidate];
+  const batchMetrics = countDaily30BatchMetrics(candidates, batchId);
+  assert(batchMetrics.formOnly === 1, 'batch metrics formOnly from JSON');
+  assert(batchMetrics.emailFound === 1, 'live email_found count drops after approval');
+
+  const dashboard = buildDaily30Dashboard(candidates, [], batchId, cloudEntry);
+  assert(dashboard.emailFoundAtCollection === 9, 'collection-time email stays 9 after approval');
+  assert(dashboard.leadApprovalPendingCount === 1, 'approval pending is live pipeline count');
+  assert(dashboard.leadApprovalApprovedCount === 1, 'approved count tracked');
+  assert(dashboard.formOnlyAtCollection === 1, 'stale GCS formOnly backfilled from JSON');
+  assert(dashboard.collectionRunStatus === 'partial_success', 'dashboard exposes run status');
+
+  const candidateView = await readFile(join(SRC_ROOT, 'ui/CandidateCollectionView.tsx'), 'utf-8');
+  assert(candidateView.includes('収集時メール取得'), 'candidate view collection-time label');
+  assert(candidateView.includes('Lead化承認済み'), 'candidate view approved label');
+  assert(candidateView.includes('daily30Loading'), 'candidate view handles loading');
+
+  const salesDash = await readFile(join(SRC_ROOT, 'ui/SalesDashboardView.tsx'), 'utf-8');
+  assert(salesDash.includes('emailFoundAtCollection'), 'sales dashboard uses collection-time metric');
+  assert(salesDash.includes('daily30Loading'), 'sales dashboard avoids 0/30 flash');
+
+  const shell = await readFile(join(SRC_ROOT, 'ui/GrowlySalesDashboard.tsx'), 'utf-8');
+  assert(shell.includes('daily30Loading'), 'shell tracks daily30 loading state');
+
+  const blockReason = await readFile(
+    join(SRC_ROOT, 'candidates/getDaily30LeadApprovalBlockReason.ts'),
+    'utf-8'
+  );
+  assert(blockReason.includes('duplicateLeadName'), 'duplicate lead name in block hints');
+
+  const cards = await readFile(join(SRC_ROOT, 'ui/Daily30CandidateCards.tsx'), 'utf-8');
+  assert(cards.includes('approvalBlockReason'), 'candidate cards show block reason');
+
+  ok('Phase 37 partial success / state / UI checks passed');
+}
+
 function verifyPhase20LiteEmailImprovement(): void {
   assert(MAX_ADDITIONAL_CONTACT_PAGES === 4, 'additional page limit is 4');
 
@@ -3473,9 +4122,151 @@ async function verifyPhase20LiteEmailImprovementAsync(): Promise<void> {
   ok('Phase 20-lite async checks passed');
 }
 
+async function verifyPhaseBLeadInventory(): Promise<void> {
+  const {
+    isGmailOutreachTarget,
+    isFormOutreachTarget,
+    isExclusionCandidate,
+    findDuplicateCandidateGroups,
+    buildPhaseBInventoryReport,
+    PHASE_B_COMPLETION_CRITERIA,
+  } = await import('../workflow/leadPhaseBInventory.js');
+
+  const phaseBScript = await readFile(
+    join(SRC_ROOT, 'scripts/run-growly-sales-phase-b-status.ts'),
+    'utf-8'
+  );
+  assert(phaseBScript.includes('読み取り専用'), 'phase-b-status is read-only');
+  assert(phaseBScript.includes('PHASE_B_COMPLETION_CRITERIA'), 'phase-b-status prints completion criteria');
+
+  const filterUtils = await readFile(join(SRC_ROOT, 'ui/leadFilterUtils.ts'), 'utf-8');
+  assert(filterUtils.includes('gmail_outreach'), 'Lead list has Gmail outreach filter');
+  assert(filterUtils.includes('form_outreach'), 'Lead list has form outreach filter');
+  assert(filterUtils.includes('exclusion_candidate'), 'Lead list has exclusion filter');
+  assert(filterUtils.includes('duplicate_candidate'), 'Lead list has duplicate filter');
+
+  const gmailTarget = baseEligibleLead({
+    companyName: 'Phase B Gmail Target',
+    humanReviewStatus: 'approved',
+    sendStatus: 'not_sent',
+    gmailDraftStatus: 'none',
+  });
+  assert(isGmailOutreachTarget(gmailTarget), 'approved unsent email lead is Gmail outreach target');
+
+  const draftCreated = baseEligibleLead({
+    companyName: 'Phase B Draft Created',
+    gmailDraftStatus: 'draft_created',
+  });
+  assert(!isGmailOutreachTarget(draftCreated), 'draft_created lead excluded from Gmail outreach');
+
+  const formTarget = createEmptyLead({
+    companyName: 'Phase B Form Target',
+    area: '仙台市',
+    industry: '工務店',
+    websiteUrl: 'https://form-target.test',
+    sourceUrls: ['https://form-target.test'],
+    contactFormUrl: 'https://form-target.test/contact',
+    emailSubject: '件名',
+    emailBody: '本文',
+    humanReviewStatus: 'approved',
+    sendStatus: 'not_sent',
+  });
+  assert(isFormOutreachTarget(formTarget), 'form-only approved lead is form outreach target');
+  assert(!isGmailOutreachTarget(formTarget), 'form-only lead is not Gmail outreach target');
+
+  const dupA = baseEligibleLead({
+    companyName: 'Dup Co',
+    websiteUrl: 'https://dup.example',
+    emailCandidates: ['info@dup.example'],
+  });
+  const dupB = baseEligibleLead({
+    companyName: 'Dup Co',
+    websiteUrl: 'https://dup.example',
+    emailCandidates: ['other@dup.example'],
+  });
+  const dupGroups = findDuplicateCandidateGroups([dupA, dupB]);
+  assert(dupGroups.length >= 1, 'duplicate groups detected by company or website');
+
+  const sentNoAction = createEmptyLead({
+    companyName: 'Sent No Action',
+    area: '仙台市',
+    industry: '工務店',
+    websiteUrl: 'https://sent-no-action.test',
+    sourceUrls: ['https://sent-no-action.test'],
+    sendStatus: 'sent',
+    replyStatus: 'no_reply',
+    nextAction: '対象外',
+  });
+  assert(isExclusionCandidate(sentNoAction), 'sent no-action lead can be exclusion candidate');
+
+  const report = buildPhaseBInventoryReport([gmailTarget, formTarget, sentNoAction, dupA, dupB]);
+  assert(report.totalLeads === 5, 'phase B report counts all leads');
+  assert(report.counts.gmail_outreach >= 1, 'report has gmail outreach count');
+  assert(PHASE_B_COMPLETION_CRITERIA.length >= 5, 'phase B completion criteria defined');
+
+  ok('Phase B lead inventory classification verified');
+}
+
+async function verifyPhaseCCloudDaily30Status(): Promise<void> {
+  const pkg = await readFile(join(PROJECT_ROOT, 'package.json'), 'utf-8');
+  assert(pkg.includes('growly-sales:phase-c-cloud-status'), 'package.json has phase-c-cloud-status');
+
+  const phaseCScript = await readFile(
+    join(SRC_ROOT, 'scripts/run-growly-sales-phase-c-cloud-status.ts'),
+    'utf-8'
+  );
+  assert(phaseCScript.includes('読み取り専用'), 'phase-c script is read-only');
+  assert(!phaseCScript.includes('GMAIL_REFRESH_TOKEN'), 'phase-c script has no refresh token');
+  assert(!phaseCScript.includes('AIzaSy'), 'phase-c script has no sample api key');
+
+  const cloudDash = await readFile(join(SRC_ROOT, 'candidates/buildDaily30CloudDashboard.ts'), 'utf-8');
+  assert(cloudDash.includes('gcsReadError'), 'cloud dashboard has gcsReadError field');
+  assert(cloudDash.includes('contactPathSummary'), 'cloud dashboard has contact path summary');
+  assert(cloudDash.includes('ok: false'), 'cloud dashboard degrades on gcs failure');
+
+  const candidateView = await readFile(join(SRC_ROOT, 'ui/CandidateCollectionView.tsx'), 'utf-8');
+  assert(candidateView.includes('メール取得済み'), 'candidate view shows email-found KPI');
+  assert(candidateView.includes('総収集候補'), 'candidate view shows total collected helper');
+  assert(candidateView.includes('cloudOk'), 'candidate view handles cloud unavailable');
+
+  const { diagnoseGcsAuth } = await import('../config/gcsAuthDiagnostics.js');
+  const { summarizeDaily30ContactPaths } = await import('../candidates/summarizeDaily30ContactPaths.js');
+  const diag = diagnoseGcsAuth();
+  assert(typeof diag.recommendedAction === 'string', 'gcs auth diagnostics returns action');
+
+  const paths = summarizeDaily30ContactPaths(
+    [
+      {
+        collectionBatchId: '2026-06-30',
+        pipelineStatus: 'email_found',
+        importStatus: 'preview',
+        emailCandidates: ['info@example.com'],
+        contactFormUrl: null,
+      } as never,
+      {
+        collectionBatchId: '2026-06-30',
+        pipelineStatus: 'collected',
+        importStatus: 'preview',
+        emailCandidates: [],
+        contactFormUrl: 'https://example.com/contact',
+      } as never,
+    ],
+    '2026-06-30'
+  );
+  assert(paths.emailOnly === 1, 'contact path email only');
+  assert(paths.formOnly === 1, 'contact path form only');
+
+  ok('Phase C Cloud Daily 30 status diagnostics verified');
+}
+
 async function main(): Promise<void> {
   console.log('Growly Sales — Verify');
   console.log('========================');
+
+  loadEnv();
+  if (process.env.VERIFY_WITH_GCS !== 'true') {
+    process.env.GROWLY_STORAGE_BACKEND = 'local';
+  }
 
   const sampleLead = createEmptyLead({
     companyName: 'Sample Housing',
@@ -3562,8 +4353,18 @@ async function main(): Promise<void> {
   await verifyPhase28CloudStorageBackend();
   await verifyPhase29CloudSchedulerDeploy();
   await verifyPhase30CloudRunLoggingAndRecovery();
+  await verifyPhase31GcsLocalUiDashboard();
+  await verifyPhase33EmailFoundCollection();
+  await verifyPhase34LeadApprovalCopyFlow();
+  await verifyPhase35OneScreenDashboard();
+  await verifyPhase36UiPolish();
+  await verifyPhase365DashboardReadability();
+  await verifyPhase366LeadListPanel();
+  await verifyPhase37PartialSuccessState();
   verifyPhase20LiteEmailImprovement();
   await verifyPhase20LiteEmailImprovementAsync();
+  await verifyPhaseBLeadInventory();
+  await verifyPhaseCCloudDaily30Status();
   await verifyNoSendCode();
   verifyNpmAudit();
 

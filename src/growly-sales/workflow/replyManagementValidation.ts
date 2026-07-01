@@ -16,6 +16,12 @@ export const REPLY_MANAGEMENT_UI_STATUSES: readonly ReplyStatus[] = [
   'bounced',
 ] as const;
 
+/** reply-management API で許可する replyStatus（UI選択肢 + ワンクリック操作用） */
+export const REPLY_MANAGEMENT_API_STATUSES: readonly ReplyStatus[] = [
+  ...REPLY_MANAGEMENT_UI_STATUSES,
+  'no_reply',
+] as const;
+
 export const REPLY_SUMMARY_MAX_LENGTH = 500;
 
 export class ReplyManagementNotAllowedError extends Error {
@@ -36,6 +42,10 @@ export function isReplyManagementUiStatus(value: string): value is ReplyStatus {
   return (REPLY_MANAGEMENT_UI_STATUSES as readonly string[]).includes(value);
 }
 
+export function isReplyManagementApiStatus(value: string): value is ReplyStatus {
+  return (REPLY_MANAGEMENT_API_STATUSES as readonly string[]).includes(value);
+}
+
 export function isValidFollowUpDueAt(value: string | null | undefined): boolean {
   if (value === null || value === undefined || value === '') return true;
   const trimmed = value.trim();
@@ -50,8 +60,9 @@ export function isValidFollowUpDueAt(value: string | null | undefined): boolean 
 export function inferNextActionFromReplyStatus(replyStatus: ReplyStatus): OutreachNextAction {
   switch (replyStatus) {
     case 'none':
-    case 'no_reply':
       return '返信待ち';
+    case 'no_reply':
+      return '対象外';
     case 'replied':
     case 'interested':
     case 'follow_up_needed':
@@ -77,9 +88,9 @@ export function assertReplyManagementEligible(lead: Lead): void {
 }
 
 export function validateReplyManagementUpdatePayload(update: ReplyManagementUpdate): void {
-  if (update.replyStatus !== undefined && !isReplyManagementUiStatus(update.replyStatus)) {
+  if (update.replyStatus !== undefined && !isReplyManagementApiStatus(update.replyStatus)) {
     throw new ReplyManagementValidationError(
-      `不正な replyStatus です。許可: ${REPLY_MANAGEMENT_UI_STATUSES.join(', ')}`
+      `不正な replyStatus です。API許可: ${REPLY_MANAGEMENT_API_STATUSES.join(', ')}`
     );
   }
   if (update.followUpDueAt !== undefined && !isValidFollowUpDueAt(update.followUpDueAt)) {
@@ -135,6 +146,7 @@ export function appendReplyManagementDiffMemo(before: Lead, after: Lead): Lead {
 export function replyStatusLabel(status: ReplyStatus): string {
   const labels: Partial<Record<ReplyStatus, string>> = {
     none: '返信待ち',
+    no_reply: '返信なし確認済',
     replied: '返信あり',
     interested: '興味あり',
     requested_report: '診断希望',

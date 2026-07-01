@@ -10,7 +10,13 @@ import {
 } from './buildDaily30Dashboard.js';
 import { fetchDaily30Candidates } from './fetchDaily30Candidates.js';
 import { todayBatchId } from './daily30AreaConfig.js';
-import { DAILY_30_TARGET } from './daily30CandidateStatus.js';
+import { DAILY_30_TARGET, DAILY_30_TARGET_EMAIL_FOUND } from './daily30CandidateStatus.js';
+import {
+  countDaily30BatchMetrics,
+  ensureDaily30StoppedReasonForRun,
+  type Daily30StoppedReason,
+} from './daily30BatchMetrics.js';
+import { DAILY_30_AREA_EXPANSION } from './daily30AreaConfig.js';
 import {
   createCloudRunId,
   getCloudRunEntryForBatch,
@@ -54,10 +60,16 @@ export interface Daily30CloudAutoFetchResponse {
   runId: string;
   batchId: string;
   target: number;
+  targetEmailFound: number;
   collected: number;
+  totalCollected: number;
   emailFound: number;
+  formOnly: number;
+  noEmail: number;
   duplicates: number;
   excluded: number;
+  reachedTarget: boolean;
+  stoppedReason?: Daily30StoppedReason;
   nextArea: string;
   startedAt: string;
   finishedAt: string;
@@ -90,27 +102,32 @@ interface RunEnvironmentSnapshot {
   gcsBucketConfigured: boolean;
 }
 
-function countBatchMetrics(candidates: ExternalLeadCandidate[], batchId: string): {
-  collected: number;
-  emailFound: number;
-  duplicates: number;
-  excluded: number;
-} {
-  const today = candidates.filter((c) => c.collectionBatchId === batchId);
-  const accepted = today.filter(
-    (c) =>
-      c.pipelineStatus !== 'duplicate' &&
-      c.pipelineStatus !== 'excluded' &&
-      c.importStatus !== 'duplicate'
-  );
+function countBatchMetrics(candidates: ExternalLeadCandidate[], batchId: string) {
+  return countDaily30BatchMetrics(candidates, batchId);
+}
+
+function buildRunMetricsFields(metrics: ReturnType<typeof countDaily30BatchMetrics>) {
   return {
-    collected: accepted.length,
-    emailFound: today.filter((c) => c.pipelineStatus === 'email_found').length,
-    duplicates: today.filter(
-      (c) => c.pipelineStatus === 'duplicate' || c.importStatus === 'duplicate'
-    ).length,
-    excluded: today.filter((c) => c.pipelineStatus === 'excluded').length,
+    collected: metrics.totalCollected,
+    totalCollected: metrics.totalCollected,
+    targetEmailFound: metrics.targetEmailFound,
+    emailFound: metrics.emailFound,
+    formOnly: metrics.formOnly,
+    noEmail: metrics.noEmail,
+    duplicates: metrics.duplicates,
+    excluded: metrics.excluded,
+    reachedTarget: metrics.reachedTarget,
   };
+}
+
+function buildFetchCompletionMessage(reachedTarget: boolean): string {
+  return reachedTarget
+    ? 'Daily 30 email-found target completed'
+    : 'Daily 30 partially completed — email-found target not reached';
+}
+
+function buildFetchFailedMessage(fallback: string): string {
+  return fallback.trim() || 'Daily 30 auto-fetch failed';
 }
 
 function getEnvironmentSnapshot(): RunEnvironmentSnapshot {
@@ -147,8 +164,17 @@ function buildResponse(
 ): Daily30CloudAutoFetchResponse {
   const finishedAt = partial.finishedAt ?? new Date().toISOString();
   const safeMessage = partial.safeMessage ?? partial.message;
+  const totalCollected = partial.totalCollected ?? partial.collected ?? 0;
+  const targetEmailFound = partial.targetEmailFound ?? DAILY_30_TARGET_EMAIL_FOUND;
   return {
     ...partial,
+    target: partial.target ?? DAILY_30_TARGET,
+    targetEmailFound,
+    totalCollected,
+    collected: totalCollected,
+    formOnly: partial.formOnly ?? 0,
+    noEmail: partial.noEmail ?? 0,
+    reachedTarget: partial.reachedTarget ?? partial.emailFound >= targetEmailFound,
     finishedAt,
     durationMs: durationMs(partial.startedAt, finishedAt),
     safeMessage,
@@ -190,7 +216,13 @@ function makeStateEntry(
     startedAt: string;
     finishedAt: string;
     collected: number;
+    totalCollected?: number;
+    targetEmailFound?: number;
     emailFound: number;
+    formOnly?: number;
+    noEmail?: number;
+    reachedTarget?: boolean;
+    stoppedReason?: Daily30StoppedReason;
     duplicates: number;
     excluded: number;
     nextArea?: string;
@@ -202,10 +234,34 @@ function makeStateEntry(
   },
   env: RunEnvironmentSnapshot
 ): Daily30CloudRunStateEntry {
+  const totalCollected = base.totalCollected ?? base.collected;
+  const targetEmailFound = base.targetEmailFound ?? DAILY_30_TARGET_EMAIL_FOUND;
+  const emailFound = base.emailFound;
+  const reachedTarget = base.reachedTarget ?? emailFound >= targetEmailFound;
+  const duration = durationMs(base.startedAt, base.finishedAt);
+  const stoppedReason =
+    base.mode === 'run' && (base.status === 'success' || base.status === 'partial_success')
+      ? ensureDaily30StoppedReasonForRun({
+          reachedTarget,
+          emailFound,
+          targetEmailFound,
+          totalCollected,
+          durationMs: duration,
+          explicit: base.stoppedReason,
+          totalAreas: DAILY_30_AREA_EXPANSION.length,
+        })
+      : base.stoppedReason;
   return {
     ...base,
+    collected: totalCollected,
+    totalCollected,
+    targetEmailFound,
+    formOnly: base.formOnly ?? 0,
+    noEmail: base.noEmail ?? 0,
+    reachedTarget,
+    stoppedReason,
     completedAt: base.finishedAt,
-    durationMs: durationMs(base.startedAt, base.finishedAt),
+    durationMs: duration,
     storageBackend: env.storageBackend,
     schedulerConfigured: env.schedulerConfigured,
     cloudRunServiceUrlConfigured: env.cloudRunServiceUrlConfigured,
@@ -299,10 +355,7 @@ export async function runDaily30CloudAutoFetch(
       runId,
       batchId,
       target: DAILY_30_TARGET,
-      collected: metrics.collected,
-      emailFound: metrics.emailFound,
-      duplicates: metrics.duplicates,
-      excluded: metrics.excluded,
+      ...buildRunMetricsFields(metrics),
       nextArea: dashboard.nextExploreArea,
       startedAt,
       finishedAt,
@@ -583,21 +636,22 @@ export async function runDaily30CloudAutoFetch(
     const metrics = countBatchMetrics(candidates, batchId);
     const afterDashboard = buildDaily30Dashboard(candidates, leads, batchId);
     const finishedAt = new Date().toISOString();
+    const reachedTarget = stats.reachedTarget;
+    const runStatus: Daily30CloudRunStatus = reachedTarget ? 'success' : 'partial_success';
+    const message = buildFetchCompletionMessage(reachedTarget);
     const entry = makeStateEntry(
       {
         runId,
         batchId,
         mode: 'run',
-        status: 'success',
+        status: runStatus,
         startedAt,
         finishedAt,
-        collected: metrics.collected,
-        emailFound: stats.emailFound,
-        duplicates: metrics.duplicates,
-        excluded: metrics.excluded,
+        ...buildRunMetricsFields(metrics),
+        stoppedReason: stats.stoppedReason,
         nextArea: afterDashboard.nextExploreArea,
         force,
-        message: 'Daily 30 auto-fetch completed',
+        message,
       },
       env
     );
@@ -606,17 +660,15 @@ export async function runDaily30CloudAutoFetch(
       {
         ok: true,
         mode: 'run',
-        status: 'success',
+        status: runStatus,
         runId,
         batchId,
         target: DAILY_30_TARGET,
-        collected: metrics.collected,
-        emailFound: stats.emailFound,
-        duplicates: metrics.duplicates,
-        excluded: metrics.excluded,
+        ...buildRunMetricsFields(metrics),
+        stoppedReason: stats.stoppedReason,
         nextArea: afterDashboard.nextExploreArea,
         startedAt,
-        message: 'Daily 30 auto-fetch completed',
+        message,
         force,
         cloudRunAlreadyCompleted: false,
       },
@@ -686,8 +738,14 @@ export interface Daily30CloudLastRunSummary {
   durationMs: number;
   mode: string;
   status: string;
+  targetEmailFound: number;
   collected: number;
+  totalCollected: number;
   emailFound: number;
+  formOnly: number;
+  noEmail: number;
+  reachedTarget: boolean;
+  stoppedReason?: Daily30StoppedReason;
   duplicates: number;
   excluded: number;
   nextArea?: string;
@@ -701,6 +759,7 @@ export interface Daily30CloudLastRunSummary {
 
 export type Daily30CloudAutomationStatus =
   | 'success'
+  | 'partial_success'
   | 'failed'
   | 'skipped'
   | 'blocked'
@@ -747,8 +806,14 @@ function mapLastRun(entry: Daily30CloudRunStateEntry | null): Daily30CloudLastRu
     durationMs: entry.durationMs,
     mode: entry.mode,
     status: entry.status,
+    targetEmailFound: entry.targetEmailFound,
     collected: entry.collected,
+    totalCollected: entry.totalCollected,
     emailFound: entry.emailFound,
+    formOnly: entry.formOnly,
+    noEmail: entry.noEmail,
+    reachedTarget: entry.reachedTarget,
+    stoppedReason: entry.stoppedReason,
     duplicates: entry.duplicates,
     excluded: entry.excluded,
     nextArea: entry.nextArea,
@@ -768,6 +833,7 @@ function deriveAutomationStatus(
   if (!lastRun) return 'not_run';
   if (lastRun.batchId !== todayBatchId) return 'not_run';
   if (lastRun.status === 'success') return 'success';
+  if (lastRun.status === 'partial_success') return 'partial_success';
   if (lastRun.status === 'failed') return 'failed';
   if (lastRun.status === 'blocked') return 'blocked';
   if (lastRun.status === 'skipped') return 'skipped';
@@ -806,8 +872,8 @@ export async function buildDaily30CloudStatus(): Promise<Daily30CloudStatus> {
     duplicateGuardActive: true,
     todayCloudRunCompleted,
     externalFetchConfigured: isExternalFetchConfigured(),
-    collectedToday: dashboard.collectedToday,
-    target: dashboard.target,
+    collectedToday: dashboard.emailFoundAtCollection,
+    target: dashboard.targetEmailFound,
     automationStatus,
     lastRun,
     cloudLoggingFilter: CLOUD_LOGGING_FILTER_ONE_LINE,

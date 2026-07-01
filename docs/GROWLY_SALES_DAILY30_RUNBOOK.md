@@ -227,6 +227,25 @@ chmod +x scripts/cloud/growly-daily30/*.sh
 3. 毎朝 9:00 自動実行を UI で確認
 4. 候補の Lead 化・営業文・下書き・送信は人間オペレーション（自動化外）
 
+### ローカル UI で Cloud 結果を見る（.env）
+
+```env
+GROWLY_CLOUD_RUN_SERVICE_URL=https://<cloud-run-url>
+GROWLY_CLOUD_SCHEDULER_CONFIGURED=true
+GROWLY_STORAGE_BACKEND=gcs
+GROWLY_GCS_BUCKET=growly-sales-daily30
+GROWLY_GCS_PREFIX=prod/growly-sales
+```
+
+**注意:** ローカル PC から GCS を読むには Google 認証が必要な場合があります。
+
+```powershell
+gcloud auth application-default login
+npm run growly-sales:ui
+```
+
+認証がない場合、候補収集タブに GCS 読み込みエラーが表示されます（Secret / token は表示しません）。
+
 - `needs_review` / `excluded` は下書き候補化しない
 - 署名 Email: `c_hiratsuka@wantreach.jp`
 - 返信本文全文は保存せず `replySummary` のみ

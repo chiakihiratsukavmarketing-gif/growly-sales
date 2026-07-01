@@ -1,5 +1,6 @@
 import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTypes.js';
 import type { Daily30DraftPipelineProgress } from '../candidates/buildDaily30DraftPipelineProgress.js';
+import type { Daily30ReadyForDraftApiPayload } from '../candidates/buildDaily30ReadyForDraftApiPayload.js';
 import { readApiError } from './apiError.js';
 
 const API_BASE = '';
@@ -12,12 +13,7 @@ export interface Daily30ReadyForDraftItem {
   qualityCheckPassed: boolean;
 }
 
-export interface Daily30ReadyForDraftResponse {
-  items: Daily30ReadyForDraftItem[];
-  draftPipeline: Daily30DraftPipelineProgress;
-  generatedAt: string;
-  note: string;
-}
+export interface Daily30ReadyForDraftResponse extends Daily30ReadyForDraftApiPayload {}
 
 export interface Daily30ImportDraftResponse {
   imported: Array<{ lead: { id: string; companyName: string }; candidate: ExternalLeadCandidate }>;

@@ -1,12 +1,12 @@
 import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTypes.js';
 import { findDuplicateReason } from '../adapters/dedupeExternalCandidates.js';
-import { loadLeadsFromJson } from '../storage/jsonLeadRepository.js';
-import { getLeadsJsonPath } from '../config/paths.js';
+import { loadLeadsOptionalForDaily30 } from '../storage/loadLeadsOptionalForDaily30.js';
 import {
   loadExternalCandidatesFromJson,
-  saveExternalCandidatesToCsv,
+  persistExternalCandidates,
   saveExternalCandidatesToJson,
 } from '../storage/externalCandidatesRepository.js';
+import { isGcsStorageBackend } from '../config/storageBackend.js';
 import { isDaily30LeadReviewCandidate } from '../candidates/selectDaily30LeadCandidates.js';
 
 export async function approveExternalCandidateForLead(
@@ -24,7 +24,7 @@ export async function approveExternalCandidateForLead(
     throw new Error('Lead化承認の条件を満たしていません（email_found・必須フィールド・未取り込み）');
   }
 
-  const existingLeads = await loadLeadsFromJson(getLeadsJsonPath());
+  const existingLeads = await loadLeadsOptionalForDaily30();
   const dup = findDuplicateReason(candidate, existingLeads, candidates);
   if (dup) {
     throw new Error(dup);
@@ -34,11 +34,15 @@ export async function approveExternalCandidateForLead(
     ...candidate,
     importStatus: 'approved_for_lead',
     pipelineStatus: 'ready_for_copy',
+    humanReviewStatus: null,
     failureReason: null,
     updatedAt: new Date().toISOString(),
   };
   candidates[index] = updated;
-  await saveExternalCandidatesToJson(candidates);
-  await saveExternalCandidatesToCsv(candidates);
+  if (isGcsStorageBackend()) {
+    await saveExternalCandidatesToJson(candidates);
+  } else {
+    await persistExternalCandidates(candidates);
+  }
   return updated;
 }

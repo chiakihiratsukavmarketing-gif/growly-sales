@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { fetchSalesDashboard, type SalesDashboardResponse } from './salesDashboardApi.js';
-import { InfoBanner } from './InfoBanner.js';
 import { SectionCard } from './SectionCard.js';
 import { SignatureRefreshPanel } from './SignatureRefreshPanel.js';
 import { Daily30SafetyRulesPanel } from './Daily30OperationsPanel.js';
+import { PageHeader } from './common/PageHeader.js';
+import { DevDetails } from './common/DevDetails.js';
 
 interface SettingsViewProps {
   onError: (message: string) => void;
@@ -34,20 +35,27 @@ export function SettingsView({ onError, onDataChanged }: SettingsViewProps) {
   if (!data) return null;
 
   const { outreachSender, mimeVerification } = data;
+  const senderConfigured = Boolean(outreachSender.fromEmail && outreachSender.signatureEmail);
 
   return (
     <div className="settings-view">
-      <InfoBanner variant="info">
-        送信元・MIME の表示のみ。APIキー・refresh token・.env の秘密情報は表示しません。
-      </InfoBanner>
+      <PageHeader title="設定" subtitle="現在の安全状態と送信元設定を確認します。" />
 
-      <SignatureRefreshPanel
-        onError={onError}
-        onRefreshed={() => {
-          onDataChanged?.();
-          void load();
-        }}
-      />
+      <SectionCard title="安全状態">
+        <ul className="safety-status-list">
+          <li><span className="safety-ok">OFF</span> 自動送信</li>
+          <li><span className="safety-ok">手動承認後のみ</span> Gmail下書き作成</li>
+          <li>
+            <span className={senderConfigured ? 'safety-ok' : 'safety-warn'}>
+              {senderConfigured ? '設定済み' : '要確認'}
+            </span>{' '}
+            送信元
+          </li>
+          <li><span className="safety-ok">保存しない</span> 返信本文全文</li>
+          <li><span className="safety-ok">非表示</span> 秘密情報（APIキー等）</li>
+          <li><span className="safety-ok">ローカルJSON</span> データ保存先</li>
+        </ul>
+      </SectionCard>
 
       <SectionCard title="営業メール送信元">
         <dl className="config-dl">
@@ -68,34 +76,29 @@ export function SettingsView({ onError, onDataChanged }: SettingsViewProps) {
             <dd>{outreachSender.signatureEmail}</dd>
           </div>
         </dl>
-        <p className="hint">
-          標準値 c_hiratsuka@wantreach.jp。変更は .env の OUTREACH_* 変数（画面には秘密を出しません）。
-        </p>
       </SectionCard>
 
-      <SectionCard title="MIME / Gmail下書き品質">
-        <InfoBanner variant="success">{mimeVerification.label}</InfoBanner>
-        <p className="hint">{mimeVerification.summary}</p>
-        <ul className="mime-check-list">
-          {mimeVerification.checks.map((check) => (
-            <li key={check.id} className={check.ok ? 'mime-ok' : 'mime-ng'}>
-              {check.ok ? '✓' : '✗'} {check.label}
-            </li>
-          ))}
-        </ul>
-      </SectionCard>
+      <SignatureRefreshPanel
+        onError={onError}
+        onRefreshed={() => {
+          onDataChanged?.();
+          void load();
+        }}
+      />
 
-      <Daily30SafetyRulesPanel />
-
-      <SectionCard title="運用ポリシー">
-        <ul className="policy-list">
-          <li>Gmail下書き作成は CREATE_DRAFTS 明示時のみ（下書き候補タブ）</li>
-          <li>humanReviewStatus=pending は承認後にのみ下書き作成可能</li>
-          <li>sendStatus=sent は人手で Gmail 送信後に送信記録タブで記録</li>
-          <li>自動送信・一括送信は禁止</li>
-          <li>データ保存: leads.json / leads.csv（ローカル）</li>
-        </ul>
-      </SectionCard>
+      <DevDetails title="開発者向け詳細（MIME・安全ルール）">
+        <SectionCard title="MIME / Gmail下書き品質">
+          <p className="hint">{mimeVerification.label} — {mimeVerification.summary}</p>
+          <ul className="mime-check-list">
+            {mimeVerification.checks.map((check) => (
+              <li key={check.id} className={check.ok ? 'mime-ok' : 'mime-ng'}>
+                {check.ok ? '✓' : '✗'} {check.label}
+              </li>
+            ))}
+          </ul>
+        </SectionCard>
+        <Daily30SafetyRulesPanel />
+      </DevDetails>
     </div>
   );
 }
