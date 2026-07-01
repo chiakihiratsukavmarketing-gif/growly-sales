@@ -25,9 +25,11 @@ export interface EmailOutreachCandidateView {
   email: string;
   emailSourceUrl: string | null;
   emailSourceLabel: string;
+  emailSourceCompactLabel: string;
   sourcePageType: EmailSourcePageType;
   officialSiteUrl: string | null;
   isOfficialSiteOrigin: boolean;
+  emailSourceConfirmed: boolean;
   isPlaceholderEmail: boolean;
   isPersonalEmail: boolean;
   batchId: string | null;
@@ -220,9 +222,11 @@ export function buildEmailOutreachCandidateView(
     email: emailSource.email,
     emailSourceUrl: emailSource.emailSourceUrl,
     emailSourceLabel: emailSource.emailSourceLabel,
+    emailSourceCompactLabel: emailSource.emailSourceCompactLabel,
     sourcePageType: emailSource.sourcePageType,
     officialSiteUrl: emailSource.officialSiteUrl,
     isOfficialSiteOrigin: emailSource.isOfficialSiteOrigin,
+    emailSourceConfirmed: emailSource.emailSourceConfirmed,
     isPlaceholderEmail: emailSource.isPlaceholderEmail,
     isPersonalEmail: emailSource.isPersonalEmail,
     batchId: emailSource.batchId,

@@ -1,6 +1,10 @@
 import type { Lead } from '../types/lead.js';
 import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTypes.js';
 import { findDuplicateReason } from '../adapters/dedupeExternalCandidates.js';
+import {
+  isPlaceholderEmailAddress,
+  isPersonalEmailAddress,
+} from './resolveEmailSourceDisplay.js';
 import { isDaily30LeadReviewCandidate } from './selectDaily30LeadCandidates.js';
 
 export interface Daily30LeadApprovalBlockHint {
@@ -38,6 +42,23 @@ export function getDaily30LeadApprovalBlockReason(
     return {
       blockReason: dup,
       duplicateLeadName: extractDuplicateLeadName(dup),
+      canApprove: false,
+    };
+  }
+
+  const email =
+    candidate.targetEmail?.trim() ||
+    candidate.emailCandidates.find((e) => e.trim())?.trim() ||
+    '';
+  if (email && isPlaceholderEmailAddress(email)) {
+    return {
+      blockReason: 'メール不正の可能性（プレースホルダ）',
+      canApprove: false,
+    };
+  }
+  if (email && isPersonalEmailAddress(email)) {
+    return {
+      blockReason: '個人メールの可能性',
       canApprove: false,
     };
   }

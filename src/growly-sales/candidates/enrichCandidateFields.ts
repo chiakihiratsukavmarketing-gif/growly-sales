@@ -35,6 +35,9 @@ export function enrichExternalLeadCandidate(
     humanReviewStatus: candidate.humanReviewStatus ?? null,
     gmailDraftStatus: candidate.gmailDraftStatus ?? null,
     sendStatus: candidate.sendStatus ?? null,
+    excludedAt: candidate.excludedAt ?? null,
+    excludedReason: candidate.excludedReason ?? null,
+    excludedBy: candidate.excludedBy ?? null,
   };
 }
 

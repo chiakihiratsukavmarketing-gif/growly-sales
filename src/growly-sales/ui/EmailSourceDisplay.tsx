@@ -1,9 +1,9 @@
 import type { EmailSourceDisplayInfo } from '../candidates/resolveEmailSourceDisplay.js';
 import { shortenEmailSourceUrl } from '../candidates/resolveEmailSourceDisplay.js';
+import type { EmailOutreachCandidateView } from '../outreach/outreachPolicy.js';
 
 interface EmailSourceDisplayProps {
   info: EmailSourceDisplayInfo;
-  /** compact: メール行の直下に取得先のみ。full: ラベル付きブロック */
   variant?: 'compact' | 'full' | 'inline';
   showEmail?: boolean;
   showOfficialSite?: boolean;
@@ -26,23 +26,37 @@ function EmailSourceLink({ url }: { url: string }) {
 }
 
 function EmailSourceWarnings({ info }: { info: EmailSourceDisplayInfo }) {
-  if (!info.isPlaceholderEmail && !info.isPersonalEmail && info.isOfficialSiteOrigin) {
-    return null;
+  const warnings: string[] = [];
+  if (info.isPlaceholderEmail) {
+    warnings.push('メール不正の可能性あり');
   }
+  if (info.isPersonalEmail) {
+    warnings.push('個人メールの可能性');
+  }
+  if (!info.emailSourceConfirmed) {
+    warnings.push(
+      'メール取得元URLが未確認です。送信前に公式サイト上で宛先を確認してください。'
+    );
+  } else if (!info.isOfficialSiteOrigin && info.emailSourceUrl) {
+    warnings.push('公式サイト以外のページから取得');
+  }
+
+  if (warnings.length === 0) return null;
+
   return (
     <ul className="email-source-warnings">
-      {info.isPlaceholderEmail ? (
-        <li className="email-source-warning email-source-warning-danger">プレースホルダメールの可能性</li>
-      ) : null}
-      {info.isPersonalEmail ? (
-        <li className="email-source-warning email-source-warning-danger">個人メールの可能性</li>
-      ) : null}
-      {!info.isOfficialSiteOrigin && info.emailSourceUrl ? (
-        <li className="email-source-warning">公式サイト以外のページから取得</li>
-      ) : null}
-      {!info.emailSourceUrl ? (
-        <li className="email-source-warning">メール取得先URLが未記録</li>
-      ) : null}
+      {warnings.map((w) => (
+        <li
+          key={w}
+          className={`email-source-warning ${
+            w.includes('メール不正') || w.includes('個人メール')
+              ? 'email-source-warning-danger'
+              : ''
+          }`}
+        >
+          {w}
+        </li>
+      ))}
     </ul>
   );
 }
@@ -55,18 +69,22 @@ export function EmailSourceDisplay({
   showWarnings = false,
   className = '',
 }: EmailSourceDisplayProps) {
-  if (!info.email && !info.emailSourceUrl) return null;
+  if (!info.email && !info.emailSourceUrl && !info.officialSiteUrl) return null;
+
+  const displayLabel =
+    variant === 'compact' ? info.emailSourceCompactLabel : info.emailSourceLabel;
 
   if (variant === 'inline') {
     return (
       <span className={`email-source-inline ${className}`.trim()}>
-        {info.emailSourceUrl ? (
+        <span className="email-source-inline-label">メール取得元:</span>{' '}
+        {info.emailSourceConfirmed && info.emailSourceUrl ? (
           <>
-            <span className="email-source-inline-label">取得先:</span>{' '}
+            <span className="email-source-page-label">{displayLabel}</span>{' '}
             <EmailSourceLink url={info.emailSourceUrl} />
           </>
         ) : (
-          <span className="email-source-missing">取得先未記録</span>
+          <span className="email-source-missing">未確認</span>
         )}
       </span>
     );
@@ -83,15 +101,20 @@ export function EmailSourceDisplay({
         </div>
       ) : null}
       <div className="email-source-row">
-        <span className="email-source-label">取得先</span>
+        <span className="email-source-label">メール取得元</span>
         <span className="email-source-value">
-          {info.emailSourceUrl ? (
+          {info.emailSourceConfirmed && info.emailSourceUrl ? (
             <>
-              <span className="email-source-page-label">{info.emailSourceLabel}</span>
+              <span className="email-source-page-label">{displayLabel}</span>
               <EmailSourceLink url={info.emailSourceUrl} />
             </>
           ) : (
-            <span className="email-source-missing">未記録</span>
+            <>
+              <span className="email-source-missing">未確認</span>
+              {info.officialSiteUrl ? (
+                <span className="email-source-subhint">公式サイトURLのみ確認済み</span>
+              ) : null}
+            </>
           )}
         </span>
       </div>
@@ -103,17 +126,29 @@ export function EmailSourceDisplay({
           </span>
         </div>
       ) : null}
-      {showOfficialSite && info.emailSourceUrl ? (
-        <div className="email-source-row">
-          <span className="email-source-label">公式由来</span>
-          <span className="email-source-value">
-            {info.isOfficialSiteOrigin ? 'はい' : 'いいえ（要確認）'}
-          </span>
-        </div>
-      ) : null}
       {showWarnings ? <EmailSourceWarnings info={info} /> : null}
     </div>
   );
+}
+
+export function emailSourceInfoFromOutreachView(
+  view: EmailOutreachCandidateView & { to?: string }
+): EmailSourceDisplayInfo {
+  return {
+    email: view.to?.trim() || view.email,
+    emailSourceUrl: view.emailSourceUrl,
+    emailSourceLabel: view.emailSourceLabel,
+    emailSourceCompactLabel: view.emailSourceCompactLabel,
+    sourcePageType: view.sourcePageType,
+    officialSiteUrl: view.officialSiteUrl ?? (view.websiteUrl || null),
+    isOfficialSiteOrigin: view.isOfficialSiteOrigin,
+    emailSourceConfirmed: view.emailSourceConfirmed,
+    isPlaceholderEmail: view.isPlaceholderEmail,
+    isPersonalEmail: view.isPersonalEmail,
+    checkedUrls: view.emailCandidateSourceUrls,
+    batchId: view.batchId,
+    source: view.source,
+  };
 }
 
 export function EmailSourceConfirmBlock({ info }: { info: EmailSourceDisplayInfo }) {

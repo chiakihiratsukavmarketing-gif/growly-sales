@@ -4035,6 +4035,30 @@ async function verifyEmailSourceDisplay(): Promise<void> {
   assert(!resolved.isPlaceholderEmail, 'corporate email is not placeholder');
   assert(!resolved.isPersonalEmail, 'corporate email is not personal');
 
+  assert(resolved.emailSourceLabel.includes('公式サイト /'), 'label uses official site prefix');
+  assert(resolved.emailSourceLabel.includes('会社概要'), 'about page labeled as company profile');
+  assert(resolved.emailSourceConfirmed, 'explicit source url is confirmed');
+
+  const contactLead = createEmptyLead({
+    companyName: '問い合わせテスト',
+    area: '宮城県',
+    industry: '工務店',
+    websiteUrl: 'https://utsumi-h.com/',
+    emailCandidates: ['info@utsumi-h.com'],
+    emailCandidateSourceUrls: ['https://utsumi-h.com/contact'],
+    contactFormUrl: 'https://utsumi-h.com/contact',
+    emailContactType: 'corporate',
+  });
+  const contactResolved = resolveEmailSourceFromLead(contactLead);
+  assert(
+    contactResolved.emailSourceLabel.includes('お問い合わせ'),
+    'contact page uses お問い合わせ label not form-only wording'
+  );
+  assert(
+    !contactResolved.emailSourceLabel.includes('問い合わせフォームページ'),
+    'avoids ambiguous 問い合わせフォームページ label'
+  );
+
   const view = buildEmailOutreachCandidateView(lead);
   assert(view.emailSourceUrl === resolved.emailSourceUrl, 'outreach view exposes emailSourceUrl');
   assert(view.emailSourceLabel.length > 0, 'outreach view exposes emailSourceLabel');
@@ -4100,13 +4124,58 @@ async function verifyEmailSourceDisplay(): Promise<void> {
 
   const gmailDialog = await readFile(join(SRC_ROOT, 'ui/GmailDraftCreateDialog.tsx'), 'utf-8');
   const leadDetail = await readFile(join(SRC_ROOT, 'ui/LeadDetailPanel.tsx'), 'utf-8');
+  const emailUi = await readFile(join(SRC_ROOT, 'ui/EmailSourceDisplay.tsx'), 'utf-8');
   const recordWorkflow = await readFile(join(SRC_ROOT, 'workflow/recordManualGmailSent.ts'), 'utf-8');
+  assert(emailUi.includes('メール取得元'), 'UI label is メール取得元');
   assert(gmailDialog.includes('EmailSourceConfirmBlock'), 'gmail create dialog shows email source confirm');
   assert(leadDetail.includes('EmailSourceDisplay'), 'lead detail shows email source');
   assert(recordWorkflow.includes('emailSourceUrl='), 'send memo records emailSourceUrl');
   assert(!recordWorkflow.includes('messages.send'), 'email source record workflow does not send');
 
   ok('Email source URL display checks passed');
+}
+
+async function verifyPhase381EmailSourceAndExclude(): Promise<void> {
+  const excludeWorkflow = await readFile(join(SRC_ROOT, 'workflow/excludeDaily30Candidate.ts'), 'utf-8');
+  const cards = await readFile(join(SRC_ROOT, 'ui/Daily30CandidateCards.tsx'), 'utf-8');
+  const confirmExclude = await readFile(join(SRC_ROOT, 'ui/confirmDaily30CandidateExclude.ts'), 'utf-8');
+  const uiServer = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
+  const copyApi = await readFile(join(SRC_ROOT, 'ui/daily30CopyApi.ts'), 'utf-8');
+
+  assert(excludeWorkflow.includes("pipelineStatus: 'excluded'"), 'exclude sets pipelineStatus excluded');
+  assert(excludeWorkflow.includes("importStatus: 'excluded'"), 'exclude sets importStatus excluded');
+  assert(excludeWorkflow.includes('excludedBy:'), 'exclude records excludedBy');
+  assert(excludeWorkflow.includes('imported'), 'exclude blocks imported candidates');
+  assert(!excludeWorkflow.includes('messages.send'), 'exclude workflow does not send gmail');
+  assert(!excludeWorkflow.includes('users.drafts.create'), 'exclude workflow does not create drafts');
+
+  assert(cards.includes('候補から除外'), 'candidate card has exclude button');
+  assert(cards.includes('btn-exclude'), 'exclude button uses subdued red style');
+  assert(cards.includes('承認不可'), 'duplicate shows approval blocked');
+  assert(cards.includes('isPlaceholderEmail'), 'placeholder email blocks approval via isPlaceholderEmail');
+
+  assert(confirmExclude.includes('window.confirm'), 'exclude uses confirm dialog');
+  assert(confirmExclude.includes('window.prompt'), 'exclude uses reason prompt');
+
+  assert(uiServer.includes('/api/daily30-candidates/exclude'), 'exclude API route exists');
+  assert(copyApi.includes('excludeDaily30CandidateApi'), 'client exclude API helper');
+
+  const { filterDaily30VisibleCandidates } = await import('../workflow/excludeDaily30Candidate.js');
+  const { isPlaceholderEmailAddress } = await import('../candidates/resolveEmailSourceDisplay.js');
+  assert(isPlaceholderEmailAddress('info@xxx.com'), 'placeholder info@xxx.com detected');
+
+  const excludedSample = {
+    ...({
+      externalCandidateId: 'phase381-exclude-visible',
+      importStatus: 'excluded' as const,
+      pipelineStatus: 'excluded' as const,
+      excludedBy: 'human' as const,
+    }),
+  } as import('../adapters/externalLeadCandidateTypes.js').ExternalLeadCandidate;
+  const visible = filterDaily30VisibleCandidates([excludedSample]);
+  assert(visible.length === 0, 'excluded candidate hidden from visible list');
+
+  ok('Phase 38.1 email source normalization and candidate exclude checks passed');
 }
 
 function verifyPhase20LiteEmailImprovement(): void {
@@ -4476,6 +4545,7 @@ async function main(): Promise<void> {
   await verifyPhase366LeadListPanel();
   await verifyPhase37PartialSuccessState();
   await verifyEmailSourceDisplay();
+  await verifyPhase381EmailSourceAndExclude();
   verifyPhase20LiteEmailImprovement();
   await verifyPhase20LiteEmailImprovementAsync();
   await verifyPhaseBLeadInventory();

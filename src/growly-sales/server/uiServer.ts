@@ -60,6 +60,11 @@ import {
 } from '../candidates/selectDaily30LeadCandidates.js';
 import { buildDaily30LeadApprovalBlockHints } from '../candidates/getDaily30LeadApprovalBlockReason.js';
 import {
+  excludeDaily30Candidate,
+  filterDaily30VisibleCandidates,
+  isDaily30HumanExcludedCandidate,
+} from '../workflow/excludeDaily30Candidate.js';
+import {
   markDealStatus,
   markFollowUpNeeded,
   markManualSent,
@@ -389,7 +394,9 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
       const leads = await loadLeadsOptionalForDaily30();
       const reviewCandidates = selectDaily30LeadReviewCandidates(candidates);
       const approvalPending = selectDaily30LeadApprovalPending(candidates);
-      const approvedForLead = candidates.filter((c) => c.importStatus === 'approved_for_lead');
+      const approvedForLead = candidates.filter(
+        (c) => c.importStatus === 'approved_for_lead' && !isDaily30HumanExcludedCandidate(c)
+      );
       const approvalBlockHints = buildDaily30LeadApprovalBlockHints(
         [...approvalPending, ...reviewCandidates],
         leads,
@@ -403,6 +410,32 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
         generatedAt: new Date().toISOString(),
         note: 'Lead化候補一覧。leads.json への自動取り込みは行いません。',
       });
+      return;
+    }
+
+    if (req.method === 'POST' && pathname === '/api/daily30-candidates/exclude') {
+      const body = await readJsonBody<{ candidateId?: string; reason?: string }>(req);
+      const candidateId = body.candidateId?.trim();
+      const reason = body.reason?.trim() ?? '';
+      if (!candidateId) {
+        sendApiError(res, 400, pathname, 'candidateId が必要です');
+        return;
+      }
+      try {
+        const candidate = await excludeDaily30Candidate(candidateId, reason);
+        sendJson(res, 200, {
+          candidate,
+          generatedAt: new Date().toISOString(),
+          message: '候補を除外しました（論理削除・既存Leadは削除していません）',
+        });
+      } catch (err) {
+        sendApiError(
+          res,
+          400,
+          pathname,
+          err instanceof Error ? err.message : '候補の除外に失敗しました'
+        );
+      }
       return;
     }
 
@@ -454,6 +487,14 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
       const draftPipeline = buildDaily30DraftPipelineProgress(candidates, leads, dashboard.batchId);
       const operations = buildDaily30OperationsSummary(candidates, leads, dashboard.batchId);
       const plan = buildDaily30FetchPlan();
+      const visibleCandidates = filterDaily30VisibleCandidates(candidates);
+      const emailFoundForHints = visibleCandidates.filter((c) => c.pipelineStatus === 'email_found');
+      const approvalBlockHints = buildDaily30LeadApprovalBlockHints(
+        emailFoundForHints,
+        leads,
+        candidates
+      );
+      const humanExcludedCount = candidates.filter(isDaily30HumanExcludedCandidate).length;
       sendJson(res, 200, {
         ...cloudDashboard,
         dashboard,
@@ -461,6 +502,8 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
         operations,
         areaExpansion: describeDaily30AreaExpansion(),
         plan,
+        approvalBlockHints,
+        humanExcludedCount,
         generatedAt: new Date().toISOString(),
         note: 'Daily 30 集計。Gmail送信・下書き自動作成は行いません。',
       });

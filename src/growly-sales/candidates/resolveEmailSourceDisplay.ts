@@ -1,9 +1,6 @@
 import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTypes.js';
 import { classifyEmailCandidate } from '../collectors/classifyEmailCandidate.js';
-import {
-  isFreeEmailDomain,
-  looksLikePersonalEmail,
-} from '../safety/contactPolicy.js';
+import { isRejectedEmail, isFreeEmailDomain, looksLikePersonalEmail } from '../safety/contactPolicy.js';
 import type { Lead } from '../types/lead.js';
 
 export type EmailSourcePageType =
@@ -19,10 +16,15 @@ export type EmailSourcePageType =
 export interface EmailSourceDisplayInfo {
   email: string;
   emailSourceUrl: string | null;
+  /** 表示用フルラベル（例: 公式サイト / お問い合わせページ） */
   emailSourceLabel: string;
+  /** カード内短縮ラベル（例: 公式サイト / お問い合わせ） */
+  emailSourceCompactLabel: string;
   sourcePageType: EmailSourcePageType;
   officialSiteUrl: string | null;
   isOfficialSiteOrigin: boolean;
+  /** emailCandidateSourceUrls 等の明示記録があるか */
+  emailSourceConfirmed: boolean;
   isPlaceholderEmail: boolean;
   isPersonalEmail: boolean;
   checkedUrls: string[];
@@ -67,7 +69,7 @@ function isHomepagePath(pathname: string): boolean {
   return p === '/' || p === '';
 }
 
-function inferPageType(url: string, contactFormUrl?: string | null): EmailSourcePageType {
+function inferPageType(url: string): EmailSourcePageType {
   const normalized = normalizeUrl(url);
   let pathname = '';
   try {
@@ -76,7 +78,6 @@ function inferPageType(url: string, contactFormUrl?: string | null): EmailSource
     return 'unknown';
   }
 
-  if (contactFormUrl && normalizeUrl(contactFormUrl) === normalized) return 'form';
   if (CONTACT_PATH_HINTS.some((h) => pathname.includes(h.toLowerCase()) || normalized.includes(h))) {
     return 'contact';
   }
@@ -91,36 +92,60 @@ function inferPageType(url: string, contactFormUrl?: string | null): EmailSource
   return 'other';
 }
 
-export function labelForEmailSourcePageType(pageType: EmailSourcePageType): string {
+function pageTypeJapanese(pageType: EmailSourcePageType, compact: boolean): string {
   switch (pageType) {
     case 'contact':
-      return '公式サイト お問い合わせページ';
     case 'form':
-      return '問い合わせフォームページ';
+      return compact ? 'お問い合わせ' : 'お問い合わせページ';
     case 'company_profile':
-      return '公式サイト 会社概要ページ';
+      return compact ? '会社概要' : '会社概要ページ';
     case 'privacy':
-      return '公式サイト プライバシーポリシー';
+      return compact ? 'プライバシーポリシー' : 'プライバシーポリシー';
     case 'official_home':
-      return '公式サイト トップページ';
+      return compact ? 'トップ' : 'トップページ';
     case 'recruit':
-      return '公式サイト 採用ページ';
+      return compact ? '採用' : '採用ページ';
     case 'other':
-      return '公式サイト';
+      return compact ? 'その他' : 'その他ページ';
     default:
-      return '確認元URL';
+      return '未確認';
   }
+}
+
+export function buildEmailSourceLabels(
+  pageType: EmailSourcePageType,
+  isOfficialSiteOrigin: boolean,
+  confirmed: boolean
+): { full: string; compact: string } {
+  if (!confirmed || pageType === 'unknown') {
+    return { full: '未確認', compact: '未確認' };
+  }
+  const pageFull = pageTypeJapanese(pageType, false);
+  const pageCompact = pageTypeJapanese(pageType, true);
+  if (isOfficialSiteOrigin) {
+    return {
+      full: `公式サイト / ${pageFull}`,
+      compact: `公式サイト / ${pageCompact}`,
+    };
+  }
+  return { full: pageFull, compact: pageCompact };
 }
 
 export function isPlaceholderEmailAddress(email: string): boolean {
   const normalized = email.trim().toLowerCase();
   if (!normalized) return false;
+  if (isRejectedEmail(normalized)) return true;
   if (/@xxx\.com$/i.test(normalized)) return true;
   if (/^xxx@/i.test(normalized)) return true;
   const [local, domain] = normalized.split('@');
   if (!local || !domain) return false;
-  if (local === 'xxx' || local === 'example' || local === 'sample') return true;
-  if (domain === 'xxx.com' || domain === 'example.com') return true;
+  if (local === 'xxx' || local === 'example' || local === 'sample' || local === 'test') {
+    return true;
+  }
+  if (domain === 'xxx.com' || domain === 'example.com' || domain === 'example.co.jp') {
+    return true;
+  }
+  if (/dummy|placeholder/.test(normalized)) return true;
   return false;
 }
 
@@ -148,7 +173,8 @@ function pickBestFallbackUrl(
     if (!officialHost) return false;
     const host = normalizeHost(u);
     if (host !== officialHost) return false;
-    return inferPageType(u, contactFormUrl) === 'contact' || inferPageType(u, contactFormUrl) === 'form';
+    const pt = inferPageType(u);
+    return pt === 'contact' || pt === 'form';
   });
   if (sameDomainContact) return sameDomainContact;
 
@@ -185,11 +211,12 @@ function resolveCore(input: {
 
   const uniqueChecked = [...new Set(checkedUrls)];
 
-  let emailSourceUrl =
+  const explicitSourceUrl =
     input.emailSourceUrl?.trim() ||
     input.emailCandidateSourceUrls?.find((u) => u.trim())?.trim() ||
     null;
-  emailSourceUrl = emailSourceUrl ? normalizeUrl(emailSourceUrl) : null;
+  const emailSourceConfirmed = Boolean(explicitSourceUrl);
+  let emailSourceUrl = explicitSourceUrl ? normalizeUrl(explicitSourceUrl) : null;
 
   if (!emailSourceUrl) {
     emailSourceUrl = pickBestFallbackUrl(
@@ -199,25 +226,23 @@ function resolveCore(input: {
     );
   }
 
-  const sourcePageType = emailSourceUrl
-    ? inferPageType(emailSourceUrl, input.contactFormUrl ?? null)
-    : 'unknown';
-  const emailSourceLabel = emailSourceUrl
-    ? labelForEmailSourcePageType(sourcePageType)
-    : '取得先未記録';
-
+  const sourcePageType = emailSourceUrl ? inferPageType(emailSourceUrl) : 'unknown';
   const isOfficialSiteOrigin = emailSourceUrl
     ? hostsMatch(emailSourceUrl, officialSiteUrl) ||
       (!officialSiteUrl && uniqueChecked.some((u) => hostsMatch(emailSourceUrl, u)))
     : false;
 
+  const labels = buildEmailSourceLabels(sourcePageType, isOfficialSiteOrigin, emailSourceConfirmed);
+
   return {
     email,
     emailSourceUrl,
-    emailSourceLabel,
+    emailSourceLabel: labels.full,
+    emailSourceCompactLabel: labels.compact,
     sourcePageType,
     officialSiteUrl,
     isOfficialSiteOrigin,
+    emailSourceConfirmed,
     isPlaceholderEmail: isPlaceholderEmailAddress(email),
     isPersonalEmail: isPersonalEmailAddress(email, input.emailContactType),
     checkedUrls: uniqueChecked,
@@ -279,4 +304,9 @@ export function shortenEmailSourceUrl(url: string, maxLen = 36): string {
     if (trimmed.length <= maxLen) return trimmed;
     return `${trimmed.slice(0, maxLen - 1)}…`;
   }
+}
+
+/** @deprecated Use buildEmailSourceLabels — kept for outreachPolicy memo compat */
+export function labelForEmailSourcePageType(pageType: EmailSourcePageType): string {
+  return buildEmailSourceLabels(pageType, true, true).full;
 }

@@ -2359,6 +2359,22 @@ body {
 
 .daily30-candidate-actions {
   flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.btn-exclude {
+  background: transparent;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.btn-exclude:hover:not(:disabled) {
+  background: #fef2f2;
+  border-color: #f87171;
 }
 
 .daily30-approved-label {
@@ -2485,6 +2501,18 @@ body {
   border: 1px solid var(--border-color, #e5e7eb);
   border-radius: 6px;
   background: var(--surface-muted, #f9fafb);
+}
+
+.email-source-subhint {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin-top: 0.1rem;
+}
+
+.daily30-excluded-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.78rem;
 }
 
 .daily30-candidate-field-email .email-source-display {

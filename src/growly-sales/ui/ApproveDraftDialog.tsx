@@ -1,5 +1,5 @@
 import type { GmailDraftCandidateDetail } from './gmailDraftCandidatesApi.js';
-import { EmailSourceConfirmBlock } from './EmailSourceDisplay.js';
+import { EmailSourceConfirmBlock, emailSourceInfoFromOutreachView } from './EmailSourceDisplay.js';
 
 interface ApproveDraftDialogProps {
   candidate: GmailDraftCandidateDetail;
@@ -22,19 +22,7 @@ export function ApproveDraftDialog({
           <strong>{candidate.companyName}</strong> の営業メール内容を確認し、Gmail下書き作成候補として承認します。
         </p>
         <EmailSourceConfirmBlock
-          info={{
-            email: candidate.to || candidate.email,
-            emailSourceUrl: candidate.emailSourceUrl,
-            emailSourceLabel: candidate.emailSourceLabel,
-            sourcePageType: candidate.sourcePageType,
-            officialSiteUrl: candidate.officialSiteUrl ?? (candidate.websiteUrl || null),
-            isOfficialSiteOrigin: candidate.isOfficialSiteOrigin,
-            isPlaceholderEmail: candidate.isPlaceholderEmail,
-            isPersonalEmail: candidate.isPersonalEmail,
-            checkedUrls: candidate.emailCandidateSourceUrls,
-            batchId: candidate.batchId,
-            source: candidate.source,
-          }}
+          info={emailSourceInfoFromOutreachView({ ...candidate, to: candidate.to || candidate.email })}
         />
         <ul className="policy-list compact">
           <li>承認は下書き作成の許可であり、<strong>送信ではありません</strong></li>

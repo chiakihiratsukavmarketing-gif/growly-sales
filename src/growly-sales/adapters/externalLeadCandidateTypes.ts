@@ -24,7 +24,8 @@ export type ExternalCandidateImportStatus =
   | 'imported'
   | 'skipped'
   | 'duplicate'
-  | 'needs_review';
+  | 'needs_review'
+  | 'excluded';
 
 export const EXTERNAL_CANDIDATE_SOURCE_TYPES: readonly ExternalCandidateSourceType[] = [
   'google_places',
@@ -40,6 +41,7 @@ export const EXTERNAL_CANDIDATE_IMPORT_STATUSES: readonly ExternalCandidateImpor
   'skipped',
   'duplicate',
   'needs_review',
+  'excluded',
 ];
 
 export interface ExternalLeadCandidate {
@@ -96,6 +98,12 @@ export interface ExternalLeadCandidate {
   humanReviewStatus: Daily30HumanReviewStatus | null;
   gmailDraftStatus: Daily30GmailDraftStatus | null;
   sendStatus: Daily30SendStatus | null;
+  /** Phase 38.1: 人間が候補一覧から除外した日時 */
+  excludedAt?: string | null;
+  /** Phase 38.1: 除外理由 */
+  excludedReason?: string | null;
+  /** Phase 38.1: 除外実行者 */
+  excludedBy?: 'human' | null;
   notes: string;
   collectedAt: string;
   createdAt: string;

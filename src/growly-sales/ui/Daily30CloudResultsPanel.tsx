@@ -2,8 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTypes.js';
 import { SectionCard } from './SectionCard.js';
 import { InfoBanner } from './InfoBanner.js';
-import { approveExternalCandidateForLead } from './daily30CopyApi.js';
+import { approveExternalCandidateForLead, excludeDaily30CandidateApi } from './daily30CopyApi.js';
 import { confirmDaily30LeadApproval } from './confirmDaily30LeadApproval.js';
+import { confirmDaily30CandidateExclude } from './confirmDaily30CandidateExclude.js';
 import { fetchDaily30Dashboard, type Daily30DashboardResponse } from './daily30Api.js';
 import { EmptyState } from './common/EmptyState.js';
 import { DevDetails } from './common/DevDetails.js';
@@ -57,6 +58,7 @@ export function Daily30CloudResultsPanel({
   const [data, setData] = useState<Daily30DashboardResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [excludingId, setExcludingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -95,6 +97,22 @@ export function Daily30CloudResultsPanel({
     }
   }
 
+  async function handleExclude(candidate: ExternalLeadCandidate): Promise<void> {
+    const reason = confirmDaily30CandidateExclude(candidate);
+    if (!reason) return;
+    setExcludingId(candidate.externalCandidateId);
+    try {
+      await excludeDaily30CandidateApi(candidate.externalCandidateId, reason);
+      onSuccess?.(`${candidate.companyName} を候補から除外しました`);
+      onChanged?.();
+      await load();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : '候補の除外に失敗しました');
+    } finally {
+      setExcludingId(null);
+    }
+  }
+
   if (loading) return <p className="loading">収集結果を読み込み中…</p>;
 
   if (!data || data.ok === false) {
@@ -130,6 +148,8 @@ export function Daily30CloudResultsPanel({
   const emailFound = data.emailFoundCandidates ?? [];
   const allCandidates = data.candidates ?? [];
   const pipelineCounts = countByPipeline(allCandidates);
+  const approvalBlockHints = data.approvalBlockHints ?? {};
+  const humanExcludedCount = data.humanExcludedCount ?? 0;
 
   return (
     <SectionCard title="今日の収集結果" className="daily30-cloud-results-card">
@@ -195,6 +215,10 @@ export function Daily30CloudResultsPanel({
             <dd>{data.excluded}</dd>
           </div>
           <div>
+            <dt>humanExcluded</dt>
+            <dd>{humanExcludedCount}</dd>
+          </div>
+          <div>
             <dt>最終実行</dt>
             <dd>{formatTimestamp(data.finishedAt)}</dd>
           </div>
@@ -237,10 +261,17 @@ export function Daily30CloudResultsPanel({
           candidates={emailFound}
           showApprove
           approvingId={approvingId}
+          excludingId={excludingId}
           onApprove={(c) => void handleApprove(c)}
+          onExclude={(c) => void handleExclude(c)}
+          approvalBlockHints={approvalBlockHints}
           emptyMessage="メール取得済候補はありません。"
         />
       </section>
+
+      {humanExcludedCount > 0 ? (
+        <p className="hint daily30-excluded-hint">除外済み {humanExcludedCount}件（通常一覧には表示しません）</p>
+      ) : null}
 
       <section className="daily30-candidate-section">
         <header className="daily30-section-header">

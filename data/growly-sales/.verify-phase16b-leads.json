@@ -1,7 +1,7 @@
 {
   "leads": [
     {
-      "id": "e12ecd63-f708-4cd9-9a15-994ae049df28",
+      "id": "a00f625d-5bef-49e3-b81a-d60f99c069a8",
       "instagramUrl": null,
       "emailCandidates": [],
       "emailCandidateSourceUrls": [],
@@ -58,13 +58,13 @@
       "collectionBatchId": null,
       "source": null,
       "daily30PipelineStatus": null,
-      "createdAt": "2026-07-01T02:29:37.682Z",
-      "updatedAt": "2026-07-01T02:29:37.684Z",
+      "createdAt": "2026-07-01T02:48:03.931Z",
+      "updatedAt": "2026-07-01T02:48:03.933Z",
       "companyName": "Follow Up Unset Co",
       "area": "仙台市",
       "industry": "工務店",
       "websiteUrl": "https://follow-unset.test"
     }
   ],
-  "updatedAt": "2026-07-01T02:29:37.684Z"
+  "updatedAt": "2026-07-01T02:48:03.933Z"
 }

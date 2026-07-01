@@ -72,3 +72,21 @@ export async function runDaily30GenerateCopy(
   }
   return (await res.json()) as Daily30GenerateCopyResponse;
 }
+
+export async function excludeDaily30CandidateApi(
+  candidateId: string,
+  reason: string
+): Promise<ExternalLeadCandidate> {
+  const res = await fetch(`${API_BASE}/api/daily30-candidates/exclude`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ candidateId, reason }),
+  });
+  if (!res.ok) {
+    throw new Error(
+      await readApiError(res, 'POST /api/daily30-candidates/exclude', '候補の除外に失敗しました')
+    );
+  }
+  const data = (await res.json()) as { candidate: ExternalLeadCandidate };
+  return data.candidate;
+}

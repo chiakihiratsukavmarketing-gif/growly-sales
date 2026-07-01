@@ -72,6 +72,8 @@ interface Daily30CandidateCardProps {
   showApprove?: boolean;
   approving?: boolean;
   onApprove?: () => void;
+  excluding?: boolean;
+  onExclude?: () => void;
   compact?: boolean;
   approvalBlockReason?: string | null;
   duplicateLeadName?: string | null;
@@ -82,6 +84,8 @@ export function Daily30CandidateCard({
   showApprove = false,
   approving = false,
   onApprove,
+  excluding = false,
+  onExclude,
   compact = true,
   approvalBlockReason = null,
   duplicateLeadName = null,
@@ -90,7 +94,10 @@ export function Daily30CandidateCard({
   const email = c.emailCandidates?.[0] ?? c.targetEmail ?? '';
   const emailSource = resolveEmailSourceFromCandidate(c);
   const blocked = Boolean(approvalBlockReason);
-  const canApprove = showApprove && c.importStatus !== 'approved_for_lead' && !blocked;
+  const badEmail = emailSource.isPlaceholderEmail || emailSource.isPersonalEmail;
+  const canApprove =
+    showApprove && c.importStatus !== 'approved_for_lead' && !blocked && !badEmail;
+  const canExclude = Boolean(onExclude) && c.importStatus !== 'imported' && c.importStatus !== 'excluded';
   const workflow = resolveDaily30WorkflowStatus(c);
 
   return (
@@ -102,34 +109,45 @@ export function Daily30CandidateCard({
           </h4>
           <CandidateStatusBadges candidate={c} />
         </div>
-        {showApprove ? (
+        {showApprove || canExclude ? (
           <div className="daily30-candidate-actions">
             {canApprove ? (
               <button
                 type="button"
                 className="btn btn-primary btn-xs"
-                disabled={approving}
+                disabled={approving || excluding}
                 onClick={onApprove}
               >
                 {approving ? '承認中…' : 'Lead化承認'}
               </button>
             ) : blocked ? (
               <span className="status-badge status-badge-status-warn">承認不可</span>
-            ) : (
+            ) : badEmail ? (
+              <span className="status-badge status-badge-status-warn">メール要確認</span>
+            ) : showApprove ? (
               <span className={`status-badge status-badge-workflow-${workflow.variant}`}>
                 {workflow.label}
               </span>
-            )}
+            ) : null}
+            {canExclude ? (
+              <button
+                type="button"
+                className="btn btn-exclude btn-xs"
+                disabled={approving || excluding}
+                onClick={onExclude}
+              >
+                {excluding ? '除外中…' : '候補から除外'}
+              </button>
+            ) : null}
           </div>
         ) : null}
       </div>
 
       {blocked ? (
         <p className="hint daily30-approval-block-hint">
-          既存Leadと重複の可能性
-          {duplicateLeadName ? `（${duplicateLeadName}）` : ''}
-          {' — '}
-          {approvalBlockReason}
+          既存Leadと重複
+          {duplicateLeadName ? `：${duplicateLeadName}` : ''}
+          {approvalBlockReason && !duplicateLeadName ? ` — ${approvalBlockReason}` : null}
         </p>
       ) : null}
 
@@ -146,7 +164,12 @@ export function Daily30CandidateCard({
             {email || '—'}
           </span>
           {email ? (
-            <EmailSourceDisplay info={emailSource} variant="compact" className="daily30-email-source" />
+            <EmailSourceDisplay
+              info={emailSource}
+              variant="compact"
+              showWarnings
+              className="daily30-email-source"
+            />
           ) : null}
         </div>
         <div className="daily30-candidate-field">
@@ -172,14 +195,18 @@ export function Daily30CandidateList({
   candidates,
   showApprove = false,
   approvingId = null,
+  excludingId = null,
   onApprove,
+  onExclude,
   emptyMessage = '候補がありません。',
   approvalBlockHints = {},
 }: {
   candidates: ExternalLeadCandidate[];
   showApprove?: boolean;
   approvingId?: string | null;
+  excludingId?: string | null;
   onApprove?: (candidate: ExternalLeadCandidate) => void;
+  onExclude?: (candidate: ExternalLeadCandidate) => void;
   emptyMessage?: string;
   approvalBlockHints?: Record<string, { blockReason: string; duplicateLeadName?: string }>;
 }) {
@@ -191,15 +218,17 @@ export function Daily30CandidateList({
       {candidates.map((c) => {
         const hint = approvalBlockHints[c.externalCandidateId];
         return (
-        <Daily30CandidateCard
-          key={c.externalCandidateId}
-          candidate={c}
-          showApprove={showApprove}
-          approving={approvingId === c.externalCandidateId}
-          onApprove={onApprove ? () => onApprove(c) : undefined}
-          approvalBlockReason={hint?.blockReason ?? null}
-          duplicateLeadName={hint?.duplicateLeadName ?? null}
-        />
+          <Daily30CandidateCard
+            key={c.externalCandidateId}
+            candidate={c}
+            showApprove={showApprove}
+            approving={approvingId === c.externalCandidateId}
+            excluding={excludingId === c.externalCandidateId}
+            onApprove={onApprove ? () => onApprove(c) : undefined}
+            onExclude={onExclude ? () => onExclude(c) : undefined}
+            approvalBlockReason={hint?.blockReason ?? null}
+            duplicateLeadName={hint?.duplicateLeadName ?? null}
+          />
         );
       })}
     </div>

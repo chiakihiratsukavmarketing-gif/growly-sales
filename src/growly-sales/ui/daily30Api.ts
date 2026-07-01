@@ -3,6 +3,7 @@ import type { Daily30Dashboard } from '../candidates/buildDaily30Dashboard.js';
 import type { Daily30DraftPipelineProgress } from '../candidates/buildDaily30DraftPipelineProgress.js';
 import type { Daily30OperationsSummary } from '../candidates/buildDaily30OperationsSummary.js';
 import type { Daily30CloudDashboardPayload } from '../candidates/buildDaily30CloudDashboard.js';
+import type { Daily30LeadApprovalBlockHint } from '../candidates/getDaily30LeadApprovalBlockReason.js';
 import { readApiError } from './apiError.js';
 
 const API_BASE = '';
@@ -15,6 +16,8 @@ export interface Daily30DashboardResponse extends Daily30CloudDashboardPayload {
   operations?: Daily30OperationsSummary;
   areaExpansion: string;
   plan: { target: number; areas: { prefecture: string; regionGroup: string }[]; note: string };
+  approvalBlockHints?: Record<string, Daily30LeadApprovalBlockHint>;
+  humanExcludedCount?: number;
   generatedAt: string;
   note: string;
 }

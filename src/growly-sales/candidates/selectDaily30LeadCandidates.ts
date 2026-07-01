@@ -13,7 +13,11 @@ function hasEmailSourceUrls(candidate: ExternalLeadCandidate): boolean {
 }
 
 function isNotImported(candidate: ExternalLeadCandidate): boolean {
-  return candidate.importStatus !== 'imported' && candidate.importStatus !== 'duplicate';
+  return (
+    candidate.importStatus !== 'imported' &&
+    candidate.importStatus !== 'duplicate' &&
+    candidate.importStatus !== 'excluded'
+  );
 }
 
 function isNotExcludedPipeline(candidate: ExternalLeadCandidate): boolean {

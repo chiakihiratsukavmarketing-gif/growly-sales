@@ -1,7 +1,7 @@
 {
   "leads": [
     {
-      "id": "4d6a3f35-3d72-4719-90b8-adafedcd3298",
+      "id": "cb5fa857-31b2-4aeb-aade-14cb706d67d8",
       "instagramUrl": null,
       "emailCandidates": [],
       "emailCandidateSourceUrls": [],
@@ -58,13 +58,13 @@
       "collectionBatchId": null,
       "source": null,
       "daily30PipelineStatus": null,
-      "createdAt": "2026-07-01T02:29:37.597Z",
-      "updatedAt": "2026-07-01T02:29:37.605Z",
+      "createdAt": "2026-07-01T02:48:03.853Z",
+      "updatedAt": "2026-07-01T02:48:03.864Z",
       "companyName": "Email Edit Co",
       "area": "仙台市",
       "industry": "工務店",
       "websiteUrl": "https://email-edit.example"
     }
   ],
-  "updatedAt": "2026-07-01T02:29:37.606Z"
+  "updatedAt": "2026-07-01T02:48:03.865Z"
 }

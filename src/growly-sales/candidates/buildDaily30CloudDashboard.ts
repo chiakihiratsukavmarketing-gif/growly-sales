@@ -16,6 +16,7 @@ import { describeStorageBackendStatus, getStorageBackend } from '../config/stora
 import { diagnoseGcsAuth } from '../config/gcsAuthDiagnostics.js';
 import { summarizeDaily30ContactPaths, type Daily30ContactPathSummary } from './summarizeDaily30ContactPaths.js';
 import { sanitizeErrorMessageSafe } from './daily30CloudRunErrors.js';
+import { filterDaily30VisibleCandidates } from '../workflow/excludeDaily30Candidate.js';
 import { NEXT_SCHEDULED_RUN_LABEL, isCloudRunUrlConfigured, isCloudSchedulerConfigured } from '../config/cloudDeployConfig.js';
 import { countDaily30BatchMetrics } from './daily30BatchMetrics.js';
 import type { Daily30StoppedReason } from './daily30BatchMetrics.js';
@@ -179,7 +180,8 @@ export async function buildDaily30CloudDashboardPayload(
   }
 
   const metrics = metricsFromRun(latestRun, batchId, candidates, leads);
-  const emailFoundCandidates = candidates.filter((c) => c.pipelineStatus === 'email_found');
+  const visibleCandidates = filterDaily30VisibleCandidates(candidates);
+  const emailFoundCandidates = visibleCandidates.filter((c) => c.pipelineStatus === 'email_found');
   const contactPathSummary = summarizeDaily30ContactPaths(candidates, batchId);
 
   let cloudStatus;
@@ -217,7 +219,7 @@ export async function buildDaily30CloudDashboardPayload(
     schedulerConfigured: isCloudSchedulerConfigured(),
     cloudRunUrlConfigured: isCloudRunUrlConfigured(),
     nextScheduledRun: NEXT_SCHEDULED_RUN_LABEL,
-    candidates,
+    candidates: visibleCandidates,
     emailFoundCandidates,
     contactPathSummary,
   };

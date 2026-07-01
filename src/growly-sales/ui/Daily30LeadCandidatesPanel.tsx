@@ -6,10 +6,12 @@ import { SummaryStatCard } from './SummaryStatCard.js';
 import {
   GENERATE_DAILY_30_COPY_GATE_LABEL,
   approveExternalCandidateForLead,
+  excludeDaily30CandidateApi,
   fetchDaily30LeadCandidates,
   runDaily30GenerateCopy,
 } from './daily30CopyApi.js';
 import { confirmDaily30LeadApproval } from './confirmDaily30LeadApproval.js';
+import { confirmDaily30CandidateExclude } from './confirmDaily30CandidateExclude.js';
 import { Daily30CandidateList } from './Daily30CandidateCards.js';
 import { countDaily30LeadCopyWorkflow } from '../candidates/resolveDaily30WorkflowStatus.js';
 
@@ -33,6 +35,7 @@ export function Daily30LeadCandidatesPanel({
     Record<string, { blockReason: string; duplicateLeadName?: string }>
   >({});
   const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [excludingId, setExcludingId] = useState<string | null>(null);
   const [gateInput, setGateInput] = useState('');
   const [generating, setGenerating] = useState(false);
   const [generateMessage, setGenerateMessage] = useState<string | null>(null);
@@ -110,6 +113,27 @@ export function Daily30LeadCandidatesPanel({
     }
   }
 
+  async function handleExclude(candidate: ExternalLeadCandidate): Promise<void> {
+    const reason = confirmDaily30CandidateExclude(candidate);
+    if (!reason) return;
+    setExcludingId(candidate.externalCandidateId);
+    try {
+      await excludeDaily30CandidateApi(candidate.externalCandidateId, reason);
+      setApprovalPending((prev) =>
+        prev.filter((c) => c.externalCandidateId !== candidate.externalCandidateId)
+      );
+      setApprovedForLead((prev) =>
+        prev.filter((c) => c.externalCandidateId !== candidate.externalCandidateId)
+      );
+      onSuccess?.(`${candidate.companyName} を候補から除外しました`);
+      onChanged?.();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : '候補の除外に失敗しました');
+    } finally {
+      setExcludingId(null);
+    }
+  }
+
   const gateOk = gateInput.trim() === GENERATE_DAILY_30_COPY_GATE_LABEL;
 
   if (loading) return <p className="loading">Lead化候補を読み込み中…</p>;
@@ -140,7 +164,9 @@ export function Daily30LeadCandidatesPanel({
         candidates={approvalPending}
         showApprove
         approvingId={approvingId}
+        excludingId={excludingId}
         onApprove={(c) => void handleApprove(c)}
+        onExclude={(c) => void handleExclude(c)}
         approvalBlockHints={approvalBlockHints}
         emptyMessage="承認待ち候補はありません。セクション1で収集結果を確認してください。"
       />
