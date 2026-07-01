@@ -12,6 +12,7 @@ import { SectionCard } from './SectionCard.js';
 import { GmailDraftCreateDialog } from './GmailDraftCreateDialog.js';
 import { GmailDraftCreateResultPanel } from './GmailDraftCreateResultPanel.js';
 import { ApproveDraftDialog } from './ApproveDraftDialog.js';
+import { EmailSourceDisplay } from './EmailSourceDisplay.js';
 import { PageHeader } from './common/PageHeader.js';
 import { EmptyState } from './common/EmptyState.js';
 import { SearchAndFilterBar } from './common/SearchAndFilterBar.js';
@@ -133,6 +134,24 @@ export function GmailDraftCandidatesView({
           <p className="pending-meta">
             To: {candidate.to} / 件名: {candidate.subject}
           </p>
+          <EmailSourceDisplay
+            info={{
+              email: candidate.to,
+              emailSourceUrl: candidate.emailSourceUrl,
+              emailSourceLabel: candidate.emailSourceLabel,
+              sourcePageType: candidate.sourcePageType,
+              officialSiteUrl: candidate.officialSiteUrl ?? (candidate.websiteUrl || null),
+              isOfficialSiteOrigin: candidate.isOfficialSiteOrigin,
+              isPlaceholderEmail: candidate.isPlaceholderEmail,
+              isPersonalEmail: candidate.isPersonalEmail,
+              checkedUrls: candidate.emailCandidateSourceUrls,
+              batchId: candidate.batchId,
+              source: candidate.source,
+            }}
+            variant="compact"
+            showWarnings
+            className="gmail-candidate-email-source"
+          />
           <div className="candidate-badges">
             <LeadStatusBadge kind="human" value={candidate.humanReviewStatus} />
           </div>
@@ -249,7 +268,7 @@ export function GmailDraftCandidatesView({
 
       {approveCandidate && (
         <ApproveDraftDialog
-          companyName={approveCandidate.companyName}
+          candidate={approveCandidate}
           approving={approving}
           onConfirm={() => void handleConfirmApprove()}
           onCancel={() => !approving && setApproveCandidate(null)}

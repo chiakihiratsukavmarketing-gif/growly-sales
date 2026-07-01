@@ -1,7 +1,7 @@
 {
   "leads": [
     {
-      "id": "480262c7-14e6-4bf1-a796-a67a38c2f0e8",
+      "id": "ce8fdb3e-b667-4d23-bd96-15b0dd0d9a47",
       "instagramUrl": null,
       "emailCandidates": [
         "info@phase16.example"
@@ -34,7 +34,7 @@
       "humanReviewStatus": "approved",
       "sendStatus": "sent",
       "replyStatus": "none",
-      "manualSentAt": "2026-07-01T01:33:53.838Z",
+      "manualSentAt": "2026-07-01T02:29:37.668Z",
       "manualSendMethod": "email",
       "replyReceivedAt": null,
       "repliedAt": null,
@@ -45,7 +45,7 @@
       "followUpMemo": "",
       "dealStatus": "none",
       "outcomeMemo": "",
-      "communicationMemo": "Gmail手動送信（manual_gmail） / draftId=r-verify-draft-001 / To=info@phase16.example / From=c_hiratsuka@wantreach.jp / Reply-To=c_hiratsuka@wantreach.jp",
+      "communicationMemo": "Gmail手動送信（manual_gmail） / draftId=r-verify-draft-001 / To=info@phase16.example / From=c_hiratsuka@wantreach.jp / Reply-To=c_hiratsuka@wantreach.jp / emailSourceUrl=https://phase16.example / emailSourceLabel=公式サイト トップページ / officialSiteUrl=https://phase16.example",
       "gmailDraftStatus": "draft_created",
       "gmailDraftId": "r-verify-draft-001",
       "gmailDraftCreatedAt": null,
@@ -60,13 +60,15 @@
       "collectionBatchId": null,
       "source": null,
       "daily30PipelineStatus": null,
-      "createdAt": "2026-07-01T01:33:53.836Z",
-      "updatedAt": "2026-07-01T01:33:53.838Z",
+      "createdAt": "2026-07-01T02:29:37.665Z",
+      "updatedAt": "2026-07-01T02:29:37.668Z",
       "companyName": "Phase16 Record Co",
       "area": "仙台市",
       "industry": "工務店",
-      "websiteUrl": "https://phase16.example"
+      "websiteUrl": "https://phase16.example",
+      "emailSourceUrl": "https://phase16.example",
+      "emailSourceLabel": "公式サイト トップページ"
     }
   ],
-  "updatedAt": "2026-07-01T01:33:53.838Z"
+  "updatedAt": "2026-07-01T02:29:37.668Z"
 }

@@ -1,5 +1,6 @@
 import type { GmailDraftCandidateDetail } from './gmailDraftCandidatesApi.js';
 import { CREATE_DRAFTS_GATE_LABEL } from './gmailDraftCandidatesApi.js';
+import { EmailSourceConfirmBlock } from './EmailSourceDisplay.js';
 
 interface GmailDraftCreateDialogProps {
   candidate: GmailDraftCandidateDetail;
@@ -45,6 +46,25 @@ export function GmailDraftCreateDialog({
             <dt>To</dt>
             <dd>{candidate.to}</dd>
           </div>
+        </dl>
+
+        <EmailSourceConfirmBlock
+          info={{
+            email: candidate.to,
+            emailSourceUrl: candidate.emailSourceUrl,
+            emailSourceLabel: candidate.emailSourceLabel,
+            sourcePageType: candidate.sourcePageType,
+            officialSiteUrl: candidate.officialSiteUrl ?? (candidate.websiteUrl || null),
+            isOfficialSiteOrigin: candidate.isOfficialSiteOrigin,
+            isPlaceholderEmail: candidate.isPlaceholderEmail,
+            isPersonalEmail: candidate.isPersonalEmail,
+            checkedUrls: candidate.emailCandidateSourceUrls,
+            batchId: candidate.batchId,
+            source: candidate.source,
+          }}
+        />
+
+        <dl className="confirm-dl">
           <div className="confirm-row">
             <dt>From</dt>
             <dd>

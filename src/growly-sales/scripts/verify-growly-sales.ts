@@ -3995,6 +3995,120 @@ async function verifyPhase37PartialSuccessState(): Promise<void> {
   ok('Phase 37 partial success / state / UI checks passed');
 }
 
+async function verifyEmailSourceDisplay(): Promise<void> {
+  const resolverPath = join(SRC_ROOT, 'candidates/resolveEmailSourceDisplay.ts');
+  const uiPath = join(SRC_ROOT, 'ui/EmailSourceDisplay.tsx');
+  await access(resolverPath);
+  await access(uiPath);
+
+  const {
+    resolveEmailSourceFromLead,
+    resolveEmailSourceFromCandidate,
+    isPlaceholderEmailAddress,
+  } = await import('../candidates/resolveEmailSourceDisplay.js');
+  const { buildEmailOutreachCandidateView } = await import('../outreach/outreachPolicy.js');
+  const { buildManualGmailSendPreview } = await import('../workflow/recordManualGmailSent.js');
+
+  const lead = createEmptyLead({
+    companyName: '取得先テスト工務店',
+    area: '茨城県',
+    industry: '工務店',
+    websiteUrl: 'https://oakvillehomes.jp/',
+    emailCandidates: ['info@oakvillehomes.jp'],
+    emailCandidateSourceUrls: ['https://oakvillehomes.jp/about'],
+    contactFormUrl: 'https://oakvillehomes.jp/contact',
+    emailContactType: 'corporate',
+    collectionBatchId: '2026-07-01',
+    source: 'daily30',
+    humanReviewStatus: 'approved',
+    reviewStatus: 'approve',
+    sendStatus: 'not_sent',
+    gmailDraftStatus: 'draft_created',
+    gmailDraftId: 'r-verify-email-source',
+    emailSubject: '件名',
+    emailBody: '本文',
+  });
+
+  const resolved = resolveEmailSourceFromLead(lead);
+  assert(resolved.emailSourceUrl === 'https://oakvillehomes.jp/about', 'uses emailCandidateSourceUrls[0]');
+  assert(resolved.isOfficialSiteOrigin, 'official site origin when same domain');
+  assert(!resolved.isPlaceholderEmail, 'corporate email is not placeholder');
+  assert(!resolved.isPersonalEmail, 'corporate email is not personal');
+
+  const view = buildEmailOutreachCandidateView(lead);
+  assert(view.emailSourceUrl === resolved.emailSourceUrl, 'outreach view exposes emailSourceUrl');
+  assert(view.emailSourceLabel.length > 0, 'outreach view exposes emailSourceLabel');
+
+  const preview = buildManualGmailSendPreview(lead);
+  assert(preview.emailSourceUrl === resolved.emailSourceUrl, 'send preview includes emailSourceUrl');
+  assert(preview.batchId === '2026-07-01', 'send preview includes batchId');
+  assert(preview.source === 'daily30', 'send preview includes source');
+
+  assert(isPlaceholderEmailAddress('info@xxx.com'), 'detects xxx placeholder');
+
+  const candidate = {
+    externalCandidateId: 'verify-email-source',
+    sourceType: 'google_places' as const,
+    companyName: '候補テスト',
+    area: '宮城県',
+    industry: '工務店',
+    websiteUrl: 'https://e-s-first.com/',
+    officialSiteUrl: 'https://e-s-first.com/',
+    phoneNumber: null,
+    address: null,
+    googlePlaceId: null,
+    sourceUrl: null,
+    sourceQuery: 'q',
+    category: '工務店',
+    contactFormUrl: 'https://e-s-first.com/contact',
+    emailCandidates: ['info@mutumisetubi.com'],
+    confidenceScore: 0.8,
+    importStatus: 'preview' as const,
+    riskLevel: 'low' as const,
+    duplicateReason: '',
+    duplicateKey: 'k',
+    pipelineStatus: 'email_found' as const,
+    prefecture: '宮城県',
+    regionGroup: '宮城' as const,
+    collectionPriority: 1,
+    collectionAreaSource: '宮城県',
+    collectionBatchId: '2026-07-01',
+    emailCandidateSourceUrls: ['https://e-s-first.com/company'],
+    emailVerifiedAt: null,
+    generatedEmailSubject: null,
+    generatedEmailBody: null,
+    generatedCustomHook: null,
+    generatedCustomHookReason: null,
+    targetEmail: 'info@mutumisetubi.com',
+    emailCandidateSourceUrl: 'https://e-s-first.com/company',
+    failureReason: null,
+    copyGeneratedAt: null,
+    qualityCheckedAt: null,
+    humanReviewStatus: null,
+    gmailDraftStatus: null,
+    sendStatus: null,
+    notes: '',
+    collectedAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  const fromCandidate = resolveEmailSourceFromCandidate(candidate);
+  assert(
+    fromCandidate.emailSourceUrl === 'https://e-s-first.com/company',
+    'candidate resolver uses emailCandidateSourceUrl'
+  );
+
+  const gmailDialog = await readFile(join(SRC_ROOT, 'ui/GmailDraftCreateDialog.tsx'), 'utf-8');
+  const leadDetail = await readFile(join(SRC_ROOT, 'ui/LeadDetailPanel.tsx'), 'utf-8');
+  const recordWorkflow = await readFile(join(SRC_ROOT, 'workflow/recordManualGmailSent.ts'), 'utf-8');
+  assert(gmailDialog.includes('EmailSourceConfirmBlock'), 'gmail create dialog shows email source confirm');
+  assert(leadDetail.includes('EmailSourceDisplay'), 'lead detail shows email source');
+  assert(recordWorkflow.includes('emailSourceUrl='), 'send memo records emailSourceUrl');
+  assert(!recordWorkflow.includes('messages.send'), 'email source record workflow does not send');
+
+  ok('Email source URL display checks passed');
+}
+
 function verifyPhase20LiteEmailImprovement(): void {
   assert(MAX_ADDITIONAL_CONTACT_PAGES === 4, 'additional page limit is 4');
 
@@ -4361,6 +4475,7 @@ async function main(): Promise<void> {
   await verifyPhase365DashboardReadability();
   await verifyPhase366LeadListPanel();
   await verifyPhase37PartialSuccessState();
+  await verifyEmailSourceDisplay();
   verifyPhase20LiteEmailImprovement();
   await verifyPhase20LiteEmailImprovementAsync();
   await verifyPhaseBLeadInventory();

@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { Lead } from '../../types/lead.js';
+import { resolveEmailSourceFromLead } from '../candidates/resolveEmailSourceDisplay.js';
+import { EmailSourceDisplay } from './EmailSourceDisplay.js';
 import { LeadStatusBadge } from './LeadStatusBadge.js';
 import { LeadReviewActions } from './LeadReviewActions.js';
 import { LeadCommunicationActions } from './LeadCommunicationActions.js';
@@ -91,6 +93,21 @@ export function LeadDetailPanel({ lead, onUpdated, onError }: LeadDetailPanelPro
           <dt>連絡禁止</dt>
           <dd>{lead.doNotContact ? 'はい' : 'いいえ'}</dd>
         </dl>
+      </section>
+
+      <section className="detail-section">
+        <h3>連絡先</h3>
+        {lead.emailCandidates.some((e) => e.trim()) ? (
+          <EmailSourceDisplay
+            info={resolveEmailSourceFromLead(lead)}
+            variant="full"
+            showEmail
+            showOfficialSite
+            showWarnings
+          />
+        ) : (
+          <p className="hint">メール候補なし</p>
+        )}
       </section>
 
       <section className="detail-section">

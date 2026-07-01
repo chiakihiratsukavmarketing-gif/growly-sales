@@ -8,6 +8,188 @@
 
 ---
 
+## 2026-07-01 — メール取得先URLの明記対応（Phase 38）
+
+**種別:** UI + データ表示・送信記録拡張。Gmail送信・下書き再作成なし。
+
+### 実装内容
+
+- `resolveEmailSourceDisplay.ts` — Lead / Daily30候補から取得先URL・ラベル・公式由来判定を解決
+- `EmailSourceDisplay.tsx` — 候補収集 / Lead詳細 / 下書き候補 / 送信記録で共通表示
+- Gmail下書き作成・承認・送信記録ダイアログに取得先確認ブロックを追加
+- 手動送信記録（`recordManualGmailSent`）の memo に `emailSourceUrl` / `emailSourceLabel` / `officialSiteUrl` / `batchId` / `source` を追記
+
+### 本日下書き7件 — メール取得先URL
+
+会社名：住まいの足軽隊 〜住宅リフォーム店〜
+メール：info@mutumisetubi.com
+取得先URL：https://e-s-first.com/company
+公式サイト：https://e-s-first.com/
+draftId：r8164606133101662721
+送信状態：not_sent
+備考：会社概要ページから取得（emailCandidateSourceUrls）
+
+会社名：オークヴィルホームズ
+メール：info@oakvillehomes.jp
+取得先URL：https://oakvillehomes.jp/about
+公式サイト：https://oakvillehomes.jp/
+draftId：r-810018114229840836
+送信状態：not_sent
+備考：会社概要ページから取得
+
+会社名：桂住宅建設株式会社
+メール：info@katsurajyuken.com
+取得先URL：https://katsurajyuken.com/privacy
+公式サイト：http://katsurajyuken.com/
+draftId：r-2948859915204951771
+送信状態：not_sent
+備考：プライバシーポリシーページから取得
+
+会社名：株式会社AS IT IS
+メール：info@asitis.ibaraki.jp
+取得先URL：https://asitis.ibaraki.jp/
+公式サイト：https://asitis.ibaraki.jp/
+draftId：r3391971582117788795
+送信状態：not_sent
+備考：公式トップページから取得
+
+会社名：有限会社 水戸工務店
+メール：info@mitok.jp
+取得先URL：https://mitok.jp/about
+公式サイト：http://mitok.jp/
+draftId：r2932789133786339440
+送信状態：not_sent
+備考：会社概要ページから取得
+
+会社名：MIRAIE株式会社
+メール：info@miraie-home.com
+取得先URL：https://miraie-home-group.com/
+公式サイト：https://miraie-home-group.com/
+draftId：r4980594914741382854
+送信状態：not_sent
+備考：公式トップページから取得
+
+会社名：(株)テクノホーム
+メール：info@technohome.co.jp
+取得先URL：https://technohome.co.jp/consultation
+公式サイト：https://technohome.co.jp/
+draftId：r4056441127015213698
+送信状態：not_sent
+備考：相談・問い合わせページから取得（contactFormUrl と同一）
+
+### 取得先が確認できなかった会社
+
+- なし（7件すべて leads.json の `emailCandidateSourceUrls` から確認済み）
+
+### 安全ガード
+
+- messages.send 未使用 / 既存下書き再作成なし / 送信済み履歴上書きなし
+
+---
+
+## 2026-07-01 — Daily 30 実運用処理（Lead整理・下書き作成まで）
+
+**種別:** 実運用（GCS候補 + ローカル leads.json）。自動送信なし。
+
+### 開始時状態
+
+| 項目 | 値 |
+|------|-----|
+| 収集時メール取得（GCS state） | 9 / 30 |
+| ready_for_draft（事前） | 3件 |
+| Lead化承認待ち | 6件 |
+| leads.json | 46件 / 送信済み 13件 |
+
+### Lead化承認（4件）
+
+| 会社名 | 結果 |
+|--------|------|
+| オークヴィルホームズ | ✅ 承認 |
+| 株式会社AS IT IS | ✅ 承認 |
+| 有限会社 水戸工務店 | ✅ 承認 |
+| MIRAIE株式会社 | ✅ 承認 |
+
+### 重複・保留（2件）
+
+| 会社名 | 理由 |
+|--------|------|
+| ㈱徳田工務店 | 既存Lead重複（株式会社徳田工務店） |
+| Banana works LABO・ドクターリフォーム | 代表メール `info@xxx.com` がプレースホルダのため保留 |
+
+### 営業文生成（GENERATE_DAILY_30_COPY 相当・ゲート付き実行）
+
+| 項目 | 値 |
+|------|-----|
+| processed | 4 |
+| generated | 4 |
+| passed (ready_for_draft) | 4 |
+| needsReview | 0 |
+| excluded | 0 |
+
+### leads.json 取り込み（IMPORT_DAILY_30_DRAFT_CANDIDATES ゲート）
+
+**取り込み前:** 46件 → **取り込み後:** 53件（+7）
+
+| 会社名 | leadId |
+|--------|--------|
+| 住まいの足軽隊 〜住宅リフォーム店〜 | 7fc577b2-fa2a-45b6-8ca7-3f188aa9c4bc |
+| オークヴィルホームズ | 78a50527-c7b1-4591-869e-d684c35b2540 |
+| 桂住宅建設株式会社 | 80fa46fe-679e-44bb-9c3b-36797edad51f |
+| 株式会社AS IT IS | 49fddbf5-e3a0-4eaa-b4d9-cdc9399403ec |
+| 有限会社 水戸工務店 | 828fd6f4-d8d6-4d43-8b71-9a40f4c3fbb6 |
+| MIRAIE株式会社 | a7824e74-080e-4380-9381-099f6ea98720 |
+| (株)テクノホーム | 15b022fc-721a-4b62-9b9e-82ab3a5b8e0c |
+
+### Gmail下書き作成（CREATE_DRAFTS ゲート）
+
+From / Reply-To / 署名: **c_hiratsuka@wantreach.jp**
+
+| 会社名 | draftId | 宛先 |
+|--------|---------|------|
+| 住まいの足軽隊 〜住宅リフォーム店〜 | r8164606133101662721 | info@mutumisetubi.com |
+| オークヴィルホームズ | r-810018114229840836 | info@oakvillehomes.jp |
+| 桂住宅建設株式会社 | r-2948859915204951771 | info@katsurajyuken.com |
+| 株式会社AS IT IS | r3391971582117788795 | info@asitis.ibaraki.jp |
+| 有限会社 水戸工務店 | r2932789133786339440 | info@mitok.jp |
+| MIRAIE株式会社 | r4980594914741382854 | info@miraie-home.com |
+| (株)テクノホーム | r4056441127015213698 | info@technohome.co.jp |
+
+### Gmail手動送信
+
+- **未実施**（Growly Sales からは送信していない）
+- 送信記録: **追加なし**（Gmail画面で人間送信後に記録予定）
+
+### 未処理リード（本日バッチ）
+
+- ㈱徳田工務店 — 既存Lead重複
+- Banana works LABO — メールプレースホルダ保留
+
+### 安全ガード
+
+- messages.send 未使用 / users.drafts.create は CREATE_DRAFTS 時のみ
+- 送信済み履歴・返信履歴 上書きなし
+
+### 次回対応
+
+- Gmail で7件の下書きを確認 → 問題なければ手動送信 → 送信記録タブで `manual_gmail` 記録
+- 明日 9:00 Phase 37 本番反映確認（partial_success / stoppedReason / formOnly）
+
+---
+
+## 2026-07-01 — Phase 37.1: Cloud Run 再デプロイ
+
+**種別:** インフラ（Phase 37 コードを本番反映）
+
+| 項目 | 値 |
+|------|-----|
+| commit | `55096d2` Fix Daily 30 partial success metrics |
+| Cloud Build | SUCCESS（build `a2a0eeed-bb00-4f8c-a4bc-67ee70469be9`） |
+| Cloud Run revision | `growly-sales-daily30-00003-l7s` |
+| dry-run | ok / mode=dry_run |
+| Scheduler | ENABLED（cron 変更なし） |
+
+---
+
 ## 2026-07-01 — Phase 35〜36.6: UI polish（ダッシュボード・候補収集・Lead一覧）
 
 **種別:** UIのみ（機能・API・Cloud/Gmailロジック変更なし）

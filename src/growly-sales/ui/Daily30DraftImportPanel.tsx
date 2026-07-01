@@ -9,6 +9,8 @@ import {
   importDaily30DraftCandidatesBulk,
 } from './daily30ImportApi.js';
 import type { Daily30DraftPipelineProgress } from '../candidates/buildDaily30DraftPipelineProgress.js';
+import { resolveEmailSourceFromCandidate } from '../candidates/resolveEmailSourceDisplay.js';
+import { EmailSourceDisplay } from './EmailSourceDisplay.js';
 import { SummaryStatCard } from './SummaryStatCard.js';
 
 interface Daily30DraftImportPanelProps {
@@ -153,7 +155,12 @@ export function Daily30DraftImportPanel({
                   <strong>{c.companyName}</strong>
                   <p className="hint">{c.websiteUrl ?? c.officialSiteUrl}</p>
                   <p className="hint">To: {c.targetEmail}</p>
-                  <p className="hint">確認元: {c.emailCandidateSourceUrl}</p>
+                  <EmailSourceDisplay
+                    info={resolveEmailSourceFromCandidate(c)}
+                    variant="compact"
+                    showOfficialSite
+                    className="daily30-draft-import-email-source"
+                  />
                   <p className="hint">件名: {c.generatedEmailSubject}</p>
                   <p className="hint">
                     customHook:{' '}

@@ -1,5 +1,9 @@
 import type { Lead } from '../types/lead.js';
 import type { OfferProfile } from '../config/offerProfile.js';
+import {
+  resolveEmailSourceFromLead,
+  type EmailSourcePageType,
+} from '../candidates/resolveEmailSourceDisplay.js';
 import { containsProhibitedClaim } from '../config/offerProfile.js';
 import { containsProhibitedPhrase } from '../generation/generationUtils.js';
 import { hasEmailCandidates, hasContactForm, isFormCopyOnlyLead } from '../analytics/contactPathTypes.js';
@@ -18,6 +22,16 @@ export interface EmailOutreachCandidateView {
   websiteUrl: string;
   emailCandidates: string[];
   emailCandidateSourceUrls: string[];
+  email: string;
+  emailSourceUrl: string | null;
+  emailSourceLabel: string;
+  sourcePageType: EmailSourcePageType;
+  officialSiteUrl: string | null;
+  isOfficialSiteOrigin: boolean;
+  isPlaceholderEmail: boolean;
+  isPersonalEmail: boolean;
+  batchId: string | null;
+  source: string | null;
   humanReviewStatus: Lead['humanReviewStatus'];
   sendStatus: Lead['sendStatus'];
   gmailDraftStatus: Lead['gmailDraftStatus'];
@@ -197,11 +211,22 @@ export function buildEmailOutreachCandidateView(
   offer?: OfferProfile
 ): EmailOutreachCandidateView {
   const exclusionReason = getGmailDraftExclusionReason(lead, offer);
+  const emailSource = resolveEmailSourceFromLead(lead);
   return {
     companyName: lead.companyName,
     websiteUrl: lead.websiteUrl,
     emailCandidates: [...lead.emailCandidates],
     emailCandidateSourceUrls: [...lead.emailCandidateSourceUrls],
+    email: emailSource.email,
+    emailSourceUrl: emailSource.emailSourceUrl,
+    emailSourceLabel: emailSource.emailSourceLabel,
+    sourcePageType: emailSource.sourcePageType,
+    officialSiteUrl: emailSource.officialSiteUrl,
+    isOfficialSiteOrigin: emailSource.isOfficialSiteOrigin,
+    isPlaceholderEmail: emailSource.isPlaceholderEmail,
+    isPersonalEmail: emailSource.isPersonalEmail,
+    batchId: emailSource.batchId,
+    source: emailSource.source,
     humanReviewStatus: lead.humanReviewStatus,
     sendStatus: lead.sendStatus,
     gmailDraftStatus: lead.gmailDraftStatus,

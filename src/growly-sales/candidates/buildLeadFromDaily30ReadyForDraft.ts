@@ -1,6 +1,7 @@
 import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTypes.js';
 import type { Lead } from '../types/lead.js';
 import { buildLeadStubFromExternalCandidate } from './buildLeadStubFromExternalCandidate.js';
+import { resolveEmailSourceFromCandidate } from './resolveEmailSourceDisplay.js';
 
 /** ready_for_draft 候補から leads.json 用 Lead を構築（まだ保存しない） */
 export function buildLeadFromDaily30ReadyForDraft(
@@ -9,12 +10,15 @@ export function buildLeadFromDaily30ReadyForDraft(
   const stub = buildLeadStubFromExternalCandidate(candidate);
   const targetEmail = candidate.targetEmail!.trim().toLowerCase();
   const sourceUrl = candidate.emailCandidateSourceUrl!.trim();
+  const emailSource = resolveEmailSourceFromCandidate(candidate);
   const now = new Date().toISOString();
 
   return {
     ...stub,
     emailCandidates: [targetEmail],
     emailCandidateSourceUrls: [sourceUrl],
+    emailSourceUrl: emailSource.emailSourceUrl,
+    emailSourceLabel: emailSource.emailSourceLabel,
     emailCandidateConfidence: 'medium',
     emailContactType: 'corporate',
     emailSubject: candidate.generatedEmailSubject!.trim(),

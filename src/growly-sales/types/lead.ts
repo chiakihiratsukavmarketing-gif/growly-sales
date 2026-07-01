@@ -136,6 +136,10 @@ export interface Lead {
   instagramUrl: string | null;
   emailCandidates: string[];
   emailCandidateSourceUrls: string[];
+  /** メール確認元URL（主ソース・表示・送信記録用。emailCandidateSourceUrls[0] と同期想定） */
+  emailSourceUrl?: string | null;
+  /** メール確認元の表示ラベル（例: 公式サイト お問い合わせページ） */
+  emailSourceLabel?: string | null;
   emailCandidateConfidence: ContactPathConfidence;
   emailContactType: EmailContactType;
   contactPathType: ContactPathType;

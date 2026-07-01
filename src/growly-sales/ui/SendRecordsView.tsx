@@ -13,7 +13,9 @@ import { EmptyState } from './common/EmptyState.js';
 import { SearchAndFilterBar } from './common/SearchAndFilterBar.js';
 import { FilterEmptyState } from './common/FilterEmptyState.js';
 import { replyStatusLabel } from './displayLabels.js';
+import { EmailSourceDisplay } from './EmailSourceDisplay.js';
 import { nextActionLabel } from './leadDisplayUtils.js';
+import { resolveEmailSourceFromLead } from '../candidates/resolveEmailSourceDisplay.js';
 import {
   filterByCompanyName,
   matchesSendRecordRow,
@@ -191,6 +193,22 @@ export function SendRecordsView({
                         <div className="pending-record-main">
                           <h4 className="pending-company">{item.companyName}</h4>
                           <p className="pending-meta">To: {item.to}</p>
+                          <EmailSourceDisplay
+                            info={{
+                              email: item.to,
+                              emailSourceUrl: item.emailSourceUrl,
+                              emailSourceLabel: item.emailSourceLabel,
+                              sourcePageType: 'unknown',
+                              officialSiteUrl: item.officialSiteUrl,
+                              isOfficialSiteOrigin: item.isOfficialSiteOrigin,
+                              isPlaceholderEmail: item.isPlaceholderEmail,
+                              isPersonalEmail: item.isPersonalEmail,
+                              checkedUrls: item.emailSourceUrl ? [item.emailSourceUrl] : [],
+                              batchId: item.batchId,
+                              source: item.source,
+                            }}
+                            variant="compact"
+                          />
                           <p className="pending-subject">件名: {item.subject}</p>
                         </div>
                         <div className="pending-record-actions">
@@ -229,7 +247,16 @@ export function SendRecordsView({
                       const lead = row.lead;
                       return (
                         <tr key={lead.id}>
-                          <td className="company-name">{lead.companyName}</td>
+                          <td className="company-name">
+                            <div>{lead.companyName}</div>
+                            {lead.emailCandidates.some((e) => e.trim()) ? (
+                              <EmailSourceDisplay
+                                info={resolveEmailSourceFromLead(lead)}
+                                variant="compact"
+                                className="send-record-email-source"
+                              />
+                            ) : null}
+                          </td>
                           <td>{formatSentDate(lead)}</td>
                           <td>
                             <span className={`reply-display reply-display-${lead.replyStatus ?? 'none'}`}>

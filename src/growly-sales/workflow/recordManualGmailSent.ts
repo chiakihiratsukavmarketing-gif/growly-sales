@@ -1,4 +1,5 @@
 import type { Lead } from '../types/lead.js';
+import { resolveEmailSourceFromLead } from '../candidates/resolveEmailSourceDisplay.js';
 import { getOutreachFromEmail, getOutreachReplyToEmail } from '../config/env.js';
 import { loadLeadsFromJson, saveLeadsToJson } from '../storage/jsonLeadRepository.js';
 import { saveLeadsToCsv } from '../storage/csvLeadRepository.js';
@@ -21,6 +22,14 @@ export interface ManualGmailSendPreview {
   replyTo: string;
   draftId: string;
   subject: string;
+  emailSourceUrl: string | null;
+  emailSourceLabel: string;
+  officialSiteUrl: string | null;
+  isOfficialSiteOrigin: boolean;
+  isPlaceholderEmail: boolean;
+  isPersonalEmail: boolean;
+  batchId: string | null;
+  source: string | null;
 }
 
 /** Gmail下書き作成済み・未送信で、手動送信記録が可能な Lead */
@@ -43,6 +52,7 @@ export function buildManualGmailSendPreview(lead: Lead): ManualGmailSendPreview 
   if (!to) {
     throw new ManualGmailSendRecordError('宛先メールがありません');
   }
+  const emailSource = resolveEmailSourceFromLead(lead);
   return {
     leadId: lead.id,
     companyName: lead.companyName,
@@ -51,17 +61,41 @@ export function buildManualGmailSendPreview(lead: Lead): ManualGmailSendPreview 
     replyTo: getOutreachReplyToEmail(),
     draftId,
     subject: lead.emailSubject?.trim() || '（件名なし）',
+    emailSourceUrl: emailSource.emailSourceUrl,
+    emailSourceLabel: emailSource.emailSourceLabel,
+    officialSiteUrl: emailSource.officialSiteUrl,
+    isOfficialSiteOrigin: emailSource.isOfficialSiteOrigin,
+    isPlaceholderEmail: emailSource.isPlaceholderEmail,
+    isPersonalEmail: emailSource.isPersonalEmail,
+    batchId: emailSource.batchId,
+    source: emailSource.source,
   };
 }
 
 function buildSentMemo(preview: ManualGmailSendPreview): string {
-  return [
+  const parts = [
     'Gmail手動送信（manual_gmail）',
     `draftId=${preview.draftId}`,
     `To=${preview.to}`,
     `From=${preview.from}`,
     `Reply-To=${preview.replyTo}`,
-  ].join(' / ');
+  ];
+  if (preview.emailSourceUrl) {
+    parts.push(`emailSourceUrl=${preview.emailSourceUrl}`);
+  }
+  if (preview.emailSourceLabel) {
+    parts.push(`emailSourceLabel=${preview.emailSourceLabel}`);
+  }
+  if (preview.officialSiteUrl) {
+    parts.push(`officialSiteUrl=${preview.officialSiteUrl}`);
+  }
+  if (preview.batchId) {
+    parts.push(`batchId=${preview.batchId}`);
+  }
+  if (preview.source) {
+    parts.push(`source=${preview.source}`);
+  }
+  return parts.join(' / ');
 }
 
 function assertCanRecord(lead: Lead, expectedDraftId: string): void {
@@ -99,6 +133,8 @@ export function applyManualGmailSendRecord(
     sendStatus: 'sent',
     manualSentAt: sentAt,
     manualSendMethod: 'email',
+    emailSourceUrl: preview.emailSourceUrl ?? lead.emailSourceUrl ?? null,
+    emailSourceLabel: preview.emailSourceLabel ?? lead.emailSourceLabel ?? null,
     nextAction: inferNextActionForLead({ ...lead, sendStatus: 'sent' }),
     communicationMemo,
     updatedAt: sentAt,

@@ -2403,6 +2403,100 @@ body {
   white-space: nowrap;
 }
 
+.email-source-display {
+  margin-top: 0.2rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.email-source-row {
+  display: flex;
+  gap: 0.35rem;
+  align-items: flex-start;
+  margin-bottom: 0.15rem;
+}
+
+.email-source-label {
+  flex: 0 0 auto;
+  min-width: 4.5rem;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.email-source-value {
+  min-width: 0;
+  flex: 1;
+}
+
+.email-source-page-label {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  margin-bottom: 0.05rem;
+}
+
+.email-source-link {
+  color: #2563eb;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  max-width: 100%;
+}
+
+.email-source-link:hover {
+  text-decoration: underline;
+}
+
+.email-source-missing {
+  color: var(--text-muted);
+}
+
+.email-source-inline {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 0.1rem;
+}
+
+.email-source-inline-label {
+  color: var(--text-muted);
+}
+
+.email-source-warnings {
+  margin: 0.35rem 0 0;
+  padding-left: 1rem;
+  font-size: 0.72rem;
+}
+
+.email-source-warning {
+  color: #b45309;
+}
+
+.email-source-warning-danger {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.email-source-confirm-block {
+  margin: 0.75rem 0;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  background: var(--surface-muted, #f9fafb);
+}
+
+.daily30-candidate-field-email .email-source-display {
+  margin-top: 0.15rem;
+}
+
+.gmail-candidate-email-source,
+.send-record-email-source,
+.daily30-draft-import-email-source {
+  margin-top: 0.25rem;
+}
+
 .daily30-link-row {
   display: flex;
   flex-wrap: wrap;

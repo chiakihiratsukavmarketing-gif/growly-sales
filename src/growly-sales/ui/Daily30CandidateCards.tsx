@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTypes.js';
 import { resolveDaily30WorkflowStatus } from '../candidates/resolveDaily30WorkflowStatus.js';
+import { resolveEmailSourceFromCandidate } from '../candidates/resolveEmailSourceDisplay.js';
+import { EmailSourceDisplay } from './EmailSourceDisplay.js';
 import {
   pipelineStatusLabel,
   pipelineStatusVariant,
@@ -85,7 +87,8 @@ export function Daily30CandidateCard({
   duplicateLeadName = null,
 }: Daily30CandidateCardProps) {
   const siteUrl = c.officialSiteUrl ?? c.websiteUrl ?? '';
-  const email = c.emailCandidates?.[0] ?? '';
+  const email = c.emailCandidates?.[0] ?? c.targetEmail ?? '';
+  const emailSource = resolveEmailSourceFromCandidate(c);
   const blocked = Boolean(approvalBlockReason);
   const canApprove = showApprove && c.importStatus !== 'approved_for_lead' && !blocked;
   const workflow = resolveDaily30WorkflowStatus(c);
@@ -137,11 +140,14 @@ export function Daily30CandidateCard({
             {c.area || '—'}
           </span>
         </div>
-        <div className="daily30-candidate-field">
+        <div className="daily30-candidate-field daily30-candidate-field-email">
           <span className="daily30-field-label">メール</span>
           <span className="daily30-field-value daily30-field-ellipsis" title={email}>
             {email || '—'}
           </span>
+          {email ? (
+            <EmailSourceDisplay info={emailSource} variant="compact" className="daily30-email-source" />
+          ) : null}
         </div>
         <div className="daily30-candidate-field">
           <span className="daily30-field-label">サイト</span>
