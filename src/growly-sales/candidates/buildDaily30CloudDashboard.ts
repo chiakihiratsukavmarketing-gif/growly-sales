@@ -1,7 +1,12 @@
 import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTypes.js';
 import type { Lead } from '../types/lead.js';
 import { buildDaily30Dashboard } from './buildDaily30Dashboard.js';
-import { todayBatchId } from './daily30AreaConfig.js';
+import { todayBatchIdJst } from './daily30AreaConfig.js';
+import { resolveDaily30FetchRunContext } from './fetchDaily30Candidates.js';
+import {
+  formatScheduleSourceLabel,
+  buildRunContextFromCloudStateEntry,
+} from './resolveDaily30CollectionSchedule.js';
 import { getDaily30CloudErrorDefinition } from './daily30CloudRunErrors.js';
 import {
   buildDaily30CloudStatus,
@@ -54,6 +59,9 @@ export interface Daily30CloudDashboardPayload {
   schedulerConfigured: boolean;
   cloudRunUrlConfigured: boolean;
   nextScheduledRun: string;
+  /** 論理除外を含む全候補（ダッシュボード集計用） */
+  allCandidates: ExternalLeadCandidate[];
+  /** 通常一覧用（論理除外済みを除く） */
   candidates: ExternalLeadCandidate[];
   emailFoundCandidates: ExternalLeadCandidate[];
   gcsReadError?: string;
@@ -61,6 +69,12 @@ export interface Daily30CloudDashboardPayload {
   contactPathSummary?: Daily30ContactPathSummary;
   humanExcludedCount?: number;
   humanExcludedCandidates?: ExternalLeadCandidate[];
+  lastRunCollectionProfileName?: string | null;
+  lastRunScheduleSource?: string | null;
+  lastRunAreasUsed?: string[];
+  lastRunScheduleWarning?: string | null;
+  resolvedForToday?: Awaited<ReturnType<typeof resolveDaily30FetchRunContext>>;
+  lastRunResolvedContext?: ReturnType<typeof buildRunContextFromCloudStateEntry>;
 }
 
 function metricsFromRun(
@@ -131,7 +145,7 @@ export async function buildDaily30CloudDashboardPayload(
   leads: Lead[]
 ): Promise<Daily30CloudDashboardPayload> {
   const storage = describeStorageBackendStatus();
-  const batchId = todayBatchId();
+  const batchId = todayBatchIdJst();
 
   let candidates: ExternalLeadCandidate[];
   let latestRun: Daily30CloudRunStateEntry | null = null;
@@ -170,6 +184,7 @@ export async function buildDaily30CloudDashboardPayload(
         schedulerConfigured: isCloudSchedulerConfigured(),
         cloudRunUrlConfigured: isCloudRunUrlConfigured(),
         nextScheduledRun: NEXT_SCHEDULED_RUN_LABEL,
+        allCandidates: [],
         candidates: [],
         emailFoundCandidates: [],
         gcsReadError: sanitizeErrorMessageSafe(
@@ -182,8 +197,10 @@ export async function buildDaily30CloudDashboardPayload(
   }
 
   const metrics = metricsFromRun(latestRun, batchId, candidates, leads);
+  const resolvedForToday = await resolveDaily30FetchRunContext(batchId);
   const humanExcludedCandidates = candidates.filter(isDaily30HumanExcludedCandidate);
-  const humanExcludedCount = countDaily30HumanExcluded(candidates);
+  const todayCandidates = candidates.filter((c) => c.collectionBatchId === batchId);
+  const humanExcludedCount = countDaily30HumanExcluded(todayCandidates);
   const visibleCandidates = filterDaily30VisibleCandidates(candidates);
   const emailFoundCandidates = visibleCandidates.filter((c) => c.pipelineStatus === 'email_found');
   const contactPathSummary = summarizeDaily30ContactPaths(candidates, batchId);
@@ -223,11 +240,21 @@ export async function buildDaily30CloudDashboardPayload(
     schedulerConfigured: isCloudSchedulerConfigured(),
     cloudRunUrlConfigured: isCloudRunUrlConfigured(),
     nextScheduledRun: NEXT_SCHEDULED_RUN_LABEL,
+    allCandidates: candidates,
     candidates: visibleCandidates,
     emailFoundCandidates,
     contactPathSummary,
     humanExcludedCount,
     humanExcludedCandidates,
+    lastRunCollectionProfileName: latestRun?.collectionProfileName ?? null,
+    lastRunScheduleSource: latestRun?.scheduleSource
+      ? formatScheduleSourceLabel(latestRun.scheduleSource)
+      : null,
+    lastRunAreasUsed: latestRun?.areasUsed ?? [],
+    lastRunScheduleWarning: latestRun?.scheduleWarning ?? null,
+    resolvedForToday,
+    lastRunResolvedContext:
+      latestRun?.batchId === batchId ? buildRunContextFromCloudStateEntry(latestRun) : null,
   };
 }
 

@@ -18,7 +18,7 @@ import {
 } from '../storage/jsonDocumentNames.js';
 import { jsonDocumentExists, readJsonDocument } from '../storage/jsonDocumentStorage.js';
 import { summarizeDaily30ContactPaths } from '../candidates/summarizeDaily30ContactPaths.js';
-import { todayBatchId } from '../candidates/daily30AreaConfig.js';
+import { todayBatchIdJst } from '../candidates/daily30AreaConfig.js';
 import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTypes.js';
 import { sanitizeErrorMessageSafe } from '../candidates/daily30CloudRunErrors.js';
 
@@ -96,7 +96,7 @@ async function main(): Promise<void> {
           try {
             const parsed = JSON.parse(raw) as ExternalLeadCandidate[];
             if (Array.isArray(parsed)) {
-              contactSummary = summarizeDaily30ContactPaths(parsed, todayBatchId());
+              contactSummary = summarizeDaily30ContactPaths(parsed, todayBatchIdJst());
             }
           } catch {
             /* parse error handled below */
@@ -123,7 +123,7 @@ async function main(): Promise<void> {
   console.log(`Daily30 候補 JSON: ${externalExists ? 'あり' : 'なし'}`);
   console.log(`最新候補総数: ${gcsReachable ? externalCount : '—'}`);
   if (contactSummary) {
-    console.log(`本日 batch (${todayBatchId()}) 件数: ${contactSummary.total}`);
+    console.log(`本日 batch (${todayBatchIdJst()}) 件数: ${contactSummary.total}`);
     console.log(`  メールあり（メールのみ）: ${contactSummary.emailOnly}`);
     console.log(`  フォームあり（フォームのみ）: ${contactSummary.formOnly}`);
     console.log(`  メール+フォーム: ${contactSummary.both}`);

@@ -1,5 +1,6 @@
 import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTypes.js';
 import { externalCandidateDedupeKey } from '../adapters/dedupeExternalCandidates.js';
+import { inferSourceComplianceStatus } from './daily30CollectionProfile.js';
 
 /** 保存用フィールドを補完（既存JSONとの後方互換） */
 export function enrichExternalLeadCandidate(
@@ -38,6 +39,20 @@ export function enrichExternalLeadCandidate(
     excludedAt: candidate.excludedAt ?? null,
     excludedReason: candidate.excludedReason ?? null,
     excludedBy: candidate.excludedBy ?? null,
+    collectionProfileId: candidate.collectionProfileId ?? null,
+    collectionProfileName: candidate.collectionProfileName ?? null,
+    collectionMode: candidate.collectionMode ?? null,
+    industryCategory: candidate.industryCategory ?? null,
+    areaStrategy: candidate.areaStrategy ?? null,
+    areaQueuePosition: candidate.areaQueuePosition ?? null,
+    discoverySource: candidate.discoverySource ?? null,
+    discoverySourceSite: candidate.discoverySourceSite ?? null,
+    discoverySourceLabel: candidate.discoverySourceLabel ?? null,
+    discoverySourceUrl: candidate.discoverySourceUrl ?? null,
+    sourceComplianceNote: candidate.sourceComplianceNote ?? null,
+    collectionRunId: candidate.collectionRunId ?? null,
+    sourceComplianceStatus:
+      candidate.sourceComplianceStatus ?? inferSourceComplianceStatus(candidate),
   };
 }
 

@@ -5,6 +5,7 @@ import { approveLead } from './api.js';
 import {
   createGmailDraftApi,
   fetchGmailDraftCandidates,
+  CREATE_DRAFTS_GATE_LABEL,
   type GmailDraftCandidateDetail,
 } from './gmailDraftCandidatesApi.js';
 import { LeadStatusBadge } from './LeadStatusBadge.js';
@@ -13,7 +14,9 @@ import { GmailDraftCreateDialog } from './GmailDraftCreateDialog.js';
 import { GmailDraftCreateResultPanel } from './GmailDraftCreateResultPanel.js';
 import { ApproveDraftDialog } from './ApproveDraftDialog.js';
 import { EmailSourceDisplay, emailSourceInfoFromOutreachView } from './EmailSourceDisplay.js';
+import { CollectionProfileDisplay } from './CollectionProfileDisplay.js';
 import { PageHeader } from './common/PageHeader.js';
+import { DevDetails } from './common/DevDetails.js';
 import { EmptyState } from './common/EmptyState.js';
 import { SearchAndFilterBar } from './common/SearchAndFilterBar.js';
 import { FilterEmptyState } from './common/FilterEmptyState.js';
@@ -41,7 +44,7 @@ export function GmailDraftCandidatesView({
   const [data, setData] = useState<Awaited<ReturnType<typeof fetchGmailDraftCandidates>> | null>(null);
   const [dialogCandidate, setDialogCandidate] = useState<GmailDraftCandidateDetail | null>(null);
   const [approveCandidate, setApproveCandidate] = useState<GmailDraftCandidateDetail | null>(null);
-  const [gateInput, setGateInput] = useState('');
+  const [devGateInput, setDevGateInput] = useState('');
   const [creating, setCreating] = useState(false);
   const [approving, setApproving] = useState(false);
   const [createResult, setCreateResult] = useState<CreateGmailDraftForLeadResult | null>(null);
@@ -76,26 +79,28 @@ export function GmailDraftCandidatesView({
 
   const pendingCandidates = filteredCandidates.filter((c) => c.humanReviewStatus === 'pending');
   const approvedCandidates = filteredCandidates.filter((c) => c.humanReviewStatus === 'approved');
+  const creatableCandidates = approvedCandidates.filter((c) => c.canCreate);
 
   const clearFilters = useCallback(() => {
     setSearch('');
     setStatusFilter('all');
   }, []);
 
-  async function handleConfirmCreate(): Promise<void> {
+  async function handleConfirmCreate(gateToken = CREATE_DRAFTS_GATE_LABEL): Promise<void> {
     if (!dialogCandidate) return;
+    if (gateToken.trim() !== CREATE_DRAFTS_GATE_LABEL) return;
     setCreating(true);
     try {
-      const result = await createGmailDraftApi(dialogCandidate.leadId, gateInput.trim());
+      const result = await createGmailDraftApi(dialogCandidate.leadId, gateToken.trim());
       setDialogCandidate(null);
-      setGateInput('');
+      setDevGateInput('');
       setCreateResult(result);
       onDraftCreated?.(result.lead);
       await load();
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Gmail下書きの作成に失敗しました');
       setDialogCandidate(null);
-      setGateInput('');
+      setDevGateInput('');
     } finally {
       setCreating(false);
     }
@@ -144,6 +149,12 @@ export function GmailDraftCandidatesView({
               className="gmail-candidate-email-source"
             />
           </div>
+          <CollectionProfileDisplay
+            info={candidate.collectionProfile}
+            variant="compact"
+            emailSourceInfo={emailSourceInfoFromOutreachView({ ...candidate, to: candidate.to })}
+            showEmailSource={Boolean(candidate.to) && candidate.discoverySource === 'job_site_reference'}
+          />
           <div className="candidate-badges">
             <LeadStatusBadge kind="human" value={candidate.humanReviewStatus} />
           </div>
@@ -171,11 +182,11 @@ export function GmailDraftCandidatesView({
                 className="btn btn-primary"
                 disabled={!candidate.canCreate}
                 onClick={() => {
-                  setGateInput('');
+                  setDevGateInput('');
                   setDialogCandidate(candidate);
                 }}
               >
-                Gmail下書きを作成
+                Gmail下書きを作成する
               </button>
             </>
           )}
@@ -241,18 +252,50 @@ export function GmailDraftCandidatesView({
 
       {approvedCandidates.length > 0 && (
         <SectionCard title={`Gmail下書き作成（${approvedCandidates.length}件）`}>
+          <p className="hint human-gate-action-hint">
+            承認済み候補のGmail下書きを作成します。送信はGmailで手動確認後に行います。
+          </p>
+          {creatableCandidates.length === 0 && (
+            <p className="hint warning-text human-gate-disabled-reason">
+              内容確認済み・承認済みで下書き未作成の候補がありません（送信済み・下書き済み・除外は対象外）。
+            </p>
+          )}
           <div className="gmail-candidate-list draft-candidate-filtered-list">
             {approvedCandidates.map((c) => renderCandidateCard(c, false))}
           </div>
         </SectionCard>
       )}
 
+      <DevDetails title="詳細操作（開発者向け）" className="gmail-draft-gate-dev">
+        <p className="hint">手入力ゲートで下書き作成（先にカードから対象を開いてください）</p>
+        <div className="daily30-fetch-row">
+          <input
+            className="input input-sm"
+            value={devGateInput}
+            onChange={(e) => setDevGateInput(e.target.value)}
+            placeholder={CREATE_DRAFTS_GATE_LABEL}
+            disabled={creating || !dialogCandidate}
+          />
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            disabled={
+              creating ||
+              !dialogCandidate ||
+              devGateInput.trim() !== CREATE_DRAFTS_GATE_LABEL ||
+              !dialogCandidate.canCreate
+            }
+            onClick={() => void handleConfirmCreate(devGateInput.trim())}
+          >
+            ゲート入力で作成
+          </button>
+        </div>
+      </DevDetails>
+
       {dialogCandidate && (
         <GmailDraftCreateDialog
           candidate={dialogCandidate}
-          gateInput={gateInput}
           creating={creating}
-          onGateInputChange={setGateInput}
           onConfirm={() => void handleConfirmCreate()}
           onCancel={() => !creating && setDialogCandidate(null)}
         />

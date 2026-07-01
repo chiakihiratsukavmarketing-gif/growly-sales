@@ -1,10 +1,12 @@
 import { getStorageBackend } from '../config/storageBackend.js';
 import {
   getDaily30CloudRunStatePath,
+  getDaily30CollectionSchedulePath,
   getExternalCandidatesJsonPath,
 } from '../config/paths.js';
 import {
   DAILY30_CLOUD_RUN_STATE_JSON,
+  DAILY30_COLLECTION_SCHEDULE_JSON,
   EXTERNAL_CANDIDATES_JSON,
 } from './jsonDocumentNames.js';
 import {
@@ -22,11 +24,13 @@ import {
 
 export type JsonDocumentName =
   | typeof EXTERNAL_CANDIDATES_JSON
-  | typeof DAILY30_CLOUD_RUN_STATE_JSON;
+  | typeof DAILY30_CLOUD_RUN_STATE_JSON
+  | typeof DAILY30_COLLECTION_SCHEDULE_JSON;
 
 function resolveLocalPath(logicalName: JsonDocumentName): string {
   if (logicalName === EXTERNAL_CANDIDATES_JSON) return getExternalCandidatesJsonPath();
   if (logicalName === DAILY30_CLOUD_RUN_STATE_JSON) return getDaily30CloudRunStatePath();
+  if (logicalName === DAILY30_COLLECTION_SCHEDULE_JSON) return getDaily30CollectionSchedulePath();
   throw new Error(`未知の JSON ドキュメント: ${logicalName}`);
 }
 

@@ -14,8 +14,10 @@ import { SearchAndFilterBar } from './common/SearchAndFilterBar.js';
 import { FilterEmptyState } from './common/FilterEmptyState.js';
 import { replyStatusLabel } from './displayLabels.js';
 import { EmailSourceDisplay } from './EmailSourceDisplay.js';
+import { CollectionProfileDisplay } from './CollectionProfileDisplay.js';
 import { nextActionLabel } from './leadDisplayUtils.js';
 import { resolveEmailSourceFromLead } from '../candidates/resolveEmailSourceDisplay.js';
+import { buildCollectionProfileDisplayFromLead } from '../candidates/resolveCollectionProfileDisplay.js';
 import {
   filterByCompanyName,
   matchesSendRecordRow,
@@ -209,6 +211,24 @@ export function SendRecordsView({
                             }}
                             variant="compact"
                           />
+                          <CollectionProfileDisplay
+                            info={item.collectionProfile}
+                            variant="compact"
+                            emailSourceInfo={{
+                              email: item.to,
+                              emailSourceUrl: item.emailSourceUrl,
+                              emailSourceLabel: item.emailSourceLabel,
+                              sourcePageType: 'unknown',
+                              officialSiteUrl: item.officialSiteUrl,
+                              isOfficialSiteOrigin: item.isOfficialSiteOrigin,
+                              isPlaceholderEmail: item.isPlaceholderEmail,
+                              isPersonalEmail: item.isPersonalEmail,
+                              checkedUrls: item.emailSourceUrl ? [item.emailSourceUrl] : [],
+                              batchId: item.batchId,
+                              source: item.source,
+                            }}
+                            showEmailSource={Boolean(item.to) && item.discoverySource === 'job_site_reference'}
+                          />
                           <p className="pending-subject">件名: {item.subject}</p>
                         </div>
                         <div className="pending-record-actions">
@@ -256,6 +276,15 @@ export function SendRecordsView({
                                 className="send-record-email-source"
                               />
                             ) : null}
+                            <CollectionProfileDisplay
+                              info={buildCollectionProfileDisplayFromLead(lead)}
+                              variant="compact"
+                              emailSourceInfo={resolveEmailSourceFromLead(lead)}
+                              showEmailSource={
+                                lead.emailCandidates.some((e) => e.trim()) &&
+                                lead.discoverySource === 'job_site_reference'
+                              }
+                            />
                           </td>
                           <td>{formatSentDate(lead)}</td>
                           <td>

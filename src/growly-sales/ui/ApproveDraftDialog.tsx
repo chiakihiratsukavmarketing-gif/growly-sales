@@ -1,5 +1,6 @@
 import type { GmailDraftCandidateDetail } from './gmailDraftCandidatesApi.js';
 import { EmailSourceConfirmBlock, emailSourceInfoFromOutreachView } from './EmailSourceDisplay.js';
+import { CollectionProfileDisplay } from './CollectionProfileDisplay.js';
 
 interface ApproveDraftDialogProps {
   candidate: GmailDraftCandidateDetail;
@@ -24,9 +25,15 @@ export function ApproveDraftDialog({
         <EmailSourceConfirmBlock
           info={emailSourceInfoFromOutreachView({ ...candidate, to: candidate.to || candidate.email })}
         />
+        <CollectionProfileDisplay
+          info={candidate.collectionProfile}
+          variant="compact"
+          emailSourceInfo={emailSourceInfoFromOutreachView({ ...candidate, to: candidate.to || candidate.email })}
+          showEmailSource={Boolean(candidate.to || candidate.email) && candidate.discoverySource === 'job_site_reference'}
+        />
         <ul className="policy-list compact">
           <li>承認は下書き作成の許可であり、<strong>送信ではありません</strong></li>
-          <li>承認後も CREATE_DRAFTS の明示入力が必要です</li>
+          <li>承認後は「Gmail下書きを作成する」ボタンで確認のうえ下書きを作成します</li>
           <li>承認内容は communicationMemo に記録されます</li>
         </ul>
         <div className="modal-actions">

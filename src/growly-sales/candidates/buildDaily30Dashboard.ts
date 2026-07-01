@@ -2,7 +2,7 @@ import type { Lead } from '../types/lead.js';
 import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTypes.js';
 import {
   DAILY_30_AREA_EXPANSION,
-  todayBatchId,
+  todayBatchIdJst,
 } from './daily30AreaConfig.js';
 import { DAILY_30_TARGET, DAILY_30_TARGET_EMAIL_FOUND } from './daily30CandidateStatus.js';
 import { isExternalFetchConfigured } from '../config/env.js';
@@ -39,6 +39,7 @@ export interface Daily30Dashboard {
   noEmailCount: number;
   miyagiCount: number;
   fukushimaCount: number;
+  yamagataCount: number;
   northKantoCount: number;
   withEmailCount: number;
   withoutEmailCount: number;
@@ -64,6 +65,7 @@ export interface Daily30Dashboard {
 function countByRegion(candidates: ExternalLeadCandidate[], batchId: string): {
   miyagi: number;
   fukushima: number;
+  yamagata: number;
   northKanto: number;
 } {
   const today = candidates.filter(
@@ -72,17 +74,19 @@ function countByRegion(candidates: ExternalLeadCandidate[], batchId: string): {
   return {
     miyagi: today.filter((c) => c.regionGroup === '宮城').length,
     fukushima: today.filter((c) => c.regionGroup === '福島').length,
+    yamagata: today.filter((c) => c.regionGroup === '山形').length,
     northKanto: today.filter((c) => c.regionGroup === '北関東').length,
   };
 }
 
 function resolveNextExploreArea(
-  counts: { miyagi: number; fukushima: number; northKanto: number },
+  counts: { miyagi: number; fukushima: number; yamagata: number; northKanto: number },
   emailShortfall: number
 ): string {
   if (emailShortfall <= 0) return '本日のメール目標達成（追加収集は任意）';
   if (counts.miyagi < DAILY_30_TARGET_EMAIL_FOUND) return '宮城県（優先）';
   if (counts.miyagi + counts.fukushima < DAILY_30_TARGET_EMAIL_FOUND) return '福島県';
+  if (counts.miyagi + counts.fukushima + counts.yamagata < DAILY_30_TARGET_EMAIL_FOUND) return '山形県';
   return '北関東（茨城県 → 栃木県 → 群馬県）';
 }
 
@@ -122,7 +126,7 @@ function buildNextAction(input: {
 export function buildDaily30Dashboard(
   candidates: ExternalLeadCandidate[],
   _leads: Lead[],
-  batchId = todayBatchId(),
+  batchId = todayBatchIdJst(),
   cloudRunEntry: Daily30CloudRunStateEntry | null = null
 ): Daily30Dashboard {
   const todayAll = candidates.filter((c) => c.collectionBatchId === batchId);
@@ -157,7 +161,9 @@ export function buildDaily30Dashboard(
       c.pipelineStatus !== 'excluded'
   ).length;
 
-  const copyGeneratedCount = accepted.filter((c) => Boolean(c.copyGeneratedAt)).length;
+  const copyGeneratedCount = todayAll.filter(
+    (c) => isDaily30CandidateVisibleInLists(c) && Boolean(c.copyGeneratedAt)
+  ).length;
 
   const qualityCheckPassedCount = accepted.filter(
     (c) => c.pipelineStatus === 'ready_for_draft'
@@ -228,6 +234,7 @@ export function buildDaily30Dashboard(
     noEmailCount: batchMetrics.noEmail,
     miyagiCount: regionCounts.miyagi,
     fukushimaCount: regionCounts.fukushima,
+    yamagataCount: regionCounts.yamagata,
     northKantoCount: regionCounts.northKanto,
     withEmailCount,
     withoutEmailCount,

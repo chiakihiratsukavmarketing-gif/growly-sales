@@ -1,12 +1,13 @@
 import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTypes.js';
 
-/** 人間が候補一覧から除外した候補 */
+/** 人間が候補一覧から除外した候補（いずれか1つでも該当で非表示） */
 export function isDaily30HumanExcludedCandidate(candidate: ExternalLeadCandidate): boolean {
   return (
-    candidate.importStatus === 'excluded' ||
     candidate.pipelineStatus === 'excluded' ||
+    candidate.importStatus === 'excluded' ||
+    candidate.humanReviewStatus === 'rejected' ||
     candidate.excludedBy === 'human' ||
-    (candidate.humanReviewStatus === 'rejected' && Boolean(candidate.excludedAt))
+    Boolean(candidate.excludedAt)
   );
 }
 

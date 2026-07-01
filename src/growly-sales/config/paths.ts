@@ -100,6 +100,10 @@ export function getDaily30CloudRunStatePath(): string {
   return join(getGrowlySalesDataDir(), 'daily30-cloud-run-state.json');
 }
 
+export function getDaily30CollectionSchedulePath(): string {
+  return join(getGrowlySalesDataDir(), 'daily30-collection-schedule.json');
+}
+
 export function getUiDistDir(): string {
   return join(getProjectRoot(), 'dist', 'ui');
 }

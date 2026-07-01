@@ -3,6 +3,14 @@ import { readJsonDocument, writeJsonDocument } from './jsonDocumentStorage.js';
 import type { Daily30CloudErrorCode } from '../candidates/daily30CloudRunErrors.js';
 import type { Daily30StoppedReason } from '../candidates/daily30BatchMetrics.js';
 import { DAILY_30_TARGET_EMAIL_FOUND } from '../candidates/daily30CandidateStatus.js';
+import type {
+  Daily30AreaStrategy,
+  Daily30CollectionMode,
+  Daily30DiscoverySource,
+  Daily30DiscoverySourceSite,
+  Daily30IndustryCategory,
+} from '../candidates/daily30CollectionProfile.js';
+import type { Daily30ScheduleSource } from '../candidates/resolveDaily30CollectionSchedule.js';
 
 export type Daily30CloudRunMode = 'dry_run' | 'run' | 'already_ran' | 'blocked' | 'failed';
 export type Daily30CloudRunStatus = 'success' | 'partial_success' | 'failed' | 'skipped' | 'blocked';
@@ -38,6 +46,25 @@ export interface Daily30CloudRunStateEntry {
   gcsBucketConfigured: boolean;
   force: boolean;
   message?: string;
+  /** Phase 40.2: 実行開始（UTC ISO） */
+  runStartedAtUtc?: string;
+  /** Phase 40.2: 実行開始日（JST YYYY-MM-DD） */
+  runStartedAtJst?: string;
+  collectionProfileId?: string;
+  collectionProfileName?: string;
+  collectionMode?: Daily30CollectionMode;
+  industryCategory?: Daily30IndustryCategory;
+  areaStrategy?: Daily30AreaStrategy;
+  collectionRunId?: string;
+  discoverySource?: Daily30DiscoverySource;
+  discoverySourceSite?: Daily30DiscoverySourceSite | null;
+  discoverySourceLabel?: string | null;
+  areasUsed?: string[];
+  scheduleSource?: Daily30ScheduleSource;
+  scheduleWarning?: string | null;
+  effectiveFromBatchId?: string | null;
+  scheduleConsumedAt?: string | null;
+  scheduleConsumedBatchId?: string | null;
 }
 
 export interface Daily30CloudRunStateStore {
@@ -102,6 +129,23 @@ function normalizeEntry(raw: Partial<Daily30CloudRunStateEntry> & { batchId: str
     gcsBucketConfigured: raw.gcsBucketConfigured ?? false,
     force: raw.force ?? false,
     message: raw.message,
+    runStartedAtUtc: raw.runStartedAtUtc ?? startedAt,
+    runStartedAtJst: raw.runStartedAtJst,
+    collectionProfileId: raw.collectionProfileId,
+    collectionProfileName: raw.collectionProfileName,
+    collectionMode: raw.collectionMode,
+    industryCategory: raw.industryCategory,
+    areaStrategy: raw.areaStrategy,
+    collectionRunId: raw.collectionRunId ?? raw.runId,
+    discoverySource: raw.discoverySource,
+    discoverySourceSite: raw.discoverySourceSite,
+    discoverySourceLabel: raw.discoverySourceLabel,
+    areasUsed: raw.areasUsed,
+    scheduleSource: raw.scheduleSource,
+    scheduleWarning: raw.scheduleWarning,
+    effectiveFromBatchId: raw.effectiveFromBatchId,
+    scheduleConsumedAt: raw.scheduleConsumedAt,
+    scheduleConsumedBatchId: raw.scheduleConsumedBatchId,
   };
 }
 

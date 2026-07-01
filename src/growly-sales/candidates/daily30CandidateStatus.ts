@@ -27,7 +27,7 @@ export type Daily30GmailDraftStatus = 'none' | 'draft_created' | 'error';
 
 export type Daily30SendStatus = 'not_sent' | 'manual_sent' | 'draft' | 'sent' | 'blocked';
 
-export type Daily30RegionGroup = '宮城' | '福島' | '北関東';
+export type Daily30RegionGroup = '宮城' | '福島' | '山形' | '北関東';
 
 /** Daily 30 主目標: メール取得済み（email_found）件数 */
 export const DAILY_30_TARGET = 30;

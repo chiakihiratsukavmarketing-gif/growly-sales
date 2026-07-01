@@ -1,26 +1,20 @@
 import type { GmailDraftCandidateDetail } from './gmailDraftCandidatesApi.js';
-import { CREATE_DRAFTS_GATE_LABEL } from './gmailDraftCandidatesApi.js';
 import { EmailSourceConfirmBlock, emailSourceInfoFromOutreachView } from './EmailSourceDisplay.js';
+import { CollectionProfileDisplay } from './CollectionProfileDisplay.js';
 
 interface GmailDraftCreateDialogProps {
   candidate: GmailDraftCandidateDetail;
-  gateInput: string;
   creating: boolean;
-  onGateInputChange: (value: string) => void;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
 export function GmailDraftCreateDialog({
   candidate,
-  gateInput,
   creating,
-  onGateInputChange,
   onConfirm,
   onCancel,
 }: GmailDraftCreateDialogProps) {
-  const gateOk = gateInput.trim() === CREATE_DRAFTS_GATE_LABEL;
-
   return (
     <div className="modal-overlay" role="presentation" onClick={onCancel}>
       <div
@@ -31,10 +25,11 @@ export function GmailDraftCreateDialog({
         onClick={(e) => e.stopPropagation()}
       >
         <h3 id="gmail-draft-create-title" className="modal-title">
-          Gmail下書きを作成
+          Gmail下書きを作成する
         </h3>
         <p className="modal-lead">
-          users.drafts.create のみ実行します。<strong>メール送信はされません。</strong>
+          承認済みの下書き候補について、Gmail下書きを作成します。これは送信ではありません。
+          Gmail送信は人間がGmail画面で手動で行います。実行しますか？
         </p>
 
         <dl className="confirm-dl">
@@ -49,6 +44,13 @@ export function GmailDraftCreateDialog({
         </dl>
 
         <EmailSourceConfirmBlock info={emailSourceInfoFromOutreachView({ ...candidate, to: candidate.to })} />
+
+        <CollectionProfileDisplay
+          info={candidate.collectionProfile}
+          variant="compact"
+          emailSourceInfo={emailSourceInfoFromOutreachView({ ...candidate, to: candidate.to })}
+          showEmailSource={Boolean(candidate.to) && candidate.discoverySource === 'job_site_reference'}
+        />
 
         <dl className="confirm-dl">
           <div className="confirm-row">
@@ -80,19 +82,13 @@ export function GmailDraftCreateDialog({
           <pre className="email-body-preview">{candidate.emailBodyPreview}</pre>
         </div>
 
-        <label className="gate-field">
-          <span className="gate-label">
-            確認のため <code>{CREATE_DRAFTS_GATE_LABEL}</code> と入力してください
-          </span>
-          <input
-            type="text"
-            value={gateInput}
-            onChange={(e) => onGateInputChange(e.target.value)}
-            placeholder={CREATE_DRAFTS_GATE_LABEL}
-            autoComplete="off"
-            spellCheck={false}
-          />
-        </label>
+        <ul className="human-gate-safety-list hint-list">
+          <li>Gmail下書きのみ作成します（users.drafts.create）</li>
+          <li>自動送信は行いません</li>
+          <li>messages.send は使いません</li>
+          <li>対象件数: 1 件</li>
+          <li>From / Reply-To は {candidate.fromEmail} を確認</li>
+        </ul>
 
         <div className="modal-actions">
           <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={creating}>
@@ -102,9 +98,9 @@ export function GmailDraftCreateDialog({
             type="button"
             className="btn btn-primary"
             onClick={onConfirm}
-            disabled={creating || !gateOk || !candidate.canCreate}
+            disabled={creating || !candidate.canCreate}
           >
-            {creating ? '作成中…' : '下書きを作成'}
+            {creating ? '作成中…' : 'Gmail下書きを作成する'}
           </button>
         </div>
       </div>

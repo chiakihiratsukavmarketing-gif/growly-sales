@@ -2,6 +2,7 @@ import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTyp
 import type { Lead } from '../types/lead.js';
 import { buildLeadStubFromExternalCandidate } from './buildLeadStubFromExternalCandidate.js';
 import { resolveEmailSourceFromCandidate } from './resolveEmailSourceDisplay.js';
+import { copyCollectionProfileToLead } from './daily30CollectionProfile.js';
 
 /** ready_for_draft 候補から leads.json 用 Lead を構築（まだ保存しない） */
 export function buildLeadFromDaily30ReadyForDraft(
@@ -13,7 +14,7 @@ export function buildLeadFromDaily30ReadyForDraft(
   const emailSource = resolveEmailSourceFromCandidate(candidate);
   const now = new Date().toISOString();
 
-  return {
+  return copyCollectionProfileToLead(candidate, {
     ...stub,
     emailCandidates: [targetEmail],
     emailCandidateSourceUrls: [sourceUrl],
@@ -40,5 +41,5 @@ export function buildLeadFromDaily30ReadyForDraft(
     source: 'daily30',
     createdAt: now,
     updatedAt: now,
-  };
+  });
 }

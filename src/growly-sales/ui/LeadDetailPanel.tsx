@@ -6,6 +6,8 @@ import { LeadStatusBadge } from './LeadStatusBadge.js';
 import { LeadReviewActions } from './LeadReviewActions.js';
 import { LeadCommunicationActions } from './LeadCommunicationActions.js';
 import { leadListNextAction } from './leadDisplayUtils.js';
+import { CollectionProfileDisplay } from './CollectionProfileDisplay.js';
+import { buildCollectionProfileDisplayFromLead } from '../candidates/resolveCollectionProfileDisplay.js';
 import { DevDetails } from './common/DevDetails.js';
 
 function shortenUrl(url: string, maxLen = 36): string {
@@ -108,6 +110,16 @@ export function LeadDetailPanel({ lead, onUpdated, onError }: LeadDetailPanelPro
         ) : (
           <p className="hint">メール候補なし</p>
         )}
+      </section>
+
+      <section className="detail-section">
+        <h3>収集情報</h3>
+        <CollectionProfileDisplay
+          info={buildCollectionProfileDisplayFromLead(lead)}
+          variant="detail"
+          emailSourceInfo={resolveEmailSourceFromLead(lead)}
+          showEmailSource={lead.emailCandidates.some((e) => e.trim())}
+        />
       </section>
 
       <section className="detail-section">

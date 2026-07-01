@@ -8,15 +8,22 @@ import {
   buildDaily30Dashboard,
   describeDaily30AreaExpansion,
 } from './buildDaily30Dashboard.js';
-import { fetchDaily30Candidates } from './fetchDaily30Candidates.js';
-import { todayBatchId } from './daily30AreaConfig.js';
+import { fetchDaily30Candidates, resolveDaily30FetchRunContext } from './fetchDaily30Candidates.js';
+import { getJstDateString, todayBatchIdJst } from './daily30AreaConfig.js';
 import { DAILY_30_TARGET, DAILY_30_TARGET_EMAIL_FOUND } from './daily30CandidateStatus.js';
+import type { Daily30CollectionProfileSnapshot } from './daily30CollectionProfile.js';
+import {
+  formatScheduleWarningLabel,
+  type Daily30ScheduleSource,
+  type Daily30ScheduleWarning,
+  type ResolvedDaily30CollectionRunContext,
+} from './resolveDaily30CollectionSchedule.js';
 import {
   countDaily30BatchMetrics,
   ensureDaily30StoppedReasonForRun,
   type Daily30StoppedReason,
 } from './daily30BatchMetrics.js';
-import { DAILY_30_AREA_EXPANSION } from './daily30AreaConfig.js';
+import { DAILY_30_AREA_EXPANSION, filterDaily30ExecutionAreas } from './daily30AreaConfig.js';
 import {
   createCloudRunId,
   getCloudRunEntryForBatch,
@@ -85,6 +92,15 @@ export interface Daily30CloudAutoFetchResponse {
   errorCode?: Daily30CloudErrorCode;
   recoveryHint?: string;
   logsHint: string;
+  selectedProfile?: Daily30CollectionProfileSnapshot;
+  scheduleSource?: Daily30ScheduleSource;
+  plannedAreaStrategy?: Daily30CollectionProfileSnapshot['areaStrategy'];
+  plannedAreas?: string[];
+  effectiveFromBatchId?: string | null;
+  wouldConsumeOverride?: boolean;
+  scheduleWarnings?: string[];
+  areasUsed?: string[];
+  warning?: string;
 }
 
 export interface Daily30CloudAutoFetchOptions {
@@ -207,6 +223,59 @@ async function finalizeRun(
   });
 }
 
+function scheduleWarningText(warnings: Daily30ScheduleWarning[]): string | null {
+  if (warnings.length === 0) return null;
+  return warnings.map(formatScheduleWarningLabel).join(' / ');
+}
+
+function buildScheduleResponseFields(runContext: ResolvedDaily30CollectionRunContext) {
+  return {
+    selectedProfile: runContext.profile,
+    scheduleSource: runContext.scheduleSource,
+    plannedAreaStrategy: runContext.profile.areaStrategy,
+    plannedAreas: runContext.plannedAreaPrefectures,
+    effectiveFromBatchId: runContext.effectiveFromBatchId,
+    wouldConsumeOverride: runContext.wouldConsumeOverride,
+    scheduleWarnings: runContext.warnings.map(formatScheduleWarningLabel),
+  };
+}
+
+function attachRunCollectionMeta(
+  entry: Daily30CloudRunStateEntry,
+  meta?: {
+    startedAt: string;
+    runId: string;
+    profile: Daily30CollectionProfileSnapshot;
+    runContext?: ResolvedDaily30CollectionRunContext;
+    areasUsed?: string[];
+    scheduleConsumedAt?: string | null;
+    scheduleConsumedBatchId?: string | null;
+  }
+): Daily30CloudRunStateEntry {
+  if (!meta) return entry;
+  const runContext = meta.runContext;
+  return {
+    ...entry,
+    runStartedAtUtc: meta.startedAt,
+    runStartedAtJst: getJstDateString(new Date(meta.startedAt)),
+    collectionProfileId: meta.profile.collectionProfileId,
+    collectionProfileName: meta.profile.collectionProfileName,
+    collectionMode: meta.profile.collectionMode,
+    industryCategory: meta.profile.industryCategory,
+    areaStrategy: meta.profile.areaStrategy,
+    collectionRunId: meta.runId,
+    discoverySource: meta.profile.discoverySource,
+    discoverySourceSite: meta.profile.discoverySourceSite,
+    discoverySourceLabel: meta.profile.discoverySourceLabel,
+    areasUsed: meta.areasUsed,
+    scheduleSource: runContext?.scheduleSource,
+    scheduleWarning: runContext ? scheduleWarningText(runContext.warnings) : null,
+    effectiveFromBatchId: runContext?.effectiveFromBatchId ?? null,
+    scheduleConsumedAt: meta.scheduleConsumedAt ?? null,
+    scheduleConsumedBatchId: meta.scheduleConsumedBatchId ?? null,
+  };
+}
+
 function makeStateEntry(
   base: {
     runId: string;
@@ -232,8 +301,18 @@ function makeStateEntry(
     errorMessageSafe?: string;
     recoveryHint?: string;
   },
-  env: RunEnvironmentSnapshot
+  env: RunEnvironmentSnapshot,
+  collectionMeta?: {
+    startedAt: string;
+    runId: string;
+    profile: Daily30CollectionProfileSnapshot;
+    runContext?: ResolvedDaily30CollectionRunContext;
+    areasUsed?: string[];
+    scheduleConsumedAt?: string | null;
+    scheduleConsumedBatchId?: string | null;
+  }
 ): Daily30CloudRunStateEntry {
+  const executionAreaCount = filterDaily30ExecutionAreas(DAILY_30_AREA_EXPANSION).length;
   const totalCollected = base.totalCollected ?? base.collected;
   const targetEmailFound = base.targetEmailFound ?? DAILY_30_TARGET_EMAIL_FOUND;
   const emailFound = base.emailFound;
@@ -248,25 +327,28 @@ function makeStateEntry(
           totalCollected,
           durationMs: duration,
           explicit: base.stoppedReason,
-          totalAreas: DAILY_30_AREA_EXPANSION.length,
+          totalAreas: executionAreaCount,
         })
       : base.stoppedReason;
-  return {
-    ...base,
-    collected: totalCollected,
-    totalCollected,
-    targetEmailFound,
-    formOnly: base.formOnly ?? 0,
-    noEmail: base.noEmail ?? 0,
-    reachedTarget,
-    stoppedReason,
-    completedAt: base.finishedAt,
-    durationMs: duration,
-    storageBackend: env.storageBackend,
-    schedulerConfigured: env.schedulerConfigured,
-    cloudRunServiceUrlConfigured: env.cloudRunServiceUrlConfigured,
-    gcsBucketConfigured: env.gcsBucketConfigured,
-  };
+  return attachRunCollectionMeta(
+    {
+      ...base,
+      collected: totalCollected,
+      totalCollected,
+      targetEmailFound,
+      formOnly: base.formOnly ?? 0,
+      noEmail: base.noEmail ?? 0,
+      reachedTarget,
+      stoppedReason,
+      completedAt: base.finishedAt,
+      durationMs: duration,
+      storageBackend: env.storageBackend,
+      schedulerConfigured: env.schedulerConfigured,
+      cloudRunServiceUrlConfigured: env.cloudRunServiceUrlConfigured,
+      gcsBucketConfigured: env.gcsBucketConfigured,
+    },
+    collectionMeta
+  );
 }
 
 /** Cloud Run / Scheduler 向け Daily 30 候補収集のみ（Gmail・営業文・Lead取り込みなし） */
@@ -274,12 +356,20 @@ export async function runDaily30CloudAutoFetch(
   options: Daily30CloudAutoFetchOptions = {}
 ): Promise<Daily30CloudAutoFetchResponse> {
   const startedAt = new Date().toISOString();
-  const batchId = options.batchId ?? todayBatchId();
+  const batchId = options.batchId ?? todayBatchIdJst();
   const dryRun = options.dryRun === true;
   const force = options.force === true;
   const runId = createCloudRunId(batchId);
   const env = getEnvironmentSnapshot();
   const skipStateWrite = options.skipStateWrite === true;
+  const runContext = await resolveDaily30FetchRunContext(batchId);
+  const collectionMeta = {
+    startedAt,
+    runId,
+    profile: runContext.profile,
+    runContext,
+  };
+  const scheduleFields = buildScheduleResponseFields(runContext);
 
   logCloudAutoFetch('start', { runId, batchId, dryRun, force });
 
@@ -316,7 +406,8 @@ export async function runDaily30CloudAutoFetch(
         recoveryHint: def.recoveryHint,
         message: def.errorMessageSafe,
       },
-      env
+      env,
+      collectionMeta
     );
     return finalizeRun(
       entry,
@@ -356,16 +447,18 @@ export async function runDaily30CloudAutoFetch(
       batchId,
       target: DAILY_30_TARGET,
       ...buildRunMetricsFields(metrics),
-      nextArea: dashboard.nextExploreArea,
+      nextArea: runContext.plannedAreaPrefectures[0] ?? dashboard.nextExploreArea,
       startedAt,
       finishedAt,
-      message: 'Dry run — 外部通信・保存は行っていません',
+      message: 'Dry run — 外部通信・保存・schedule消費は行っていません',
       dryRun: true,
       force,
       areaExpansion: describeDaily30AreaExpansion(),
       externalFetchConfigured: isExternalFetchConfigured(),
       cloudRunAlreadyCompleted,
       existingCount: existingCandidates.length,
+      ...scheduleFields,
+      warning: scheduleFields.scheduleWarnings?.[0],
     });
   }
 
@@ -393,7 +486,8 @@ export async function runDaily30CloudAutoFetch(
           errorMessageSafe: def.errorMessageSafe,
           recoveryHint: def.recoveryHint,
         },
-        env
+        env,
+        collectionMeta
       );
       return finalizeRun(
         entry,
@@ -443,7 +537,8 @@ export async function runDaily30CloudAutoFetch(
         errorMessageSafe: def.errorMessageSafe,
         recoveryHint: def.recoveryHint,
       },
-      env
+      env,
+      collectionMeta
     );
     return finalizeRun(
       entry,
@@ -496,7 +591,8 @@ export async function runDaily30CloudAutoFetch(
         errorMessageSafe: def.errorMessageSafe,
         recoveryHint: def.recoveryHint,
       },
-      env
+      env,
+      collectionMeta
     );
     return finalizeRun(
       entry,
@@ -547,7 +643,8 @@ export async function runDaily30CloudAutoFetch(
         recoveryHint: def.recoveryHint,
         message: def.errorMessageSafe,
       },
-      env
+      env,
+      collectionMeta
     );
     return finalizeRun(
       entry,
@@ -579,6 +676,8 @@ export async function runDaily30CloudAutoFetch(
     const { candidates, stats } = await fetchDaily30Candidates(profile, leads, existingCandidates, {
       batchId,
       verifyEmails: true,
+      collectionRunId: runId,
+      runContext,
     });
 
     try {
@@ -607,7 +706,8 @@ export async function runDaily30CloudAutoFetch(
           errorMessageSafe: def.errorMessageSafe,
           recoveryHint: def.recoveryHint,
         },
-        env
+        env,
+        collectionMeta
       );
       return finalizeRun(
         entry,
@@ -639,6 +739,12 @@ export async function runDaily30CloudAutoFetch(
     const reachedTarget = stats.reachedTarget;
     const runStatus: Daily30CloudRunStatus = reachedTarget ? 'success' : 'partial_success';
     const message = buildFetchCompletionMessage(reachedTarget);
+    const runCollectionMeta = {
+      ...collectionMeta,
+      areasUsed: stats.areasUsed,
+      scheduleConsumedAt: runContext.wouldConsumeOverride ? finishedAt : null,
+      scheduleConsumedBatchId: runContext.wouldConsumeOverride ? batchId : null,
+    };
     const entry = makeStateEntry(
       {
         runId,
@@ -653,7 +759,8 @@ export async function runDaily30CloudAutoFetch(
         force,
         message,
       },
-      env
+      env,
+      runCollectionMeta
     );
     return finalizeRun(
       entry,
@@ -671,6 +778,9 @@ export async function runDaily30CloudAutoFetch(
         message,
         force,
         cloudRunAlreadyCompleted: false,
+        ...scheduleFields,
+        areasUsed: stats.areasUsed,
+        warning: scheduleFields.scheduleWarnings?.[0],
       },
       { skipStateWrite }
     );
@@ -702,7 +812,8 @@ export async function runDaily30CloudAutoFetch(
         errorMessageSafe: def.errorMessageSafe,
         recoveryHint: def.recoveryHint,
       },
-      env
+      env,
+      collectionMeta
     );
     return finalizeRun(
       entry,
@@ -841,7 +952,7 @@ function deriveAutomationStatus(
 }
 
 export async function buildDaily30CloudStatus(): Promise<Daily30CloudStatus> {
-  const batchId = todayBatchId();
+  const batchId = todayBatchIdJst();
   const tokenConfigured = isDaily30CloudRunTokenConfigured();
   const todayCloudRunCompleted = await isBatchCloudRunCompleted(batchId);
   const leads = await loadLeadsFromJson(getLeadsJsonPath());
@@ -894,13 +1005,13 @@ export function buildCloudAuthErrorResponse(
   startedAt: string = new Date().toISOString()
 ): Daily30CloudAutoFetchResponse {
   const def = getDaily30CloudErrorDefinition(errorCode);
-  const runId = createCloudRunId(todayBatchId());
+  const runId = createCloudRunId(todayBatchIdJst());
   return buildResponse({
     ok: false,
     mode: 'blocked',
     status: 'blocked',
     runId,
-    batchId: todayBatchId(),
+    batchId: todayBatchIdJst(),
     target: DAILY_30_TARGET,
     collected: 0,
     emailFound: 0,

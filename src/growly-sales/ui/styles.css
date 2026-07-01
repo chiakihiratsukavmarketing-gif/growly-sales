@@ -631,6 +631,29 @@ body {
   overflow-y: auto;
 }
 
+.human-gate-action-block {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-border);
+}
+
+.human-gate-action-hint {
+  margin-bottom: var(--space-sm);
+}
+
+.human-gate-disabled-reason {
+  margin-top: var(--space-sm);
+}
+
+.human-gate-safety-list {
+  margin: var(--space-md) 0;
+  padding-left: 1.25rem;
+}
+
+.human-gate-safety-list li {
+  margin-bottom: var(--space-xs);
+}
+
 .gate-field {
   display: flex;
   flex-direction: column;
@@ -1742,6 +1765,98 @@ body {
   font-size: 0.85rem;
 }
 
+.candidate-collection-view .candidate-collection-schedule {
+  margin-bottom: var(--space-md);
+}
+
+.collection-schedule-dl {
+  margin: 0 0 var(--space-md);
+}
+
+.collection-schedule-row {
+  display: grid;
+  grid-template-columns: 8.5rem 1fr;
+  gap: var(--space-sm);
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.88rem;
+}
+
+.collection-schedule-row dt {
+  margin: 0;
+  color: var(--color-subtext);
+  font-weight: 500;
+}
+
+.collection-schedule-row dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+.collection-schedule-safety {
+  margin: var(--space-md) 0;
+}
+
+.collection-schedule-actions {
+  margin-top: var(--space-md);
+}
+
+.collection-schedule-edit-dialog {
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.collection-schedule-fieldset {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  margin: 0 0 var(--space-md);
+  padding: var(--space-md);
+}
+
+.collection-schedule-fieldset legend {
+  padding: 0 var(--space-xs);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.collection-schedule-radio {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: flex-start;
+  margin: 0.35rem 0;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.collection-schedule-option-desc {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.8rem;
+}
+
+.collection-schedule-select {
+  width: 100%;
+  max-width: 20rem;
+  margin-bottom: var(--space-sm);
+}
+
+.collection-schedule-disabled-hint,
+.collection-schedule-phase-hint {
+  margin: var(--space-xs) 0 0;
+  font-size: 0.8rem;
+}
+
+.dev-json-block {
+  margin: 0;
+  padding: var(--space-md);
+  font-size: 0.75rem;
+  overflow-x: auto;
+  background: var(--bg-muted, #f8fafc);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
 .candidate-collection-view .page-header-subtitle {
   margin-bottom: var(--space-sm);
 }
@@ -2242,6 +2357,27 @@ body {
   justify-content: space-between;
   gap: 0.5rem;
   margin-bottom: 0.35rem;
+}
+
+.daily30-card-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+}
+
+.daily30-card-actions .btn-sm,
+.daily30-card-actions .btn-exclude {
+  height: 32px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.65rem;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
 }
 
 .daily30-candidate-card-title {
@@ -4277,4 +4413,123 @@ body {
   .leads-two-pane .two-pane-right {
     max-width: none;
   }
+}
+
+/* Phase 40.4 — collection profile display & filters */
+.collection-filter-bar {
+  margin: 0.5rem 0 0.75rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: 8px;
+  background: var(--surface-muted, #f8fafc);
+}
+
+.collection-filter-bar-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+}
+
+.collection-filter-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.45rem;
+  align-items: center;
+}
+
+.collection-filter-select {
+  min-width: 148px;
+  max-width: 220px;
+  font-size: 0.78rem;
+}
+
+.collection-profile-compact {
+  margin: 0.35rem 0 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border-left: 3px solid var(--accent-muted, #cbd5e1);
+  background: var(--surface-muted, #f8fafc);
+  border-radius: 0 6px 6px 0;
+  font-size: 0.78rem;
+}
+
+.collection-profile-compact-line {
+  display: flex;
+  gap: 0.35rem;
+  margin-bottom: 0.15rem;
+}
+
+.collection-profile-compact-line:last-child {
+  margin-bottom: 0;
+}
+
+.collection-profile-label {
+  flex: 0 0 auto;
+  min-width: 4.5rem;
+  color: var(--text-muted, #64748b);
+  font-size: 0.74rem;
+}
+
+.collection-profile-url-row {
+  display: flex;
+  gap: 0.35rem;
+  align-items: baseline;
+  margin-top: 0.15rem;
+  font-size: 0.76rem;
+}
+
+.collection-profile-detail {
+  font-size: 0.82rem;
+}
+
+.collection-profile-grid {
+  margin-bottom: 0.45rem;
+}
+
+.collection-profile-email-block {
+  margin-top: 0.35rem;
+}
+
+.collection-profile-email-source {
+  margin-top: 0.2rem;
+}
+
+.daily30-run-profile-summary {
+  margin: 0.5rem 0 0.75rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: 8px;
+  background: var(--surface-muted, #f8fafc);
+  font-size: 0.82rem;
+}
+
+.daily30-run-profile-title {
+  margin: 0 0 0.35rem;
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--text-muted, #64748b);
+}
+
+.daily30-run-profile-line {
+  margin: 0 0 0.35rem;
+}
+
+.daily30-run-profile-meta {
+  display: grid;
+  gap: 0.2rem 0.5rem;
+  margin: 0;
+  font-size: 0.78rem;
+}
+
+.daily30-run-profile-meta dt {
+  color: var(--text-muted, #64748b);
+}
+
+.daily30-run-profile-warnings {
+  margin: 0.35rem 0 0;
+  font-size: 0.76rem;
+}
+
+.daily30-run-profile-warning-banner {
+  margin: 0.35rem 0 0.65rem;
 }

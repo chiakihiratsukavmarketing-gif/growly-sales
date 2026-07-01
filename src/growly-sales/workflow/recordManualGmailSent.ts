@@ -1,5 +1,9 @@
 import type { Lead } from '../types/lead.js';
 import { resolveEmailSourceFromLead } from '../candidates/resolveEmailSourceDisplay.js';
+import {
+  buildCollectionProfileDisplayFromLead,
+  type CollectionProfileDisplayInfo,
+} from '../candidates/resolveCollectionProfileDisplay.js';
 import { getOutreachFromEmail, getOutreachReplyToEmail } from '../config/env.js';
 import { loadLeadsFromJson, saveLeadsToJson } from '../storage/jsonLeadRepository.js';
 import { saveLeadsToCsv } from '../storage/csvLeadRepository.js';
@@ -30,6 +34,18 @@ export interface ManualGmailSendPreview {
   isPersonalEmail: boolean;
   batchId: string | null;
   source: string | null;
+  collectionProfileId: string | null;
+  collectionProfileName: string | null;
+  collectionMode: Lead['collectionMode'];
+  industryCategory: Lead['industryCategory'];
+  areaStrategy: Lead['areaStrategy'];
+  prefecture: string | null;
+  discoverySource: Lead['discoverySource'];
+  discoverySourceSite: Lead['discoverySourceSite'];
+  discoverySourceLabel: string | null;
+  discoverySourceUrl: string | null;
+  sourceComplianceStatus: Lead['sourceComplianceStatus'];
+  collectionProfile: CollectionProfileDisplayInfo;
 }
 
 /** Gmail下書き作成済み・未送信で、手動送信記録が可能な Lead */
@@ -53,6 +69,7 @@ export function buildManualGmailSendPreview(lead: Lead): ManualGmailSendPreview 
     throw new ManualGmailSendRecordError('宛先メールがありません');
   }
   const emailSource = resolveEmailSourceFromLead(lead);
+  const collectionProfile = buildCollectionProfileDisplayFromLead(lead);
   return {
     leadId: lead.id,
     companyName: lead.companyName,
@@ -69,6 +86,18 @@ export function buildManualGmailSendPreview(lead: Lead): ManualGmailSendPreview 
     isPersonalEmail: emailSource.isPersonalEmail,
     batchId: emailSource.batchId,
     source: emailSource.source,
+    collectionProfileId: lead.collectionProfileId ?? null,
+    collectionProfileName: lead.collectionProfileName ?? null,
+    collectionMode: lead.collectionMode ?? null,
+    industryCategory: lead.industryCategory ?? null,
+    areaStrategy: lead.areaStrategy ?? null,
+    prefecture: lead.prefecture ?? null,
+    discoverySource: lead.discoverySource ?? null,
+    discoverySourceSite: lead.discoverySourceSite ?? null,
+    discoverySourceLabel: lead.discoverySourceLabel ?? null,
+    discoverySourceUrl: lead.discoverySourceUrl ?? null,
+    sourceComplianceStatus: lead.sourceComplianceStatus ?? null,
+    collectionProfile,
   };
 }
 
@@ -94,6 +123,33 @@ function buildSentMemo(preview: ManualGmailSendPreview): string {
   }
   if (preview.source) {
     parts.push(`source=${preview.source}`);
+  }
+  if (preview.collectionProfileId) {
+    parts.push(`collectionProfileId=${preview.collectionProfileId}`);
+  }
+  if (preview.collectionProfileName) {
+    parts.push(`collectionProfileName=${preview.collectionProfileName}`);
+  }
+  if (preview.collectionMode) {
+    parts.push(`collectionMode=${preview.collectionMode}`);
+  }
+  if (preview.areaStrategy) {
+    parts.push(`areaStrategy=${preview.areaStrategy}`);
+  }
+  if (preview.prefecture) {
+    parts.push(`prefecture=${preview.prefecture}`);
+  }
+  if (preview.discoverySource) {
+    parts.push(`discoverySource=${preview.discoverySource}`);
+  }
+  if (preview.discoverySourceSite) {
+    parts.push(`discoverySourceSite=${preview.discoverySourceSite}`);
+  }
+  if (preview.discoverySourceUrl) {
+    parts.push(`discoverySourceUrl=${preview.discoverySourceUrl}`);
+  }
+  if (preview.sourceComplianceStatus) {
+    parts.push(`sourceComplianceStatus=${preview.sourceComplianceStatus}`);
   }
   return parts.join(' / ');
 }

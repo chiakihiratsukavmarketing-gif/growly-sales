@@ -1,6 +1,6 @@
 import type { Lead } from '../types/lead.js';
 import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTypes.js';
-import { todayBatchId } from './daily30AreaConfig.js';
+import { todayBatchIdJst } from './daily30AreaConfig.js';
 import { buildDaily30Dashboard } from './buildDaily30Dashboard.js';
 import { buildDaily30DraftPipelineProgress } from './buildDaily30DraftPipelineProgress.js';
 import {
@@ -95,7 +95,7 @@ function resolveOperationsNextAction(flags: {
 export function buildDaily30OperationsSummary(
   candidates: ExternalLeadCandidate[],
   leads: Lead[],
-  batchId = todayBatchId()
+  batchId = todayBatchIdJst()
 ): Daily30OperationsSummary {
   const dashboard = buildDaily30Dashboard(candidates, leads, batchId);
   const draftPipeline = buildDaily30DraftPipelineProgress(candidates, leads, batchId);

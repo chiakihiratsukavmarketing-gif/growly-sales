@@ -4,6 +4,10 @@ import {
   resolveEmailSourceFromLead,
   type EmailSourcePageType,
 } from '../candidates/resolveEmailSourceDisplay.js';
+import {
+  buildCollectionProfileDisplayFromLead,
+  type CollectionProfileDisplayInfo,
+} from '../candidates/resolveCollectionProfileDisplay.js';
 import { containsProhibitedClaim } from '../config/offerProfile.js';
 import { containsProhibitedPhrase } from '../generation/generationUtils.js';
 import { hasEmailCandidates, hasContactForm, isFormCopyOnlyLead } from '../analytics/contactPathTypes.js';
@@ -42,6 +46,18 @@ export interface EmailOutreachCandidateView {
   exclusionReason: string | null;
   outreachDeferStatus: OutreachDeferStatus;
   recommendedAction: string;
+  collectionProfileId: string | null;
+  collectionProfileName: string | null;
+  collectionMode: Lead['collectionMode'];
+  industryCategory: Lead['industryCategory'];
+  areaStrategy: Lead['areaStrategy'];
+  prefecture: string | null;
+  discoverySource: Lead['discoverySource'];
+  discoverySourceSite: Lead['discoverySourceSite'];
+  discoverySourceLabel: string | null;
+  discoverySourceUrl: string | null;
+  sourceComplianceStatus: Lead['sourceComplianceStatus'];
+  collectionProfile: CollectionProfileDisplayInfo;
 }
 
 function findProhibitedPhrase(lead: Lead, offer?: OfferProfile): string | null {
@@ -214,6 +230,7 @@ export function buildEmailOutreachCandidateView(
 ): EmailOutreachCandidateView {
   const exclusionReason = getGmailDraftExclusionReason(lead, offer);
   const emailSource = resolveEmailSourceFromLead(lead);
+  const collectionProfile = buildCollectionProfileDisplayFromLead(lead);
   return {
     companyName: lead.companyName,
     websiteUrl: lead.websiteUrl,
@@ -239,6 +256,18 @@ export function buildEmailOutreachCandidateView(
     exclusionReason,
     outreachDeferStatus: getOutreachDeferStatus(lead),
     recommendedAction: getRecommendedOutreachAction(lead, exclusionReason),
+    collectionProfileId: lead.collectionProfileId ?? null,
+    collectionProfileName: lead.collectionProfileName ?? null,
+    collectionMode: lead.collectionMode ?? null,
+    industryCategory: lead.industryCategory ?? null,
+    areaStrategy: lead.areaStrategy ?? null,
+    prefecture: lead.prefecture ?? null,
+    discoverySource: lead.discoverySource ?? null,
+    discoverySourceSite: lead.discoverySourceSite ?? null,
+    discoverySourceLabel: lead.discoverySourceLabel ?? null,
+    discoverySourceUrl: lead.discoverySourceUrl ?? null,
+    sourceComplianceStatus: lead.sourceComplianceStatus ?? null,
+    collectionProfile,
   };
 }
 

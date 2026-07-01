@@ -9,6 +9,7 @@ import {
   getDaily30DraftImportBlockReason,
 } from './getDaily30DraftImportBlockReason.js';
 import { selectDaily30ReadyForDraftImportCandidates } from '../workflow/importDaily30DraftCandidates.js';
+import { filterDaily30VisibleCandidates } from './daily30CandidateVisibility.js';
 import { isDaily30LeadApproved } from './selectDaily30LeadCandidates.js';
 
 export interface Daily30ReadyForDraftItemPayload {
@@ -42,16 +43,17 @@ export function buildDaily30ReadyForDraftApiPayload(
   leads: Lead[],
   batchId?: string
 ): Daily30ReadyForDraftApiPayload {
-  const readyForDraft = selectDaily30ReadyForDraftImportCandidates(candidates);
-  const generatedCopyCandidates = candidates.filter(
+  const visibleCandidates = filterDaily30VisibleCandidates(candidates);
+  const readyForDraft = selectDaily30ReadyForDraftImportCandidates(visibleCandidates);
+  const generatedCopyCandidates = visibleCandidates.filter(
     (c) => c.importStatus === 'approved_for_lead' && Boolean(c.copyGeneratedAt)
   );
-  const approvedLeadCandidates = candidates.filter(isDaily30LeadApproved);
-  const workflowCounts = countDaily30LeadCopyWorkflow(candidates);
+  const approvedLeadCandidates = visibleCandidates.filter(isDaily30LeadApproved);
+  const workflowCounts = countDaily30LeadCopyWorkflow(visibleCandidates);
 
   const items: Daily30ReadyForDraftItemPayload[] = readyForDraft.map((candidate) => ({
     candidate,
-    importBlockReason: getDaily30DraftImportBlockReason(candidate, leads, candidates),
+    importBlockReason: getDaily30DraftImportBlockReason(candidate, leads, visibleCandidates),
     qualityCheckPassed: !candidate.failureReason,
   }));
 
@@ -63,7 +65,7 @@ export function buildDaily30ReadyForDraftApiPayload(
       warnings.push(`${item.candidate.companyName}: 品質チェック要確認`);
     }
   }
-  const needsReview = candidates.filter((c) => c.pipelineStatus === 'needs_review');
+  const needsReview = visibleCandidates.filter((c) => c.pipelineStatus === 'needs_review');
   for (const c of needsReview) {
     warnings.push(`${c.companyName}: needs_review — ${c.failureReason ?? '要確認'}`);
   }
@@ -85,7 +87,7 @@ export function buildDaily30ReadyForDraftApiPayload(
       warnings: warnings.length,
     },
     warnings,
-    draftPipeline: buildDaily30DraftPipelineProgress(candidates, leads, batchId),
+    draftPipeline: buildDaily30DraftPipelineProgress(visibleCandidates, leads, batchId),
     generatedAt: new Date().toISOString(),
     note: 'ready_for_draft 表示・確認用。Gmail API は呼びません。取り込みは IMPORT_DAILY_30_DRAFT_CANDIDATES ゲートのみ。',
   };

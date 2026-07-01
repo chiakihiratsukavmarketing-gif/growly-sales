@@ -13,6 +13,12 @@ import {
   matchesLeadAreaFilter,
   matchesLeadListFilterWithContext,
 } from './leadFilterUtils.js';
+import {
+  LeadCollectionFilterBar,
+  DEFAULT_LEAD_COLLECTION_FILTERS,
+  matchesLeadCollectionFilters,
+  type LeadCollectionFilterState,
+} from './LeadCollectionFilterBar.js';
 import { SearchAndFilterBar } from './common/SearchAndFilterBar.js';
 import { FilterEmptyState } from './common/FilterEmptyState.js';
 import { LeadListView } from './LeadListView.js';
@@ -71,6 +77,8 @@ export function GrowlySalesDashboard() {
   const [leadSearch, setLeadSearch] = useState('');
   const [leadStatusFilter, setLeadStatusFilter] = useState('all');
   const [leadAreaFilter, setLeadAreaFilter] = useState('all');
+  const [leadCollectionFilters, setLeadCollectionFilters] =
+    useState<LeadCollectionFilterState>(DEFAULT_LEAD_COLLECTION_FILTERS);
 
   const navigateToTab = useCallback((tab: SalesFlowTab, leadId?: string) => {
     setActiveTab(tab);
@@ -136,14 +144,16 @@ export function GrowlySalesDashboard() {
     let items = leads;
     items = items.filter((l) => matchesLeadListFilterWithContext(l, leadStatusFilter, leads));
     items = items.filter((l) => matchesLeadAreaFilter(l, leadAreaFilter));
+    items = items.filter((l) => matchesLeadCollectionFilters(l, leadCollectionFilters));
     items = filterByCompanyName(items, leadSearch, (l) => l.companyName);
     return items;
-  }, [leads, leadStatusFilter, leadAreaFilter, leadSearch]);
+  }, [leads, leadStatusFilter, leadAreaFilter, leadCollectionFilters, leadSearch]);
 
   const clearLeadFilters = useCallback(() => {
     setLeadSearch('');
     setLeadStatusFilter('all');
     setLeadAreaFilter('all');
+    setLeadCollectionFilters(DEFAULT_LEAD_COLLECTION_FILTERS);
   }, []);
 
   function handleLeadUpdated(updated: Lead): void {
@@ -331,6 +341,11 @@ export function GrowlySalesDashboard() {
                         areaFilterValue={leadAreaFilter}
                         onAreaFilterChange={setLeadAreaFilter}
                         areaFilterOptions={leadAreaOptions}
+                      />
+                      <LeadCollectionFilterBar
+                        filters={leadCollectionFilters}
+                        onChange={setLeadCollectionFilters}
+                        onClear={() => setLeadCollectionFilters(DEFAULT_LEAD_COLLECTION_FILTERS)}
                       />
                       {leads.length === 0 ? (
                         <div className="pane-inner-empty">

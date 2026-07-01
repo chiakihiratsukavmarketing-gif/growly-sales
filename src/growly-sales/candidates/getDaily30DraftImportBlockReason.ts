@@ -4,11 +4,13 @@ import { findDuplicateReason, leadMatchesCandidate } from '../adapters/dedupeExt
 import { verifyLeadEmailBodyForGmailDraft } from '../integrations/gmail/gmailDraftLeadValidation.js';
 import { isAllowedCorporateEmail, isFreeEmailDomain, looksLikePersonalEmail } from '../safety/contactPolicy.js';
 import { buildLeadFromDaily30ReadyForDraft } from './buildLeadFromDaily30ReadyForDraft.js';
+import { isDaily30HumanExcludedCandidate } from './daily30CandidateVisibility.js';
 
 /** ready_for_draft 取り込み対象の基本条件（Lead 重複チェック前） */
 export function isDaily30ReadyForDraftImportCandidate(
   candidate: ExternalLeadCandidate
 ): boolean {
+  if (isDaily30HumanExcludedCandidate(candidate)) return false;
   if (candidate.importStatus === 'imported') return false;
   if (candidate.pipelineStatus !== 'ready_for_draft') return false;
   if (candidate.importStatus !== 'approved_for_lead') return false;

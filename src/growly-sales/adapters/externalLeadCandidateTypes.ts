@@ -6,6 +6,14 @@ import type {
   Daily30RegionGroup,
   Daily30SendStatus,
 } from '../candidates/daily30CandidateStatus.js';
+import type {
+  Daily30AreaStrategy,
+  Daily30CollectionMode,
+  Daily30DiscoverySource,
+  Daily30DiscoverySourceSite,
+  Daily30IndustryCategory,
+  Daily30SourceComplianceStatus,
+} from '../candidates/daily30CollectionProfile.js';
 
 export type {
   Daily30GmailDraftStatus,
@@ -13,6 +21,12 @@ export type {
   Daily30PipelineStatus,
   Daily30RegionGroup,
   Daily30SendStatus,
+  Daily30AreaStrategy,
+  Daily30CollectionMode,
+  Daily30DiscoverySource,
+  Daily30DiscoverySourceSite,
+  Daily30IndustryCategory,
+  Daily30SourceComplianceStatus,
 };
 
 export type ExternalCandidateSourceType = 'google_places' | 'web_search' | 'manual';
@@ -108,6 +122,21 @@ export interface ExternalLeadCandidate {
   collectedAt: string;
   createdAt: string;
   updatedAt: string;
+  /** Phase 40.2: 収集プロファイル（optional・後方互換） */
+  collectionProfileId?: string | null;
+  collectionProfileName?: string | null;
+  collectionMode?: Daily30CollectionMode | null;
+  industryCategory?: Daily30IndustryCategory | null;
+  areaStrategy?: Daily30AreaStrategy | null;
+  areaQueuePosition?: number | null;
+  /** 企業候補の発見元（求人サイト等）。メール取得元ではない */
+  discoverySource?: Daily30DiscoverySource | null;
+  discoverySourceSite?: Daily30DiscoverySourceSite | null;
+  discoverySourceLabel?: string | null;
+  discoverySourceUrl?: string | null;
+  sourceComplianceStatus?: Daily30SourceComplianceStatus | null;
+  sourceComplianceNote?: string | null;
+  collectionRunId?: string | null;
 }
 
 export interface ExternalCandidatesStore {

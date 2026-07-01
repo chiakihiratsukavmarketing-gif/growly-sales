@@ -1,5 +1,6 @@
 import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTypes.js';
 import { createEmptyLead, type Lead } from '../types/lead.js';
+import { copyCollectionProfileToLead } from './daily30CollectionProfile.js';
 
 /** 営業文生成用の in-memory Lead（leads.json には書き込まない） */
 export function buildLeadStubFromExternalCandidate(candidate: ExternalLeadCandidate): Lead {
@@ -9,7 +10,9 @@ export function buildLeadStubFromExternalCandidate(candidate: ExternalLeadCandid
     ...(candidate.emailCandidateSourceUrls ?? []),
   ].filter((u): u is string => Boolean(u?.trim()));
 
-  return createEmptyLead({
+  return copyCollectionProfileToLead(
+    candidate,
+    createEmptyLead({
     companyName: candidate.companyName,
     area: candidate.area,
     industry: candidate.industry,
@@ -31,5 +34,6 @@ export function buildLeadStubFromExternalCandidate(candidate: ExternalLeadCandid
     collectionBatchId: candidate.collectionBatchId,
     daily30PipelineStatus: candidate.pipelineStatus,
     source: 'daily30',
-  });
+    })
+  );
 }

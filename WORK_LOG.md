@@ -8,6 +8,78 @@
 
 ---
 
+## 2026-07-01 — Phase 40.5 Cloud Run が schedule を読んで Daily 30 実行に反映
+
+**種別:** fetch / Cloud Run 実行ロジック。求人巡回・再デプロイは別途。
+
+### 実装
+
+- `resolveDaily30CollectionSchedule.ts` — 解決・消費・エリアキュー
+- `fetchDaily30Candidates` / `runDaily30CloudAutoFetch` — schedule 連携
+- `daily30CloudRunState` — areasUsed / scheduleSource 等
+- UI — `Daily30RunCollectionProfileSummary`
+- `verifyPhase405CollectionScheduleExecution`
+
+### 次
+
+- **人間:** Cloud Run 再デプロイ
+- Phase 40.6: 外部掲載サイト参考ルート
+
+---
+
+## 2026-07-01 — Phase 40.4 Lead一覧・候補一覧 収集プロファイル表示 / フィルター
+
+**種別:** UI 表示・フィルター追加。Cloud Run 反映・求人巡回なし。
+
+### 実装
+
+- `resolveCollectionProfileDisplay.ts` — ラベル解決・フィルター・後方互換
+- `CollectionProfileDisplay.tsx` / `LeadCollectionFilterBar.tsx`
+- Lead一覧・Lead詳細・候補カード・下書き候補・送信記録に収集情報表示
+- `discoverySourceUrl` と `emailSourceUrl` 分離表示
+- `recordManualGmailSent` — 送信記録 memo に collection 系 optional 追記
+- `verifyPhase404CollectionProfileDisplay`
+
+### 次
+
+- Phase 40.5: Cloud Run が schedule を読んで実行順を変える
+
+---
+
+## 2026-07-01 — Phase 40.3 明日の収集設定 UI
+
+**種別:** 候補収集タブ UI + schedule 保存 API。Cloud Run 反映・求人巡回なし。
+
+### 実装
+
+- `Daily30CollectionSchedulePanel` / `Daily30CollectionScheduleEditDialog`
+- `GET/POST /api/daily30-collection-schedule`
+- `updateDaily30CollectionSchedule.ts`（oneDay / next / reset）
+- `verifyPhase403CollectionScheduleUi`
+
+### 次
+
+- Phase 40.5: Cloud Run が schedule を読んで実行
+
+---
+
+**種別:** データ構造・保存・後方互換・verify。UI / 求人巡回 / Cloud 再デプロイなし。
+
+### 実装
+
+- JST `batchId`（`todayBatchIdJst` / `resolveDaily30BatchIdJst`）
+- `daily30PrefectureRegistry.ts`（全国46・東京除外）
+- `daily30CollectionProfile.ts` + `daily30-collection-schedule.json` repository
+- 候補・Lead optional フィールド + fetch 時デフォルト付与 + Lead 引き継ぎ
+- Cloud run state に `runStartedAtJst` / collectionProfile 系 optional
+- `verifyPhase402CollectionProfileFoundation` + docs
+
+### 次
+
+- Phase 40.3: 明日の収集設定 UI
+
+---
+
 ## 2026-07-01 — メール取得先URLの明記対応（Phase 38）
 
 **種別:** UI + データ表示・送信記録拡張。Gmail送信・下書き再作成なし。
@@ -490,4 +562,108 @@ From / Reply-To / 署名: **c_hiratsuka@wantreach.jp**
 | **20-lite** | **emailCandidates改善実装** | ✅ |
 | **19** | **Gmail下書き実作成テスト**（森のめぐみ工房1件成功） | ✅ |
 
-次回作業: [NEXT_TASKS.md](./NEXT_TASKS.md) — **明日9時 Daily 30 本番運用チェック**
+次回作業: [NEXT_TASKS.md](./NEXT_TASKS.md) — **Gmail手動送信・送信記録**
+
+---
+
+## 2026-07-01 — Phase 38.1〜38.4: 候補除外・メール取得元表示・永続化（PC再起動前記録）
+
+**種別:** Daily 30 候補除外（論理削除）・UI即時反映・GCS永続化検証・数値定義。Gmail送信・下書き再作成なし。
+
+### Phase 38.1
+- メール取得元ラベル正規化（「メール取得元」「公式サイト / お問い合わせ」）
+- 「候補から除外」ボタン・`POST /api/daily30-candidates/exclude`
+
+### Phase 38.2
+- Lead化承認待ちフィルタ統一・`humanExcludedCount`
+- メール取得元 `under-email` レイアウト
+- `daily30CandidateVisibility.ts`（UI/サーバー共通）
+
+### Phase 38.3（実画面で判明）
+- **即時削除は動作**（`sessionExcludedIds` 楽観的UI）
+- **再読み込みで候補が戻る** → 永続化未確認が原因候補
+
+### Phase 38.4（コード完了・verify通過）
+- 除外API: 保存 → `reloadExternalCandidatesFromStorage()` → excluded 確認後のみ `ok:true` / `persisted:true`
+- 永続化失敗: HTTP 409 + `EXCLUDE_PERSIST_FAILED`
+- `[daily30-exclude]` 監査ログ（secretなし）
+- `docs/GROWLY_SALES_DAILY30_METRICS.md` — 数値定義
+- `auditDaily30MetricConsistency.ts` — ダッシュボード数値連動監査
+- verify: **1713 passed / 29 failed**（既存失敗のみ）· Phase 38.1〜38.4 ✅
+
+### 再起動後にやること（最優先）
+1. `npm run growly-sales:ui` → 起動ログで `Storage: gcs (...)` を確認
+2. 候補収集タブ → **送信対象にしない候補1件**（既存Lead重複・プレースホルダ等）を除外
+3. APIレスポンス: `persisted: true` / `storageBackend: "gcs"`
+4. ページ再読み込み → Lead化承認待ちに**戻らない**こと
+5. DevDetails: `humanExcludedCount` 増加・除外済み一覧
+
+### 変更ファイル（主要・未コミットの可能性あり）
+- `workflow/excludeDaily30Candidate.ts`, `logDaily30ExcludeAudit.ts`
+- `storage/externalCandidatesRepository.ts`
+- `candidates/daily30CandidateVisibility.ts`, `findDaily30CandidateForExclude.ts`
+- `candidates/auditDaily30MetricConsistency.ts`, `daily30MetricDefinitions.ts`
+- `candidates/buildDaily30Dashboard.ts`, `getDaily30DraftImportBlockReason.ts`
+- `server/uiServer.ts`
+- `ui/Daily30LeadCandidatesPanel.tsx`, `Daily30CloudResultsPanel.tsx`, `CandidateCollectionView.tsx`
+- `ui/daily30ExcludeUi.ts`, `daily30CopyApi.ts`, `Daily30CandidateCards.tsx`, `styles.css`
+- `docs/GROWLY_SALES_DAILY30_METRICS.md`
+- `scripts/verify-growly-sales.ts`
+
+### 安全（変更なし）
+- leads.json / Gmail下書き7件 / 送信記録は未変更
+- 自動送信・`messages.send`・今回 `users.drafts.create` 不使用
+
+---
+
+## 2026-07-01 — Phase 38.4 実画面確認完了 + ダッシュボード集計修正
+
+**種別:** 除外永続化の実画面検証・`humanExcludedCount` 集計バグ修正。Gmail送信なし。
+
+### 実画面確認（GCS `gs://growly-sales-daily30/prod/...`）
+
+| 手順 | 結果 |
+|------|------|
+| ㈱徳田工務店を「候補から除外」 | ✅ `persisted: true`, `storageBackend: "gcs"` |
+| サーバー監査ログ `[daily30-exclude]` | ✅ |
+| ページ再読み込み後 Lead化承認待ち | ✅ 3件→2件（徳田は**戻らない**） |
+| 収集結果「除外済み候補（1件）」 | ✅ DevDetails に徳田 + 除外日時 |
+| `emailFoundAtCollection` | ✅ 9/30（除外後も減らない） |
+
+### 判明した集計バグと修正
+
+- **原因:** `/api/daily30-dashboard` が `visibleCandidates` のみを `buildDaily30Dashboard` に渡し、`humanExcludedCount` を visible 件数で上書きしていたため、除外済みが集計から消えていた。
+- **修正:** `buildDaily30CloudDashboardPayload` に `allCandidates` を追加。ダッシュボード集計は全候補（論理除外含む）で実施。`humanExcludedCount` は当日 batch の `dashboard.humanExcludedCount` を返す。
+- **verify:** 1714 passed / 29 failed（既存）· Phase 38.1〜38.4 ✅
+
+### 数値メモ（仕様どおり）
+
+- `leadApprovalPendingCount`（今日の状態）= **当日 batch のみ** → 0（承認待ち2件は `collectionBatchId: 2026-06-30`）
+- Lead化承認・営業文パネル = **全 batch の visible 候補** → 2件表示（仕様差・別途整理候補）
+
+### UI再起動
+
+集計修正を API に反映するには `npm run growly-sales:ui` の再起動が必要（実行中プロセスは修正前コードの可能性あり）。GCS 上の除外データ自体は永続化済み。
+
+---
+
+## 2026-07-01 — Phase 40.1: 収集プロファイル基盤 事前調査
+
+**種別:** 調査・設計のみ（コード変更なし）。
+
+### 成果物
+
+- `docs/GROWLY_SALES_DAILY30_COLLECTION_PROFILE_PLAN.md` — 現状調査・データ構造案・Phase 40.2〜40.6 実装計画
+
+### 主要所見
+
+- 収集エリアは `daily30AreaConfig.ts` の5県固定（山形・全国未対応）
+- `areasUsed` は GCS state に未保存。`nextArea` は表示用で翌日の開始点に未使用
+- 収集プロファイル override 用 JSON は未存在 → `daily30-collection-schedule.json` 新設を推奨
+- 候補/Lead に discovery 系フィールドなし。`emailSourceUrl` 分離は Phase 38 済み
+- Lead一覧フィルターは `lead.area` のみ（都道府県・収集元なし）
+
+### verify
+
+- `npm run growly-sales:verify` 実行（ベースライン・コード変更なし）
+

@@ -1,4 +1,5 @@
 import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTypes.js';
+import { pickCandidateExcludeHints } from '../candidates/findDaily30CandidateForExclude.js';
 import type { Daily30Dashboard } from '../candidates/buildDaily30Dashboard.js';
 import { readApiError } from './apiError.js';
 
@@ -20,15 +21,24 @@ export interface Daily30LeadCandidatesResponse {
 
 export interface ExcludeDaily30CandidateApiResponse {
   ok: true;
+  persisted: true;
+  storageBackend: 'local' | 'gcs';
   candidateId: string;
   pipelineStatus: ExternalLeadCandidate['pipelineStatus'];
   importStatus: ExternalLeadCandidate['importStatus'];
   humanReviewStatus: ExternalLeadCandidate['humanReviewStatus'];
+  excludedBy: 'human';
   excludedReason: string;
   excludedAt: string;
   candidate: ExternalLeadCandidate;
   message?: string;
   generatedAt?: string;
+}
+
+export interface ExcludeDaily30CandidateApiFailure {
+  ok: false;
+  errorCode: 'EXCLUDE_PERSIST_FAILED' | 'EXCLUDE_NOT_FOUND' | 'EXCLUDE_INVALID';
+  safeMessage: string;
 }
 
 export interface Daily30GenerateCopyResponse {
@@ -89,17 +99,27 @@ export async function runDaily30GenerateCopy(
 
 export async function excludeDaily30CandidateApi(
   candidateId: string,
-  reason: string
+  reason: string,
+  candidate?: ExternalLeadCandidate
 ): Promise<ExcludeDaily30CandidateApiResponse> {
+  const hints = candidate ? pickCandidateExcludeHints(candidate) : undefined;
   const res = await fetch(`${API_BASE}/api/daily30-candidates/exclude`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ candidateId, reason }),
+    body: JSON.stringify({ candidateId, reason, ...hints }),
   });
   if (!res.ok) {
+    const failure = (await res.json().catch(() => null)) as ExcludeDaily30CandidateApiFailure | null;
+    if (failure?.ok === false && failure.safeMessage) {
+      throw new Error(failure.safeMessage);
+    }
     throw new Error(
       await readApiError(res, 'POST /api/daily30-candidates/exclude', '候補の除外に失敗しました')
     );
   }
-  return (await res.json()) as ExcludeDaily30CandidateApiResponse;
+  const result = (await res.json()) as ExcludeDaily30CandidateApiResponse;
+  if (!result.ok || !result.persisted) {
+    throw new Error('候補の除外状態を保存できませんでした');
+  }
+  return result;
 }

@@ -5,11 +5,53 @@
 
 **ワークスペース:** `C:\Users\chiak\AI_\Growly Sales`  
 **更新日:** 2026-07-01  
-**現在フォーカス:** **Phase 37.1 完了 + Daily 30 実運用（下書き7件作成済）**
-
-作業入口: [CLAUDE.md](./CLAUDE.md) · 履歴: [WORK_LOG.md](./WORK_LOG.md) · Daily 30: [docs/GROWLY_SALES_DAILY30_RUNBOOK.md](./docs/GROWLY_SALES_DAILY30_RUNBOOK.md)
+**現在フォーカス:** **Phase 40.6** 外部掲載サイト参考ルート（40.5 完了・Cloud Run 再デプロイ待ち）
 
 ---
+
+## 最優先 — Cloud Run 再デプロイ（Phase 40.5 反映）
+
+Phase 40.5 コード完了。本番 Cloud Scheduler 9:00 実行に反映するには:
+
+1. Cloud Run 再デプロイ
+2. 翌朝 `npm run growly-sales:phase-c-cloud-status` で scheduleSource / areasUsed 確認
+3. UI 候補収集タブで「今回使用した収集設定」を確認
+
+**まだやらない:** 求人サイト自動巡回（40.6）
+
+---
+
+## ~~Phase 40.5 Cloud Run schedule 実行反映~~ ✅ 完了（2026-07-01）
+
+- oneDayOverride / nextProfileOverride 消費
+- areaStrategy エリアキュー
+- areasUsed / scheduleSource を state に記録
+- dryRun は schedule プレビューのみ
+
+---
+
+## ~~Phase 40.4 Lead一覧・候補一覧 収集プロファイル表示 / フィルター~~ ✅ 完了（2026-07-01）
+
+- Lead一覧: 収集元 / 求人サイト / エリア / エリア戦略 / 収集プロファイル / メール確認
+- Lead詳細「収集情報」、候補カード、下書き候補、送信記録
+- `discoverySourceUrl` と `emailSourceUrl` 分離表示
+- 既存 Lead 後方互換
+
+---
+
+## ~~Phase 40.3 明日の収集設定 UI~~ ✅ 完了（2026-07-01）
+
+- 候補収集タブ「明日の収集設定」
+- `GET/POST /api/daily30-collection-schedule`
+- oneDayOverride / nextProfileOverride / reset_to_auto
+
+---
+
+## ~~再起動後 — 最優先（Phase 38.4 実画面確認）~~ ✅ 完了（2026-07-01）
+
+**結果:** 徳田工務店除外が GCS に永続化。再読み込み後も Lead化承認待ちに戻らない。除外済み1件表示。詳細は [WORK_LOG.md](./WORK_LOG.md) Phase 38.4 実画面確認セクション。
+
+**残作業（任意）:** UIサーバー再起動で `humanExcludedCount` 集計修正を反映（`buildDaily30CloudDashboard` の `allCandidates` 対応）。
 
 ## 最優先 — Gmail手動送信・送信記録（2026-07-01 Daily30分）
 
@@ -85,5 +127,5 @@ npm run growly-sales:daily30-preview
 ## バックログ
 
 - [ ] Lead一覧 棚卸し承認待ちの消化
-- [ ] Phase 38: 候補カード重複ヒント強化（必要なら）
+- [x] Phase 38.1〜38.4 候補除外・永続化（コード完了・実画面確認は再起動後）
 - [ ] 週次 `npm run growly-sales:verify`

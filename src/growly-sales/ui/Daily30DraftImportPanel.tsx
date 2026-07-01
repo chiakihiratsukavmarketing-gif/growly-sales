@@ -12,12 +12,22 @@ import type { Daily30DraftPipelineProgress } from '../candidates/buildDaily30Dra
 import { resolveEmailSourceFromCandidate } from '../candidates/resolveEmailSourceDisplay.js';
 import { EmailSourceDisplay } from './EmailSourceDisplay.js';
 import { SummaryStatCard } from './SummaryStatCard.js';
+import { HumanGateConfirmModal } from './HumanGateConfirmModal.js';
+import { DevDetails } from './common/DevDetails.js';
+import { Daily30ImportDraftGateDev } from './Daily30ImportDraftGateDev.js';
 
 interface Daily30DraftImportPanelProps {
   onError: (message: string) => void;
   onSuccess?: (message: string) => void;
   refreshKey?: number;
   onChanged?: () => void;
+}
+
+function resolveBulkImportDisabledReason(importableCount: number): string | null {
+  if (importableCount === 0) {
+    return '取り込み可能な ready_for_draft 候補がありません（未取り込み・非除外のみ対象）。';
+  }
+  return null;
 }
 
 export function Daily30DraftImportPanel({
@@ -35,6 +45,7 @@ export function Daily30DraftImportPanel({
   const [bulkGateInput, setBulkGateInput] = useState('');
   const [bulkImporting, setBulkImporting] = useState(false);
   const [bulkMessage, setBulkMessage] = useState<string | null>(null);
+  const [showBulkModal, setShowBulkModal] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -79,14 +90,16 @@ export function Daily30DraftImportPanel({
     }
   }
 
-  async function handleBulkImport(): Promise<void> {
-    if (bulkGateInput.trim() !== IMPORT_DAILY_30_DRAFT_CANDIDATES_GATE_LABEL) return;
+  async function executeBulkImport(): Promise<void> {
     setBulkImporting(true);
     setBulkMessage(null);
     try {
-      const result = await importDaily30DraftCandidatesBulk(bulkGateInput.trim());
+      const result = await importDaily30DraftCandidatesBulk(
+        IMPORT_DAILY_30_DRAFT_CANDIDATES_GATE_LABEL
+      );
       setBulkMessage(result.message);
       setBulkGateInput('');
+      setShowBulkModal(false);
       onSuccess?.(`一括取り込み: ${result.imported.length} 件 / スキップ ${result.skipped.length} 件`);
       onChanged?.();
       await load();
@@ -97,8 +110,14 @@ export function Daily30DraftImportPanel({
     }
   }
 
+  async function handleBulkImportDev(): Promise<void> {
+    if (bulkGateInput.trim() !== IMPORT_DAILY_30_DRAFT_CANDIDATES_GATE_LABEL) return;
+    await executeBulkImport();
+  }
+
   const importable = items.filter((i) => !i.importBlockReason);
-  const bulkGateOk = bulkGateInput.trim() === IMPORT_DAILY_30_DRAFT_CANDIDATES_GATE_LABEL;
+  const bulkDisabledReason = resolveBulkImportDisabledReason(importable.length);
+  const canBulkImport = bulkDisabledReason === null;
 
   if (loading) return <p className="loading">Daily 30 下書き候補取り込みを読み込み中…</p>;
 
@@ -190,27 +209,50 @@ export function Daily30DraftImportPanel({
         </ul>
       )}
 
-      <div className="daily30-bulk-import-gate">
-        <p className="hint">一括取り込み — ゲート語句を入力</p>
-        <div className="daily30-fetch-row">
-          <input
-            className="input input-sm"
-            value={bulkGateInput}
-            onChange={(e) => setBulkGateInput(e.target.value)}
-            placeholder={IMPORT_DAILY_30_DRAFT_CANDIDATES_GATE_LABEL}
-            disabled={bulkImporting || importable.length === 0}
-          />
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            disabled={!bulkGateOk || bulkImporting || importable.length === 0}
-            onClick={() => void handleBulkImport()}
-          >
-            {bulkImporting ? '取り込み中…' : `一括取り込み（${importable.length}件）`}
-          </button>
-        </div>
+      <div className="daily30-bulk-import-gate human-gate-action-block">
+        <p className="hint human-gate-action-hint">
+          営業文生成済み候補を下書き候補へ取り込みます。Gmail下書き・送信は行いません。
+        </p>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={!canBulkImport || bulkImporting}
+          onClick={() => setShowBulkModal(true)}
+        >
+          {bulkImporting ? '取り込み中…' : '下書き候補へ取り込む'}
+        </button>
+        {bulkDisabledReason && (
+          <p className="hint warning-text human-gate-disabled-reason">{bulkDisabledReason}</p>
+        )}
         {bulkMessage && <p className="hint success-text">{bulkMessage}</p>}
+
+        <DevDetails title="詳細操作（開発者向け）">
+          <Daily30ImportDraftGateDev
+            gateInput={bulkGateInput}
+            bulkImporting={bulkImporting}
+            importableCount={importable.length}
+            onGateInputChange={setBulkGateInput}
+            onBulkImport={() => void handleBulkImportDev()}
+          />
+        </DevDetails>
       </div>
+
+      {showBulkModal && (
+        <HumanGateConfirmModal
+          title="下書き候補へ取り込む"
+          message="ready_for_draft の候補を leads.json に取り込みます。Gmail下書き作成・送信は行いません。実行しますか？"
+          targetCount={importable.length}
+          safetyNotes={[
+            'leads.json に候補を追加します',
+            'Gmail下書きは作成しません',
+            'Gmail送信は行いません',
+          ]}
+          confirmLabel="下書き候補へ取り込む"
+          confirming={bulkImporting}
+          onConfirm={() => void executeBulkImport()}
+          onCancel={() => !bulkImporting && setShowBulkModal(false)}
+        />
+      )}
     </SectionCard>
   );
 }

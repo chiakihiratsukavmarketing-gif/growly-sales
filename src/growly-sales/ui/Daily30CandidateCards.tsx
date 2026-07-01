@@ -2,7 +2,10 @@ import type { ReactNode } from 'react';
 import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTypes.js';
 import { resolveDaily30WorkflowStatus } from '../candidates/resolveDaily30WorkflowStatus.js';
 import { resolveEmailSourceFromCandidate } from '../candidates/resolveEmailSourceDisplay.js';
+import { isDaily30HumanExcludedCandidate } from '../candidates/daily30CandidateVisibility.js';
 import { EmailSourceDisplay } from './EmailSourceDisplay.js';
+import { CollectionProfileDisplay } from './CollectionProfileDisplay.js';
+import { buildCollectionProfileDisplayFromCandidate } from '../candidates/resolveCollectionProfileDisplay.js';
 import {
   pipelineStatusLabel,
   pipelineStatusVariant,
@@ -97,7 +100,10 @@ export function Daily30CandidateCard({
   const badEmail = emailSource.isPlaceholderEmail || emailSource.isPersonalEmail;
   const canApprove =
     showApprove && c.importStatus !== 'approved_for_lead' && !blocked && !badEmail;
-  const canExclude = Boolean(onExclude) && c.importStatus !== 'imported' && c.importStatus !== 'excluded';
+  const canExclude =
+    Boolean(onExclude) &&
+    c.importStatus !== 'imported' &&
+    !isDaily30HumanExcludedCandidate(c);
   const workflow = resolveDaily30WorkflowStatus(c);
 
   return (
@@ -110,11 +116,11 @@ export function Daily30CandidateCard({
           <CandidateStatusBadges candidate={c} />
         </div>
         {showApprove || canExclude ? (
-          <div className="daily30-candidate-actions">
+          <div className="daily30-card-actions">
             {canApprove ? (
               <button
                 type="button"
-                className="btn btn-primary btn-xs"
+                className="btn btn-primary btn-sm"
                 disabled={approving || excluding}
                 onClick={onApprove}
               >
@@ -132,7 +138,7 @@ export function Daily30CandidateCard({
             {canExclude ? (
               <button
                 type="button"
-                className="btn btn-exclude btn-xs"
+                className="btn btn-exclude btn-sm"
                 disabled={approving || excluding}
                 onClick={onExclude}
               >
@@ -150,6 +156,13 @@ export function Daily30CandidateCard({
           {approvalBlockReason && !duplicateLeadName ? ` — ${approvalBlockReason}` : null}
         </p>
       ) : null}
+
+      <CollectionProfileDisplay
+        info={buildCollectionProfileDisplayFromCandidate(c)}
+        variant="compact"
+        emailSourceInfo={email ? emailSource : null}
+        showEmailSource={Boolean(email) && c.discoverySource === 'job_site_reference'}
+      />
 
       <div className="daily30-candidate-grid daily30-candidate-grid-compact">
         <div className="daily30-candidate-field">

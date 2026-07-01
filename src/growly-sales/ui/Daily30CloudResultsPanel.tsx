@@ -8,18 +8,22 @@ import { confirmDaily30CandidateExclude } from './confirmDaily30CandidateExclude
 import { fetchDaily30Dashboard, type Daily30DashboardResponse } from './daily30Api.js';
 import { EmptyState } from './common/EmptyState.js';
 import { DevDetails } from './common/DevDetails.js';
+import { Daily30RunCollectionProfileSummary } from './Daily30RunCollectionProfileSummary.js';
 import { isDevApiErrorMessage } from './displayLabels.js';
 import { cloudRunStatusLabel } from './daily30StatusLabels.js';
 import {
   Daily30CandidateList,
   pipelineCountChips,
 } from './Daily30CandidateCards.js';
+import { filterDaily30UiListCandidates } from './daily30ExcludeUi.js';
 
 interface Daily30CloudResultsPanelProps {
   onError: (message: string) => void;
   onSuccess?: (message: string) => void;
   refreshKey?: number;
   onChanged?: () => void;
+  sessionExcludedIds?: ReadonlySet<string>;
+  onMarkExcluded?: (candidateId: string) => void;
 }
 
 function formatTimestamp(iso: string | null): string {
@@ -53,6 +57,8 @@ export function Daily30CloudResultsPanel({
   onSuccess,
   refreshKey = 0,
   onChanged,
+  sessionExcludedIds,
+  onMarkExcluded,
 }: Daily30CloudResultsPanelProps) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<Daily30DashboardResponse | null>(null);
@@ -102,16 +108,32 @@ export function Daily30CloudResultsPanel({
     if (!reason) return;
     const candidateId = candidate.externalCandidateId;
     setExcludingId(candidateId);
+    onMarkExcluded?.(candidateId);
+    setData((prev) => {
+      if (!prev) return prev;
+      const filterOut = (list: ExternalLeadCandidate[] | undefined) =>
+        filterDaily30UiListCandidates(list ?? [], sessionExcludedIds).filter(
+          (c) => c.externalCandidateId !== candidateId
+        );
+      return {
+        ...prev,
+        emailFoundCandidates: filterOut(prev.emailFoundCandidates),
+        candidates: filterOut(prev.candidates),
+        humanExcludedCount: (prev.humanExcludedCount ?? 0) + 1,
+      };
+    });
     try {
-      const result = await excludeDaily30CandidateApi(candidateId, reason);
-      if (!result.ok) {
-        throw new Error('候補の除外に失敗しました');
+      const result = await excludeDaily30CandidateApi(candidateId, reason, candidate);
+      if (!result.ok || !result.persisted) {
+        throw new Error('候補の除外状態を保存できませんでした');
       }
+      onMarkExcluded?.(result.candidateId);
       onSuccess?.(`${candidate.companyName} を候補から除外しました`);
-      onChanged?.();
       await load();
+      onChanged?.();
     } catch (err) {
       onError(err instanceof Error ? err.message : '候補の除外に失敗しました');
+      await load();
     } finally {
       setExcludingId(null);
     }
@@ -149,8 +171,11 @@ export function Daily30CloudResultsPanel({
   }
 
   const isGcs = data.storageBackend === 'gcs';
-  const emailFound = data.emailFoundCandidates ?? [];
-  const allCandidates = data.candidates ?? [];
+  const emailFound = filterDaily30UiListCandidates(
+    data.emailFoundCandidates ?? [],
+    sessionExcludedIds
+  );
+  const allCandidates = filterDaily30UiListCandidates(data.candidates ?? [], sessionExcludedIds);
   const pipelineCounts = countByPipeline(allCandidates);
   const approvalBlockHints = data.approvalBlockHints ?? {};
   const humanExcludedCount = data.humanExcludedCount ?? 0;
@@ -178,8 +203,30 @@ export function Daily30CloudResultsPanel({
         </span>
       </InfoBanner>
 
+      <Daily30RunCollectionProfileSummary
+        title="今回使用した収集設定"
+        runContext={data.lastRunResolvedContext ?? data.resolvedForToday}
+        areasUsed={data.lastRunAreasUsed}
+        scheduleSourceLabel={data.lastRunScheduleSource ?? undefined}
+      />
+      {data.lastRunScheduleWarning ? (
+        <p className="hint warning-text daily30-run-profile-warning-banner">{data.lastRunScheduleWarning}</p>
+      ) : null}
+
       <DevDetails title="実行メタデータ（開発者向け）">
         <dl className="daily30-run-meta">
+          <div>
+            <dt>collectionProfile</dt>
+            <dd>{data.lastRunCollectionProfileName ?? '—'}</dd>
+          </div>
+          <div>
+            <dt>schedule source</dt>
+            <dd>{data.lastRunScheduleSource ?? '—'}</dd>
+          </div>
+          <div>
+            <dt>areas used</dt>
+            <dd>{data.lastRunAreasUsed?.length ? data.lastRunAreasUsed.join(', ') : '—'}</dd>
+          </div>
           <div>
             <dt>batchId</dt>
             <dd>{data.batchId}</dd>

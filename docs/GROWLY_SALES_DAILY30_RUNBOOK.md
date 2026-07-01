@@ -9,11 +9,32 @@
 - Gmail `messages.send` は**使わない**
 - Gmail下書きは `users.drafts.create` のみ（`CREATE_DRAFTS` ゲート付き）
 
-## エリア拡大順
+## エリア拡大順（当面の収集ループ）
 
-1. 宮城県（優先）
-2. 福島県
-3. 北関東 — 茨城県 → 栃木県 → 群馬県
+1. 宮城県（第1優先）
+2. 福島県（第1優先）
+3. 山形県（第1優先）
+4. 北関東 — 茨城県 → 栃木県 → 群馬県（第2優先）
+
+**東京都は対象外。** 全国 46 道府県の探索キューは `daily30PrefectureRegistry.ts`（Phase 40.2）。
+
+## batchId（JST）
+
+- Cloud Scheduler は JST 9:00 実行
+- 新規 run の `collectionBatchId` / `batchId` は **JST の YYYY-MM-DD**
+- UI の「今日」も JST 基準
+- 既存 UTC batchId のデータは壊さない
+
+## 収集プロファイル（Phase 40.2 基盤 / 40.3 UI / 40.4 表示）
+
+- 候補・Lead に `collectionProfileId` 等を optional 保存
+- 設定ファイル: `daily30-collection-schedule.json`
+- **UI:** 候補収集タブ「明日の収集設定」で表示・予約保存（Phase 40.3）
+- **API:** `GET/POST /api/daily30-collection-schedule`
+- **Lead一覧 / 候補一覧:** 収集プロファイル表示・フィルター（Phase 40.4）
+- **実行:** Cloud Run / 手動 FETCH が schedule を解決して実行（Phase 40.5）
+- **注意:** 本番 Cloud Run へ反映するには再デプロイが必要
+- スキーマ: `docs/GROWLY_SALES_COLLECTION_PROFILE_SCHEMA.md`
 
 ## 毎日の実行手順
 

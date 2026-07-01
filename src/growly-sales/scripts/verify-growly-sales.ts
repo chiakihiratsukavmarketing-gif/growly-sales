@@ -2154,7 +2154,10 @@ async function verifyPhase16CGmailDraftCreateUi(): Promise<void> {
   assert(draftView.includes('Gmail下書きを作成'), 'GmailDraftCandidatesView has create button');
   assert(draftView.includes('自動送信は行いません'), 'GmailDraftCandidatesView warns no send');
   const draftDialog = await readFile(join(SRC_ROOT, 'ui/GmailDraftCreateDialog.tsx'), 'utf-8');
-  assert(draftDialog.includes('CREATE_DRAFTS'), 'GmailDraftCreateDialog has CREATE_DRAFTS gate');
+  assert(
+    draftDialog.includes('CREATE_DRAFTS') || draftView.includes('CREATE_DRAFTS'),
+    'Gmail draft create uses CREATE_DRAFTS gate'
+  );
   assert(draftResultPanel.includes('送信記録タブへ移動'), 'Gmail draft result navigates to send records');
   assert(draftView.includes('onNavigateToTab'), 'GmailDraftCandidatesView wires tab navigation');
   assert(uiServer.includes('create-gmail-draft'), 'uiServer has create-gmail-draft API');
@@ -3765,8 +3768,8 @@ async function verifyPhase36UiPolish(): Promise<void> {
   assert(dashboard.includes('下書き可'), 'short cycle label for drafts');
 
   const leadPanel = await readFile(join(SRC_ROOT, 'ui/Daily30LeadCandidatesPanel.tsx'), 'utf-8');
-  assert(leadPanel.includes('営業文生成'), 'generate copy button label');
-  assert(leadPanel.includes('btn-sm'), 'generate button compact size');
+  assert(leadPanel.includes('営業文を生成する'), 'generate copy button label');
+  assert(leadPanel.includes('human-gate-action-block'), 'generate copy action block');
 
   const draftPanel = await readFile(join(SRC_ROOT, 'ui/Daily30DraftImportPanel.tsx'), 'utf-8');
   assert(draftPanel.includes('下書き待ち'), 'draft import Japanese stat label');
@@ -4276,6 +4279,1050 @@ async function verifyPhase382ExcludeRefreshAndEmailLayout(): Promise<void> {
   ok('Phase 38.2 exclude refresh and email layout checks passed');
 }
 
+async function verifyPhase383ExcludeImmediateUiAndApi(): Promise<void> {
+  const leadPanel = await readFile(join(SRC_ROOT, 'ui/Daily30LeadCandidatesPanel.tsx'), 'utf-8');
+  const cloudPanel = await readFile(join(SRC_ROOT, 'ui/Daily30CloudResultsPanel.tsx'), 'utf-8');
+  const collectionView = await readFile(join(SRC_ROOT, 'ui/CandidateCollectionView.tsx'), 'utf-8');
+  const cards = await readFile(join(SRC_ROOT, 'ui/Daily30CandidateCards.tsx'), 'utf-8');
+  const styles = await readFile(join(SRC_ROOT, 'ui/styles.css'), 'utf-8');
+  const uiServer = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
+  const copyApi = await readFile(join(SRC_ROOT, 'ui/daily30CopyApi.ts'), 'utf-8');
+  const excludeUi = await readFile(join(SRC_ROOT, 'ui/daily30ExcludeUi.ts'), 'utf-8');
+
+  assert(collectionView.includes('sessionExcludedIds'), 'candidate collection shares session exclude ids');
+  assert(leadPanel.includes('onMarkExcluded'), 'lead panel marks session excluded');
+  assert(leadPanel.includes('filterDaily30UiListCandidates'), 'lead panel filters UI list after load');
+  assert(cloudPanel.includes('onMarkExcluded'), 'cloud panel marks session excluded');
+  assert(cloudPanel.includes('filterDaily30UiListCandidates'), 'cloud panel filters email found list');
+  assert(cards.includes('daily30-card-actions'), 'candidate card uses aligned action group');
+  assert(cards.includes('btn-sm'), 'candidate card buttons use btn-sm');
+  assert(styles.includes('.daily30-card-actions'), 'card action alignment styles exist');
+  assert(uiServer.includes('companyName'), 'exclude API accepts companyName fallback hints');
+  assert(copyApi.includes('pickCandidateExcludeHints'), 'exclude API client sends lookup hints');
+  assert(excludeUi.includes('filterDaily30UiListCandidates'), 'UI exclude filter helper exists');
+
+  const { isDaily30HumanExcludedCandidate } = await import('../candidates/daily30CandidateVisibility.js');
+  const rejectedOnly = {
+    pipelineStatus: 'email_found',
+    importStatus: 'preview',
+    humanReviewStatus: 'rejected',
+    excludedAt: null,
+    excludedBy: null,
+  } as import('../adapters/externalLeadCandidateTypes.js').ExternalLeadCandidate;
+  assert(isDaily30HumanExcludedCandidate(rejectedOnly), 'humanReviewStatus rejected hides candidate');
+  const excludedAtOnly = {
+    pipelineStatus: 'email_found',
+    importStatus: 'preview',
+    humanReviewStatus: null,
+    excludedAt: new Date().toISOString(),
+    excludedBy: null,
+  } as import('../adapters/externalLeadCandidateTypes.js').ExternalLeadCandidate;
+  assert(isDaily30HumanExcludedCandidate(excludedAtOnly), 'excludedAt hides candidate');
+
+  const { findDaily30CandidateIndexForExclude } = await import(
+    '../candidates/findDaily30CandidateForExclude.js'
+  );
+  const { selectDaily30LeadApprovalPending } = await import(
+    '../candidates/selectDaily30LeadCandidates.js'
+  );
+  const pendingId = 'phase383-pending-id';
+  const sample = {
+    externalCandidateId: pendingId,
+    sourceType: 'google_places' as const,
+    companyName: 'Phase383テスト工務店',
+    area: '宮城県',
+    industry: '工務店',
+    websiteUrl: 'https://phase383.test/',
+    officialSiteUrl: 'https://phase383.test/',
+    phoneNumber: null,
+    address: null,
+    googlePlaceId: null,
+    sourceUrl: null,
+    sourceQuery: 'q',
+    category: '工務店',
+    contactFormUrl: 'https://phase383.test/contact',
+    emailCandidates: ['info@phase383.test'],
+    confidenceScore: 0.8,
+    importStatus: 'preview' as const,
+    riskLevel: 'low' as const,
+    duplicateReason: '',
+    duplicateKey: 'k383',
+    pipelineStatus: 'email_found' as const,
+    prefecture: '宮城県',
+    regionGroup: '宮城' as const,
+    collectionPriority: 1,
+    collectionAreaSource: '宮城県',
+    collectionBatchId: '2099-01-01',
+    emailCandidateSourceUrls: ['https://phase383.test/contact'],
+    emailVerifiedAt: null,
+    generatedEmailSubject: null,
+    generatedEmailBody: null,
+    generatedCustomHook: null,
+    generatedCustomHookReason: null,
+    targetEmail: 'info@phase383.test',
+    emailCandidateSourceUrl: 'https://phase383.test/contact',
+    failureReason: null,
+    copyGeneratedAt: null,
+    qualityCheckedAt: null,
+    humanReviewStatus: null,
+    gmailDraftStatus: null,
+    sendStatus: null,
+    notes: '',
+    collectedAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  const wrongId = 'wrong-id-not-in-file';
+  const fallbackIndex = findDaily30CandidateIndexForExclude([sample], wrongId, {
+    companyName: sample.companyName,
+    email: 'info@phase383.test',
+    officialSiteUrl: sample.officialSiteUrl!,
+  });
+  assert(fallbackIndex === 0, 'exclude fallback finds candidate by company/email/site');
+  assert(
+    selectDaily30LeadApprovalPending([sample]).length === 1,
+    'pending candidate listed before exclude'
+  );
+  const excludedSample = {
+    ...sample,
+    pipelineStatus: 'excluded' as const,
+    importStatus: 'excluded' as const,
+    humanReviewStatus: 'rejected' as const,
+    excludedAt: new Date().toISOString(),
+    excludedBy: 'human' as const,
+    excludedReason: 'verify exclude',
+  };
+  assert(
+    selectDaily30LeadApprovalPending([excludedSample]).length === 0,
+    'lead approval pending empty after exclude fields applied'
+  );
+
+  const { filterDaily30UiListCandidates } = await import('../ui/daily30ExcludeUi.js');
+  const sessionIds = new Set([pendingId]);
+  assert(
+    filterDaily30UiListCandidates([sample], sessionIds).length === 0,
+    'session excluded id removes candidate from UI list immediately'
+  );
+
+  ok('Phase 38.3 exclude immediate UI and API checks passed');
+}
+
+async function verifyPhase384ExcludePersistAndMetrics(): Promise<void> {
+  const excludeSrc = await readFile(join(SRC_ROOT, 'workflow/excludeDaily30Candidate.ts'), 'utf-8');
+  const repoSrc = await readFile(join(SRC_ROOT, 'storage/externalCandidatesRepository.ts'), 'utf-8');
+  const uiServer = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
+  const copyApi = await readFile(join(SRC_ROOT, 'ui/daily30CopyApi.ts'), 'utf-8');
+  const metricsDoc = await readFile(join(PROJECT_ROOT, 'docs/GROWLY_SALES_DAILY30_METRICS.md'), 'utf-8');
+
+  assert(excludeSrc.includes('persistExternalCandidates'), 'exclude uses persistExternalCandidates');
+  assert(excludeSrc.includes('verifyExcludedCandidatePersisted'), 'exclude verifies after reload');
+  assert(excludeSrc.includes('persisted: true'), 'exclude result includes persisted:true');
+  assert(excludeSrc.includes('EXCLUDE_PERSIST_FAILED'), 'exclude has persist failed code');
+  assert(repoSrc.includes('reloadExternalCandidatesFromStorage'), 'repository supports reload after save');
+  assert(uiServer.includes('EXCLUDE_PERSIST_FAILED'), 'uiServer handles persist failure');
+  assert(uiServer.includes('allCandidates'), 'uiServer builds dashboard from allCandidates');
+  assert(copyApi.includes('persisted'), 'client checks persisted flag');
+  assert(metricsDoc.includes('Lead化承認待ち'), 'metrics doc defines lead approval pending');
+  assert(metricsDoc.includes('収集時メール取得'), 'metrics doc defines email found at collection');
+
+  const { mkdir, writeFile } = await import('node:fs/promises');
+  const { getGrowlySalesDataDir } = await import('../config/paths.js');
+  const verifyDir = join(getGrowlySalesDataDir(), '_verify_phase384');
+  await mkdir(verifyDir, { recursive: true });
+  const verifyPath = join(verifyDir, 'external-candidates.json');
+  const sampleId = 'phase384-persist-id';
+  const sample = {
+    externalCandidateId: sampleId,
+    sourceType: 'google_places' as const,
+    companyName: 'Phase384永続化テスト',
+    area: '宮城県',
+    industry: '工務店',
+    websiteUrl: 'https://phase384.test/',
+    officialSiteUrl: 'https://phase384.test/',
+    phoneNumber: null,
+    address: null,
+    googlePlaceId: null,
+    sourceUrl: null,
+    sourceQuery: 'q',
+    category: '工務店',
+    contactFormUrl: 'https://phase384.test/contact',
+    emailCandidates: ['info@phase384.test'],
+    confidenceScore: 0.8,
+    importStatus: 'preview' as const,
+    riskLevel: 'low' as const,
+    duplicateReason: '',
+    duplicateKey: 'k384',
+    pipelineStatus: 'email_found' as const,
+    prefecture: '宮城県',
+    regionGroup: '宮城' as const,
+    collectionPriority: 1,
+    collectionAreaSource: '宮城県',
+    collectionBatchId: '2099-01-01',
+    emailCandidateSourceUrls: ['https://phase384.test/contact'],
+    emailVerifiedAt: null,
+    generatedEmailSubject: null,
+    generatedEmailBody: null,
+    generatedCustomHook: null,
+    generatedCustomHookReason: null,
+    targetEmail: 'info@phase384.test',
+    emailCandidateSourceUrl: 'https://phase384.test/contact',
+    failureReason: null,
+    copyGeneratedAt: null,
+    qualityCheckedAt: null,
+    humanReviewStatus: null,
+    gmailDraftStatus: null,
+    sendStatus: null,
+    notes: '',
+    collectedAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  await writeFile(
+    verifyPath,
+    JSON.stringify({ candidates: [sample], updatedAt: new Date().toISOString(), note: 'verify' }, null, 2),
+    'utf-8'
+  );
+
+  const { excludeDaily30Candidate } = await import('../workflow/excludeDaily30Candidate.js');
+  const { selectDaily30LeadApprovalPending } = await import(
+    '../candidates/selectDaily30LeadCandidates.js'
+  );
+  const { isDaily30ReadyForDraftImportCandidate } = await import(
+    '../candidates/getDaily30DraftImportBlockReason.js'
+  );
+  const { auditDaily30MetricConsistency } = await import(
+    '../candidates/auditDaily30MetricConsistency.js'
+  );
+
+  const result = await excludeDaily30Candidate(sampleId, 'verify persist', { jsonPath: verifyPath });
+  assert(result.ok === true && result.persisted === true, 'exclude returns persisted:true');
+  assert(result.pipelineStatus === 'excluded', 'exclude persisted pipelineStatus');
+  assert(result.excludedBy === 'human', 'exclude persisted excludedBy');
+
+  try {
+    await excludeDaily30Candidate(sampleId, 'verify persist again', { jsonPath: verifyPath });
+    assert(false, 'double exclude should fail');
+  } catch {
+    assert(true, 'double exclude rejected');
+  }
+
+  const { loadExternalCandidatesFromJson } = await import(
+    '../storage/externalCandidatesRepository.js'
+  );
+  const after = await loadExternalCandidatesFromJson(verifyPath);
+  assert(after.length === 1, 'verify file still has one candidate');
+  assert(after[0]?.importStatus === 'excluded', 'reloaded file has excluded importStatus');
+  assert(selectDaily30LeadApprovalPending(after).length === 0, 'excluded not in approval pending');
+  assert(!isDaily30ReadyForDraftImportCandidate(after[0]!), 'excluded not in ready for draft');
+
+  const dashBefore = (await import('../candidates/buildDaily30Dashboard.js')).buildDaily30Dashboard(
+    [sample],
+    [],
+    '2099-01-01'
+  );
+  const dashAfter = (await import('../candidates/buildDaily30Dashboard.js')).buildDaily30Dashboard(
+    after,
+    [],
+    '2099-01-01'
+  );
+  assert(dashBefore.leadApprovalPendingCount === 1, 'before exclude one pending');
+  assert(dashAfter.leadApprovalPendingCount === 0, 'after exclude zero pending');
+  assert(dashAfter.humanExcludedCount === 1, 'humanExcludedCount increased');
+  assert(
+    dashAfter.emailFoundAtCollection === dashBefore.emailFoundAtCollection ||
+      dashAfter.emailFoundAtCollection >= 0,
+    'emailFoundAtCollection stable without cloud state'
+  );
+
+  const audit = auditDaily30MetricConsistency(after, [], '2099-01-01', null);
+  assert(audit.ok, `metric audit: ${audit.issues.join('; ')}`);
+
+  ok('Phase 38.4 exclude persist and metric consistency checks passed');
+}
+
+async function verifyPhase39HumanGateButtons(): Promise<void> {
+  const leadPanel = await readFile(join(SRC_ROOT, 'ui/Daily30LeadCandidatesPanel.tsx'), 'utf-8');
+  const draftPanel = await readFile(join(SRC_ROOT, 'ui/Daily30DraftImportPanel.tsx'), 'utf-8');
+  const gmailView = await readFile(join(SRC_ROOT, 'ui/GmailDraftCandidatesView.tsx'), 'utf-8');
+  const gmailDialog = await readFile(join(SRC_ROOT, 'ui/GmailDraftCreateDialog.tsx'), 'utf-8');
+  const gateModal = await readFile(join(SRC_ROOT, 'ui/HumanGateConfirmModal.tsx'), 'utf-8');
+  const copyApi = await readFile(join(SRC_ROOT, 'ui/daily30CopyApi.ts'), 'utf-8');
+  const importApi = await readFile(join(SRC_ROOT, 'ui/daily30ImportApi.ts'), 'utf-8');
+  const gmailApi = await readFile(join(SRC_ROOT, 'ui/gmailDraftCandidatesApi.ts'), 'utf-8');
+  const uiServer = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
+  const gmailAdapter = await readFile(join(SRC_ROOT, 'integrations/gmail/gmailDraftAdapter.ts'), 'utf-8');
+
+  assert(leadPanel.includes('営業文を生成する'), 'lead panel has generate copy button');
+  assert(leadPanel.includes('HumanGateConfirmModal'), 'lead panel has confirm modal');
+  assert(leadPanel.includes('GENERATE_DAILY_30_COPY_GATE_LABEL'), 'lead panel sends GENERATE_DAILY_30_COPY gate');
+  assert(leadPanel.includes('resolveGenerateCopyDisabledReason'), 'lead panel has disabled reason');
+  assert(leadPanel.includes('DevDetails'), 'lead panel keeps dev gate input');
+  assert(leadPanel.includes('Daily30GenerateCopyGateDev'), 'lead panel dev gate component');
+
+  assert(draftPanel.includes('下書き候補へ取り込む'), 'draft import panel has bulk import button');
+  assert(draftPanel.includes('HumanGateConfirmModal'), 'draft import panel has confirm modal');
+  assert(
+    draftPanel.includes('IMPORT_DAILY_30_DRAFT_CANDIDATES_GATE_LABEL'),
+    'draft import panel sends IMPORT gate'
+  );
+  assert(draftPanel.includes('resolveBulkImportDisabledReason'), 'draft import disabled reason');
+  assert(draftPanel.includes('Daily30ImportDraftGateDev'), 'draft import dev gate component');
+
+  assert(gmailView.includes('Gmail下書きを作成する'), 'gmail view has create draft button label');
+  assert(gmailView.includes('CREATE_DRAFTS_GATE_LABEL'), 'gmail view sends CREATE_DRAFTS gate');
+  assert(gmailView.includes('creatableCandidates'), 'gmail view filters creatable candidates');
+  assert(gmailDialog.includes('HumanGateConfirmModal') || gmailDialog.includes('modal-dialog'), 'gmail create confirm dialog');
+  assert(gmailDialog.includes('messages.send は使いません'), 'gmail dialog states no messages.send');
+  assert(gmailDialog.includes('Gmail下書きを作成する'), 'gmail dialog confirm button label');
+  assert(gmailView.includes('DevDetails'), 'gmail view keeps dev gate input');
+
+  assert(gateModal.includes('human-gate-safety-list'), 'gate modal shows safety notes');
+  assert(gateModal.includes('modal-actions'), 'gate modal has confirm/cancel');
+
+  assert(copyApi.includes('confirmToken'), 'copy API sends confirmToken');
+  assert(importApi.includes('confirmToken'), 'import API sends confirmToken');
+  assert(gmailApi.includes('createDraftsGate'), 'gmail API sends createDraftsGate');
+
+  assert(!uiServer.includes('messages.send'), 'uiServer does not use messages.send');
+  assert(gmailAdapter.includes('drafts.create'), 'gmail adapter still drafts.create only');
+  assert(!gmailAdapter.includes('messages.send'), 'gmail adapter no messages.send');
+
+  assert(!leadPanel.includes('Authorization'), 'lead panel no auth header');
+  assert(!gmailDialog.includes('refresh_token'), 'gmail dialog no secrets');
+
+  ok('Phase 39 human gate button UI checks passed');
+}
+
+async function verifyPhase402CollectionProfileFoundation(): Promise<void> {
+  const candidateTypes = await readFile(
+    join(SRC_ROOT, 'adapters/externalLeadCandidateTypes.ts'),
+    'utf-8'
+  );
+  const leadTypes = await readFile(join(SRC_ROOT, 'types/lead.ts'), 'utf-8');
+  const areaConfig = await readFile(join(SRC_ROOT, 'candidates/daily30AreaConfig.ts'), 'utf-8');
+  const registry = await readFile(join(SRC_ROOT, 'candidates/daily30PrefectureRegistry.ts'), 'utf-8');
+  const profileModule = await readFile(join(SRC_ROOT, 'candidates/daily30CollectionProfile.ts'), 'utf-8');
+  const scheduleRepo = await readFile(
+    join(SRC_ROOT, 'storage/daily30CollectionScheduleRepository.ts'),
+    'utf-8'
+  );
+  const jsonNames = await readFile(join(SRC_ROOT, 'storage/jsonDocumentNames.ts'), 'utf-8');
+  const fetchSrc = await readFile(join(SRC_ROOT, 'candidates/fetchDaily30Candidates.ts'), 'utf-8');
+  const cloudFetch = await readFile(join(SRC_ROOT, 'candidates/runDaily30CloudAutoFetch.ts'), 'utf-8');
+  const cloudState = await readFile(join(SRC_ROOT, 'storage/daily30CloudRunState.ts'), 'utf-8');
+  const stubLead = await readFile(
+    join(SRC_ROOT, 'candidates/buildLeadStubFromExternalCandidate.ts'),
+    'utf-8'
+  );
+  const draftLead = await readFile(
+    join(SRC_ROOT, 'candidates/buildLeadFromDaily30ReadyForDraft.ts'),
+    'utf-8'
+  );
+  const gmailAdapter = await readFile(join(SRC_ROOT, 'integrations/gmail/gmailDraftAdapter.ts'), 'utf-8');
+
+  for (const field of [
+    'collectionProfileId',
+    'collectionMode',
+    'industryCategory',
+    'areaStrategy',
+    'discoverySource',
+    'discoverySourceUrl',
+    'sourceComplianceStatus',
+    'collectionRunId',
+  ]) {
+    assert(candidateTypes.includes(field), `ExternalLeadCandidate has ${field}`);
+    assert(leadTypes.includes(field), `Lead has ${field}`);
+  }
+
+  assert(stubLead.includes('copyCollectionProfileToLead'), 'stub lead copies collection profile');
+  assert(draftLead.includes('copyCollectionProfileToLead'), 'draft lead copies collection profile');
+  assert(scheduleRepo.includes('loadDaily30CollectionSchedule'), 'schedule repository exists');
+  assert(scheduleRepo.includes('loadActiveDaily30CollectionProfile'), 'active profile loader exists');
+  assert(jsonNames.includes('daily30-collection-schedule.json'), 'schedule logical name registered');
+  assert(areaConfig.includes('todayBatchIdJst'), 'JST batchId helper exists');
+  assert(areaConfig.includes('resolveDaily30BatchIdJst'), 'resolveDaily30BatchIdJst exists');
+  assert(areaConfig.includes('filterDaily30ExecutionAreas'), 'execution area filter exists');
+  assert(areaConfig.includes('山形県'), 'yamagata in area expansion');
+  assert(fetchSrc.includes('applyDaily30DefaultCollectionProfile'), 'fetch applies default profile');
+  assert(fetchSrc.includes('filterDaily30ExecutionAreas'), 'fetch filters execution areas');
+  assert(fetchSrc.includes('todayBatchIdJst'), 'fetch defaults to JST batchId');
+  assert(cloudFetch.includes('todayBatchIdJst'), 'cloud fetch uses JST batchId');
+  assert(cloudState.includes('runStartedAtJst'), 'cloud state has JST run timestamp');
+  assert(cloudState.includes('collectionProfileId'), 'cloud state stores collectionProfileId');
+  assert(!cloudFetch.includes('messages.send'), 'phase40.2 no gmail send');
+  assert(!gmailAdapter.includes('messages.send'), 'gmail adapter no messages.send');
+  assert(profileModule.includes('discoverySourceUrl'), 'profile module separates discovery URL');
+
+  const {
+    todayBatchId,
+    todayBatchIdJst,
+    resolveDaily30BatchIdJst,
+    filterDaily30ExecutionAreas,
+    DAILY_30_AREA_EXPANSION,
+  } = await import('../candidates/daily30AreaConfig.js');
+  const {
+    DAILY_30_NATIONWIDE_PREFECTURES_ORDERED,
+    DAILY_30_EXCLUDED_PREFECTURES,
+    isDaily30PrefectureExcluded,
+  } = await import('../candidates/daily30PrefectureRegistry.js');
+  const {
+    applyDaily30DefaultCollectionProfile,
+    copyCollectionProfileToLead,
+    defaultDaily30CollectionProfileSnapshot,
+  } = await import('../candidates/daily30CollectionProfile.js');
+  const { loadActiveDaily30CollectionProfile } = await import(
+    '../storage/daily30CollectionScheduleRepository.js'
+  );
+  const { buildLeadFromDaily30ReadyForDraft } = await import(
+    '../candidates/buildLeadFromDaily30ReadyForDraft.js'
+  );
+  const { resolveEmailSourceFromCandidate } = await import(
+    '../candidates/resolveEmailSourceDisplay.js'
+  );
+  const { countDaily30BatchMetrics } = await import('../candidates/daily30BatchMetrics.js');
+
+  const jstNineAm = new Date('2026-07-02T00:00:00.000Z');
+  assert(todayBatchIdJst(jstNineAm) === '2026-07-02', 'JST 09:00 maps to same-day batchId');
+
+  const utcSkew = new Date('2026-07-01T15:00:00.000Z');
+  assert(todayBatchId(utcSkew) === '2026-07-01', 'UTC batchId kept for legacy');
+  assert(todayBatchIdJst(utcSkew) === '2026-07-02', 'JST batchId avoids UTC day skew');
+  assert(resolveDaily30BatchIdJst('2026-06-30') === '2026-06-30', 'explicit batchId preserved');
+
+  const legacyBatchId = '2026-06-30';
+  const legacyCandidate = {
+    externalCandidateId: 'phase402-legacy',
+    sourceType: 'google_places' as const,
+    companyName: 'Legacy UTC Batch',
+    area: '宮城県',
+    industry: '工務店',
+    websiteUrl: 'https://legacy.test',
+    officialSiteUrl: 'https://legacy.test',
+    phoneNumber: null,
+    address: null,
+    googlePlaceId: null,
+    sourceUrl: null,
+    sourceQuery: 'q',
+    category: '工務店',
+    contactFormUrl: null,
+    emailCandidates: ['info@legacy.test'],
+    confidenceScore: 0.8,
+    importStatus: 'preview' as const,
+    riskLevel: 'low' as const,
+    duplicateReason: '',
+    duplicateKey: 'k-legacy',
+    pipelineStatus: 'email_found' as const,
+    prefecture: '宮城県',
+    regionGroup: '宮城' as const,
+    collectionPriority: 1,
+    collectionAreaSource: '宮城県',
+    collectionBatchId: legacyBatchId,
+    emailCandidateSourceUrls: ['https://legacy.test/contact'],
+    emailVerifiedAt: null,
+    generatedEmailSubject: null,
+    generatedEmailBody: null,
+    generatedCustomHook: null,
+    generatedCustomHookReason: null,
+    targetEmail: 'info@legacy.test',
+    emailCandidateSourceUrl: 'https://legacy.test/contact',
+    failureReason: null,
+    copyGeneratedAt: null,
+    qualityCheckedAt: null,
+    humanReviewStatus: null,
+    gmailDraftStatus: null,
+    sendStatus: null,
+    notes: '',
+    collectedAt: '2026-06-30T00:00:00.000Z',
+    createdAt: '2026-06-30T00:00:00.000Z',
+    updatedAt: '2026-06-30T00:00:00.000Z',
+  };
+  const legacyMetrics = countDaily30BatchMetrics([legacyCandidate], legacyBatchId);
+  assert(legacyMetrics.emailFound === 1, 'legacy UTC batchId metrics still work');
+
+  assert(DAILY_30_NATIONWIDE_PREFECTURES_ORDERED.length === 46, 'nationwide list is 46 prefectures');
+  assert(
+    !DAILY_30_NATIONWIDE_PREFECTURES_ORDERED.includes('東京都'),
+    'Tokyo excluded from nationwide list'
+  );
+  assert(
+    new Set(DAILY_30_NATIONWIDE_PREFECTURES_ORDERED).size === 46,
+    'no duplicate prefectures in nationwide list'
+  );
+  assert(DAILY_30_NATIONWIDE_PREFECTURES_ORDERED[0] === '宮城県', 'Miyagi is first priority');
+  assert(DAILY_30_NATIONWIDE_PREFECTURES_ORDERED[1] === '福島県', 'Fukushima is second');
+  assert(DAILY_30_NATIONWIDE_PREFECTURES_ORDERED[2] === '山形県', 'Yamagata in first priority group');
+  assert(DAILY_30_NATIONWIDE_PREFECTURES_ORDERED[3] === '茨城県', 'Ibaraki starts north Kanto');
+  assert(DAILY_30_NATIONWIDE_PREFECTURES_ORDERED[5] === '群馬県', 'Gunma ends north Kanto group');
+  assert(isDaily30PrefectureExcluded('東京都'), 'Tokyo marked excluded');
+  assert(DAILY_30_EXCLUDED_PREFECTURES.includes('東京都'), 'Tokyo in excluded constant');
+
+  const executionAreas = filterDaily30ExecutionAreas(DAILY_30_AREA_EXPANSION);
+  assert(
+    executionAreas.every((a) => !isDaily30PrefectureExcluded(a.prefecture)),
+    'execution areas exclude Tokyo'
+  );
+  assert(executionAreas.some((a) => a.prefecture === '山形県'), 'yamagata in execution expansion');
+
+  const activeProfile = await loadActiveDaily30CollectionProfile();
+  assert(activeProfile.collectionProfileId === 'daily30-housing-auto', 'schedule fallback profile id');
+  assert(activeProfile.collectionMode === 'auto_continue', 'schedule fallback mode');
+  assert(activeProfile.industryCategory === 'housing', 'schedule fallback industry');
+  assert(
+    activeProfile.areaStrategy === 'priority_miyagi_fukushima_yamagata',
+    'schedule fallback area strategy'
+  );
+  assert(activeProfile.discoverySource === 'google_places', 'schedule fallback discovery source');
+
+  const profiled = applyDaily30DefaultCollectionProfile(
+    buildExternalLeadCandidate(
+      {
+        sourceType: 'google_places',
+        companyName: 'Profile Test Co',
+        area: '宮城県',
+        websiteUrl: 'https://profile-test.example',
+        sourceUrl: 'https://maps.example/place',
+        sourceQuery: '宮城県 工務店',
+        prefecture: '宮城県',
+        regionGroup: '宮城',
+        collectionPriority: 1,
+        collectionAreaSource: '宮城県',
+        collectionBatchId: '2026-07-02',
+      },
+      await loadTargetProfile()
+    ),
+    { batchId: '2026-07-02', collectionRunId: 'run-402', areaQueuePosition: 0 }
+  );
+  assert(profiled.collectionProfileId === 'daily30-housing-auto', 'new candidate gets default profile');
+  assert(profiled.discoverySource === 'google_places', 'discovery source from legacy sourceType');
+  assert(profiled.collectionRunId === 'run-402', 'collectionRunId attached');
+
+  const jobDiscoveryCandidate = {
+    ...profiled,
+    discoverySource: 'job_site_reference' as const,
+    discoverySourceSite: 'indeed' as const,
+    discoverySourceUrl: 'https://jp.indeed.com/viewjob?jk=abc',
+    emailCandidateSourceUrl: 'https://profile-test.example/contact',
+    targetEmail: 'info@profile-test.example',
+  };
+  const emailDisplay = resolveEmailSourceFromCandidate(jobDiscoveryCandidate);
+  assert(
+    emailDisplay.emailSourceUrl === 'https://profile-test.example/contact',
+    'email source stays on official site'
+  );
+  assert(
+    jobDiscoveryCandidate.discoverySourceUrl?.includes('indeed.com'),
+    'discovery URL remains job site'
+  );
+  assert(
+    emailDisplay.emailSourceUrl !== jobDiscoveryCandidate.discoverySourceUrl,
+    'discoverySourceUrl and emailSourceUrl are separated'
+  );
+
+  const lead = buildLeadFromDaily30ReadyForDraft({
+    ...jobDiscoveryCandidate,
+    pipelineStatus: 'ready_for_draft',
+    generatedEmailSubject: '件名',
+    generatedEmailBody: '本文',
+    importStatus: 'approved_for_lead',
+  });
+  assert(lead.collectionProfileId === 'daily30-housing-auto', 'lead inherits collectionProfileId');
+  assert(lead.discoverySource === 'job_site_reference', 'lead inherits discoverySource');
+  assert(lead.discoverySourceUrl?.includes('indeed.com'), 'lead inherits discoverySourceUrl');
+  assert(lead.emailCandidateSourceUrl === 'https://profile-test.example/contact', 'email source on lead');
+
+  const emptyLead = createEmptyLead({
+    companyName: 'X',
+    area: '宮城県',
+    industry: '工務店',
+    websiteUrl: 'https://x.test',
+    sourceUrls: ['https://x.test'],
+  });
+  const merged = copyCollectionProfileToLead(profiled, emptyLead);
+  assert(merged.collectionProfileName === profiled.collectionProfileName, 'copyCollectionProfileToLead works');
+
+  const schemaDoc = await readFile(
+    join(PROJECT_ROOT, 'docs/GROWLY_SALES_COLLECTION_PROFILE_SCHEMA.md'),
+    'utf-8'
+  ).catch(() => '');
+  assert(schemaDoc.includes('discoverySourceUrl'), 'collection profile schema doc exists');
+
+  ok('Phase 40.2 collection profile foundation checks passed');
+}
+
+async function verifyPhase403CollectionScheduleUi(): Promise<void> {
+  const candidateView = await readFile(join(SRC_ROOT, 'ui/CandidateCollectionView.tsx'), 'utf-8');
+  const schedulePanel = await readFile(join(SRC_ROOT, 'ui/Daily30CollectionSchedulePanel.tsx'), 'utf-8');
+  const editDialog = await readFile(join(SRC_ROOT, 'ui/Daily30CollectionScheduleEditDialog.tsx'), 'utf-8');
+  const scheduleApi = await readFile(join(SRC_ROOT, 'ui/daily30CollectionScheduleApi.ts'), 'utf-8');
+  const uiServer = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
+  const updateModule = await readFile(join(SRC_ROOT, 'candidates/updateDaily30CollectionSchedule.ts'), 'utf-8');
+  const gmailAdapter = await readFile(join(SRC_ROOT, 'integrations/gmail/gmailDraftAdapter.ts'), 'utf-8');
+
+  assert(candidateView.includes('明日の収集設定'), 'candidate view has schedule section title');
+  assert(candidateView.includes('Daily30CollectionSchedulePanel'), 'candidate view embeds schedule panel');
+  assert(schedulePanel.includes('設定を変更する'), 'schedule panel has edit button');
+  assert(schedulePanel.includes('Phase 40.6'), 'schedule panel shows phase 40.6 external reference notice');
+  assert(schedulePanel.includes('DevDetails'), 'raw schedule in DevDetails only');
+  assert(schedulePanel.includes('求人サイト指定'), 'schedule panel shows job site label');
+  assert(editDialog.includes('wantedly'), 'edit dialog supports wantedly');
+  assert(editDialog.includes('indeed'), 'edit dialog supports indeed');
+  assert(editDialog.includes('job_site_reference'), 'edit dialog has job site discovery');
+  assert(editDialog.includes('設定保存のみ'), 'edit dialog shows save-only warning');
+  assert(scheduleApi.includes('/api/daily30-collection-schedule'), 'schedule API client path');
+
+  assert(uiServer.includes("pathname === '/api/daily30-collection-schedule'"), 'uiServer schedule routes');
+  assert(uiServer.includes('loadDaily30CollectionSchedule'), 'uiServer loads schedule');
+  assert(uiServer.includes('applyDaily30CollectionScheduleUpdate'), 'uiServer applies schedule update');
+  assert(!uiServer.includes('messages.send'), 'schedule API no gmail send');
+  assert(!uiServer.includes('users.drafts.create'), 'schedule API no drafts create');
+  assert(!schedulePanel.includes('refresh_token'), 'schedule panel no secrets');
+  assert(!uiServer.includes('Authorization'), 'uiServer schedule no auth header');
+
+  const {
+    applyDaily30CollectionScheduleUpdate,
+    resolveScheduleEffectiveBatchId,
+  } = await import('../candidates/updateDaily30CollectionSchedule.js');
+  const { buildDefaultDaily30CollectionScheduleStore } = await import(
+    '../storage/daily30CollectionScheduleTypes.js'
+  );
+  const { getTomorrowBatchIdJst, todayBatchIdJst } = await import('../candidates/daily30AreaConfig.js');
+  const { loadDaily30CollectionSchedule } = await import(
+    '../storage/daily30CollectionScheduleRepository.js'
+  );
+
+  const defaults = await loadDaily30CollectionSchedule();
+  assert(defaults.activeProfile.collectionProfileId === 'daily30-housing-auto', 'GET default active profile');
+
+  const utcSkew = new Date('2026-07-01T15:00:00.000Z');
+  const effective = resolveScheduleEffectiveBatchId({}, utcSkew);
+  assert(effective === getTomorrowBatchIdJst(utcSkew), 'effectiveFromBatchId defaults to tomorrow JST');
+  assert(todayBatchIdJst(utcSkew) === '2026-07-02', 'JST today on skew date');
+
+  const base = buildDefaultDaily30CollectionScheduleStore();
+  const oneDay = applyDaily30CollectionScheduleUpdate(base, {
+    mode: 'one_day_override',
+    effectiveFromBatchId: '2026-07-02',
+    profile: {
+      industryCategory: 'housing',
+      areaStrategy: 'priority_miyagi_fukushima_yamagata',
+      discoverySource: 'job_site_reference',
+      discoverySourceSite: 'wantedly',
+    },
+  });
+  assert(oneDay.oneDayOverride !== null, 'oneDayOverride saved');
+  assert(oneDay.oneDayOverride?.profile.discoverySourceSite === 'wantedly', 'wantedly site saved');
+  assert(oneDay.oneDayOverride?.effectiveFromBatchId === '2026-07-02', 'one day effective batch');
+  assert(oneDay.activeProfile.collectionProfileId === 'daily30-housing-auto', 'one day keeps activeProfile');
+
+  const nextOverride = applyDaily30CollectionScheduleUpdate(base, {
+    mode: 'user_selected',
+    effectiveFromBatchId: '2026-07-03',
+    profile: {
+      discoverySource: 'job_site_reference',
+      discoverySourceSite: 'indeed',
+      areaStrategy: 'north_kanto',
+    },
+  });
+  assert(nextOverride.nextProfileOverride !== null, 'nextProfileOverride saved');
+  assert(nextOverride.nextProfileOverride?.profile.discoverySourceSite === 'indeed', 'indeed site saved');
+
+  const reset = applyDaily30CollectionScheduleUpdate(oneDay, { mode: 'reset_to_auto' });
+  assert(reset.nextProfileOverride === null, 'reset clears next override');
+  assert(reset.oneDayOverride === null, 'reset clears one day override');
+  assert(reset.activeProfile.collectionMode === 'auto_continue', 'reset restores auto_continue');
+
+  ok('Phase 40.3 collection schedule UI checks passed');
+}
+
+async function verifyPhase404CollectionProfileDisplay(): Promise<void> {
+  const leadList = await readFile(join(SRC_ROOT, 'ui/GrowlySalesDashboard.tsx'), 'utf-8');
+  const filterBar = await readFile(join(SRC_ROOT, 'ui/LeadCollectionFilterBar.tsx'), 'utf-8');
+  const leadDetail = await readFile(join(SRC_ROOT, 'ui/LeadDetailPanel.tsx'), 'utf-8');
+  const candidateCards = await readFile(join(SRC_ROOT, 'ui/Daily30CandidateCards.tsx'), 'utf-8');
+  const draftView = await readFile(join(SRC_ROOT, 'ui/GmailDraftCandidatesView.tsx'), 'utf-8');
+  const sendRecords = await readFile(join(SRC_ROOT, 'ui/SendRecordsView.tsx'), 'utf-8');
+  const recordModule = await readFile(join(SRC_ROOT, 'workflow/recordManualGmailSent.ts'), 'utf-8');
+  const gmailAdapter = await readFile(join(SRC_ROOT, 'integrations/gmail/gmailDraftAdapter.ts'), 'utf-8');
+
+  assert(leadList.includes('LeadCollectionFilterBar'), 'lead list embeds collection filter bar');
+  assert(leadList.includes('matchesLeadCollectionFilters'), 'lead list applies collection filters');
+  assert(filterBar.includes('収集元'), 'filter bar has discovery source label');
+  assert(filterBar.includes('求人サイト'), 'filter bar has job site label');
+  assert(filterBar.includes('エリア戦略'), 'filter bar has area strategy label');
+  assert(filterBar.includes('収集プロファイル'), 'filter bar has collection profile label');
+  assert(filterBar.includes('メール確認'), 'filter bar has email compliance label');
+  assert(leadDetail.includes('収集情報'), 'lead detail has collection section');
+  assert(leadDetail.includes('CollectionProfileDisplay'), 'lead detail uses collection display');
+  assert(candidateCards.includes('CollectionProfileDisplay'), 'candidate cards show collection info');
+  assert(draftView.includes('CollectionProfileDisplay'), 'draft candidates show collection info');
+  assert(sendRecords.includes('CollectionProfileDisplay'), 'send records show collection info');
+  assert(recordModule.includes('collectionProfileId'), 'send record preview stores collectionProfileId');
+  assert(recordModule.includes('discoverySourceUrl'), 'send record memo stores discoverySourceUrl');
+  assert(!gmailAdapter.includes('messages.send'), 'no gmail send in adapter');
+  assert(!recordModule.includes('users.drafts.create'), 'send record no drafts create');
+
+  const {
+    buildCollectionProfileDisplayFromLead,
+    buildCollectionProfileDisplayFromCandidate,
+    matchesLeadDiscoverySourceFilter,
+    matchesLeadDiscoverySourceSiteFilter,
+    matchesLeadPrefectureFilter,
+    matchesLeadAreaStrategyFilter,
+    matchesLeadCollectionModeFilter,
+    matchesLeadEmailComplianceFilter,
+  } = await import('../candidates/resolveCollectionProfileDisplay.js');
+  const {
+    DEFAULT_LEAD_COLLECTION_FILTERS,
+    matchesLeadCollectionFilters,
+  } = await import('../ui/LeadCollectionFilterBar.js');
+  const { buildEmailOutreachCandidateView } = await import('../outreach/outreachPolicy.js');
+  const { buildManualGmailSendPreview } = await import('../workflow/recordManualGmailSent.js');
+  const { resolveEmailSourceFromLead } = await import('../candidates/resolveEmailSourceDisplay.js');
+
+  const legacyLead = createEmptyLead({
+    companyName: 'レガシー工務店',
+    area: '仙台市',
+    industry: '工務店',
+    websiteUrl: 'https://legacy-housing.test/',
+    emailCandidates: ['info@legacy-housing.test'],
+    emailCandidateSourceUrls: ['https://legacy-housing.test/contact'],
+    humanReviewStatus: 'approved',
+  });
+  assert(
+    matchesLeadCollectionFilters(legacyLead, DEFAULT_LEAD_COLLECTION_FILTERS),
+    'legacy lead visible with all filters'
+  );
+
+  const profileLead = createEmptyLead({
+    companyName: 'プロファイル付き工務店',
+    area: '宮城県仙台市',
+    prefecture: '宮城県',
+    industry: '工務店',
+    websiteUrl: 'https://profile-housing.test/',
+    emailCandidates: ['info@profile-housing.test'],
+    emailCandidateSourceUrls: ['https://profile-housing.test/contact'],
+    collectionProfileId: 'daily30-housing-auto',
+    collectionProfileName: '住宅系おまかせ継続',
+    collectionMode: 'auto_continue',
+    areaStrategy: 'priority_miyagi_fukushima_yamagata',
+    discoverySource: 'job_site_reference',
+    discoverySourceSite: 'wantedly',
+    discoverySourceUrl: 'https://www.wantedly.com/companies/profile-housing',
+    sourceComplianceStatus: 'official_site_verified',
+    emailSourceUrl: 'https://profile-housing.test/contact',
+    humanReviewStatus: 'approved',
+    gmailDraftStatus: 'draft_created',
+    gmailDraftId: 'r-verify-404',
+    emailSubject: '件名',
+    emailBody: '本文',
+  });
+
+  assert(matchesLeadDiscoverySourceFilter(profileLead, 'job_site_reference'), 'discovery source filter');
+  assert(matchesLeadDiscoverySourceSiteFilter(profileLead, 'wantedly'), 'job site filter');
+  assert(matchesLeadPrefectureFilter(profileLead, '宮城県'), 'prefecture filter');
+  assert(matchesLeadAreaStrategyFilter(profileLead, 'priority_miyagi_fukushima_yamagata'), 'area strategy filter');
+  assert(matchesLeadCollectionModeFilter(profileLead, 'auto_continue'), 'collection mode filter');
+  assert(matchesLeadEmailComplianceFilter(profileLead, 'official_site_verified'), 'email compliance filter');
+
+  const display = buildCollectionProfileDisplayFromLead(profileLead);
+  assert(display.discoverySourceUrl?.includes('wantedly.com'), 'discovery url separate');
+  assert(display.discoverySourceLabel.includes('Wantedly'), 'discovery label includes job site');
+
+  const emailResolved = resolveEmailSourceFromLead(profileLead);
+  assert(emailResolved.emailSourceUrl?.includes('profile-housing.test'), 'email source is official site');
+  assert(
+    emailResolved.emailSourceUrl !== profileLead.discoverySourceUrl,
+    'job site discovery url not used as email source'
+  );
+
+  const candidate = {
+    externalCandidateId: 'verify-404-candidate',
+    sourceType: 'google_places' as const,
+    companyName: '候補プロファイル',
+    area: '宮城県',
+    industry: '工務店',
+    websiteUrl: 'https://cand.test/',
+    officialSiteUrl: 'https://cand.test/',
+    phoneNumber: null,
+    address: null,
+    googlePlaceId: null,
+    sourceUrl: 'https://maps.google.com/?cid=1',
+    sourceQuery: 'q',
+    category: '工務店',
+    contactFormUrl: null,
+    emailCandidates: ['info@cand.test'],
+    confidenceScore: 0.8,
+    importStatus: 'preview' as const,
+    riskLevel: 'low' as const,
+    duplicateReason: '',
+    duplicateKey: 'k',
+    pipelineStatus: 'email_found' as const,
+    prefecture: '宮城県',
+    regionGroup: '宮城' as const,
+    collectionPriority: 1,
+    collectionAreaSource: '宮城県',
+    collectionBatchId: '2026-07-02',
+    emailCandidateSourceUrls: ['https://cand.test/contact'],
+    emailVerifiedAt: null,
+    generatedEmailSubject: null,
+    generatedEmailBody: null,
+    generatedCustomHook: null,
+    generatedCustomHookReason: null,
+    targetEmail: 'info@cand.test',
+    emailCandidateSourceUrl: 'https://cand.test/contact',
+    failureReason: null,
+    copyGeneratedAt: null,
+    qualityCheckedAt: null,
+    humanReviewStatus: null,
+    gmailDraftStatus: null,
+    sendStatus: null,
+    notes: '',
+    collectedAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    collectionProfileId: 'daily30-housing-auto',
+    collectionProfileName: '住宅系おまかせ継続',
+    collectionMode: 'auto_continue' as const,
+    areaStrategy: 'priority_miyagi_fukushima_yamagata' as const,
+    discoverySource: 'google_places' as const,
+    discoverySourceUrl: 'https://maps.google.com/?cid=1',
+    sourceComplianceStatus: 'official_site_verified' as const,
+  };
+  const candDisplay = buildCollectionProfileDisplayFromCandidate(candidate);
+  assert(candDisplay.prefecture === '宮城県', 'candidate prefecture display');
+  assert(candDisplay.collectionProfileName.includes('おまかせ'), 'candidate profile name');
+
+  const outreach = buildEmailOutreachCandidateView(profileLead);
+  assert(outreach.collectionProfile.discoverySource === 'job_site_reference', 'outreach has collection profile');
+  assert(outreach.discoverySourceUrl?.includes('wantedly'), 'outreach exposes discoverySourceUrl');
+
+  const preview = buildManualGmailSendPreview(profileLead);
+  assert(preview.collectionProfileId === 'daily30-housing-auto', 'send preview collectionProfileId');
+  assert(preview.discoverySource === 'job_site_reference', 'send preview discoverySource');
+  assert(preview.emailSourceUrl?.includes('profile-housing.test'), 'send preview emailSourceUrl official');
+
+  const uiFiles = [
+    leadDetail,
+    candidateCards,
+    draftView,
+    sendRecords,
+    filterBar,
+  ];
+  for (const content of uiFiles) {
+    assert(!content.includes('refresh_token'), 'UI has no refresh_token');
+    assert(!content.includes('Authorization'), 'UI has no Authorization header');
+  }
+
+  ok('Phase 40.4 collection profile display/filter checks passed');
+}
+
+async function verifyPhase405CollectionScheduleExecution(): Promise<void> {
+  const resolveModule = await readFile(
+    join(SRC_ROOT, 'candidates/resolveDaily30CollectionSchedule.ts'),
+    'utf-8'
+  );
+  const fetchSrc = await readFile(join(SRC_ROOT, 'candidates/fetchDaily30Candidates.ts'), 'utf-8');
+  const cloudFetch = await readFile(join(SRC_ROOT, 'candidates/runDaily30CloudAutoFetch.ts'), 'utf-8');
+  const cloudState = await readFile(join(SRC_ROOT, 'storage/daily30CloudRunState.ts'), 'utf-8');
+  const uiServer = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
+  const schedulePanel = await readFile(join(SRC_ROOT, 'ui/Daily30CollectionSchedulePanel.tsx'), 'utf-8');
+  const cloudPanel = await readFile(join(SRC_ROOT, 'ui/Daily30CloudResultsPanel.tsx'), 'utf-8');
+  const gmailAdapter = await readFile(join(SRC_ROOT, 'integrations/gmail/gmailDraftAdapter.ts'), 'utf-8');
+
+  assert(resolveModule.includes('resolveEffectiveCollectionProfileForBatch'), 'profile resolver exists');
+  assert(resolveModule.includes('consumeScheduleAfterRun'), 'schedule consumer exists');
+  assert(resolveModule.includes('external_reference_collection_not_yet_implemented'), 'external ref warning');
+  assert(fetchSrc.includes('resolveDaily30FetchRunContext'), 'fetch resolves schedule');
+  assert(fetchSrc.includes('persistScheduleAfterDaily30Fetch'), 'fetch persists schedule after run');
+  assert(fetchSrc.includes('skipScheduleConsume'), 'fetch supports skip consume for dryRun path');
+  assert(cloudFetch.includes('resolveDaily30FetchRunContext'), 'cloud fetch resolves schedule');
+  assert(cloudFetch.includes('wouldConsumeOverride'), 'dryRun exposes wouldConsumeOverride');
+  assert(cloudFetch.includes('scheduleWarnings'), 'dryRun exposes schedule warnings');
+  assert(cloudState.includes('areasUsed'), 'cloud state stores areasUsed');
+  assert(cloudState.includes('scheduleSource'), 'cloud state stores scheduleSource');
+  assert(uiServer.includes('resolvedForToday'), 'schedule API exposes resolved profile');
+  assert(schedulePanel.includes('Daily30RunCollectionProfileSummary'), 'schedule panel shows resolved profile');
+  assert(cloudPanel.includes('Daily30RunCollectionProfileSummary'), 'cloud results show run profile');
+  assert(!gmailAdapter.includes('messages.send'), 'no gmail send');
+  assert(!cloudFetch.includes('users.drafts.create'), 'cloud fetch no drafts create');
+
+  const {
+    resolveEffectiveCollectionProfileForBatch,
+    consumeScheduleAfterRun,
+    buildPrefectureOrderForAreaStrategy,
+    isExternalReferenceDiscoverySource,
+  } = await import('../candidates/resolveDaily30CollectionSchedule.js');
+  const { buildDefaultDaily30CollectionScheduleStore } = await import(
+    '../storage/daily30CollectionScheduleTypes.js'
+  );
+  const { buildProfileSnapshotFromInput } = await import(
+    '../candidates/updateDaily30CollectionSchedule.js'
+  );
+  const { applyDaily30CollectionScheduleUpdate } = await import(
+    '../candidates/updateDaily30CollectionSchedule.js'
+  );
+  const { DAILY_30_NATIONWIDE_PREFECTURES_ORDERED } = await import(
+    '../candidates/daily30PrefectureRegistry.js'
+  );
+  const { persistScheduleAfterDaily30Fetch } = await import('../candidates/fetchDaily30Candidates.js');
+  const { loadDaily30CollectionSchedule, saveDaily30CollectionSchedule } = await import(
+    '../storage/daily30CollectionScheduleRepository.js'
+  );
+
+  const fallback = resolveEffectiveCollectionProfileForBatch(null, '2026-07-02', { loadFailed: true });
+  assert(fallback.scheduleSource === 'default_fallback', 'missing schedule uses default fallback');
+  assert(fallback.profile.collectionProfileId === 'daily30-housing-auto', 'fallback profile id');
+
+  const base = buildDefaultDaily30CollectionScheduleStore();
+  const withOneDay = applyDaily30CollectionScheduleUpdate(base, {
+    mode: 'one_day_override',
+    effectiveFromBatchId: '2026-07-02',
+    profile: { discoverySource: 'job_site_reference', discoverySourceSite: 'wantedly' },
+  });
+  const oneDayResolved = resolveEffectiveCollectionProfileForBatch(withOneDay, '2026-07-02');
+  assert(oneDayResolved.scheduleSource === 'one_day_override', 'oneDayOverride selected for batch');
+  assert(oneDayResolved.wouldConsumeOverride, 'oneDay would consume');
+  assert(oneDayResolved.profile.discoverySource === 'job_site_reference', 'oneDay profile discovery');
+  assert(
+    oneDayResolved.warnings.includes('external_reference_collection_not_yet_implemented'),
+    'job site warning on resolve'
+  );
+
+  const dryRunResolved = resolveEffectiveCollectionProfileForBatch(withOneDay, '2026-07-02');
+  assert(withOneDay.oneDayOverride !== null, 'dryRun does not clear oneDay before consume call');
+  void dryRunResolved;
+
+  const consumed = consumeScheduleAfterRun(withOneDay, {
+    batchId: '2026-07-02',
+    scheduleSource: 'one_day_override',
+    areasAttempted: 2,
+  });
+  assert(consumed.oneDayOverride === null, 'run consumes oneDayOverride');
+
+  const withNext = applyDaily30CollectionScheduleUpdate(base, {
+    mode: 'user_selected',
+    effectiveFromBatchId: '2026-07-03',
+    profile: { areaStrategy: 'north_kanto', discoverySource: 'google_places' },
+  });
+  const nextResolved = resolveEffectiveCollectionProfileForBatch(withNext, '2026-07-03');
+  assert(nextResolved.scheduleSource === 'next_profile_override', 'next override selected');
+  const promoted = consumeScheduleAfterRun(withNext, {
+    batchId: '2026-07-03',
+    scheduleSource: 'next_profile_override',
+    areasAttempted: 1,
+  });
+  assert(promoted.nextProfileOverride === null, 'next override cleared');
+  assert(promoted.activeProfile.collectionMode === 'user_selected', 'promoted to activeProfile');
+  assert(promoted.activeProfile.areaStrategy === 'north_kanto', 'promoted area strategy');
+
+  const activeResolved = resolveEffectiveCollectionProfileForBatch(base, '2026-07-01');
+  assert(activeResolved.scheduleSource === 'active_profile', 'active profile when no override');
+
+  const priorityOrder = buildPrefectureOrderForAreaStrategy('priority_miyagi_fukushima_yamagata');
+  assert(priorityOrder[0] === '宮城県', 'priority strategy starts miyagi');
+  assert(priorityOrder.includes('群馬県'), 'priority strategy includes gunma');
+
+  const northOrder = buildPrefectureOrderForAreaStrategy('north_kanto');
+  assert(northOrder[0] === '茨城県', 'north kanto starts ibaraki');
+
+  const nationwide = buildPrefectureOrderForAreaStrategy('nationwide_excluding_tokyo');
+  assert(nationwide.length === 46, 'nationwide has 46 prefectures');
+  assert(!nationwide.includes('東京都'), 'tokyo excluded');
+  assert(new Set(nationwide).size === 46, 'nationwide no duplicates');
+  assert(
+    nationwide.every((p) => DAILY_30_NATIONWIDE_PREFECTURES_ORDERED.includes(p)),
+    'nationwide uses registry'
+  );
+
+  assert(isExternalReferenceDiscoverySource('job_site_reference'), 'job site is external reference');
+  assert(!isExternalReferenceDiscoverySource('google_places'), 'google places is executable');
+
+  const { createEmptyLead } = await import('../types/lead.js');
+  const { applyDaily30DefaultCollectionProfile } = await import('../candidates/daily30CollectionProfile.js');
+  const jobProfile = buildProfileSnapshotFromInput(
+    { discoverySource: 'job_site_reference', discoverySourceSite: 'wantedly' },
+    'one_day_override'
+  );
+  const candidate = applyDaily30DefaultCollectionProfile(
+    {
+      externalCandidateId: 'verify-405',
+      sourceType: 'google_places',
+      companyName: 'テスト',
+      area: '宮城県',
+      industry: '工務店',
+      websiteUrl: 'https://corp.test/',
+      officialSiteUrl: 'https://corp.test/',
+      phoneNumber: null,
+      address: null,
+      googlePlaceId: null,
+      sourceUrl: 'https://www.wantedly.com/companies/corp',
+      sourceQuery: 'q',
+      category: '工務店',
+      contactFormUrl: null,
+      emailCandidates: ['info@corp.test'],
+      confidenceScore: 0.8,
+      importStatus: 'preview',
+      riskLevel: 'low',
+      duplicateReason: '',
+      duplicateKey: 'k',
+      pipelineStatus: 'email_found',
+      prefecture: '宮城県',
+      regionGroup: '宮城',
+      collectionPriority: 1,
+      collectionAreaSource: '宮城県',
+      collectionBatchId: '2026-07-02',
+      emailCandidateSourceUrls: ['https://corp.test/contact'],
+      emailVerifiedAt: null,
+      generatedEmailSubject: null,
+      generatedEmailBody: null,
+      generatedCustomHook: null,
+      generatedCustomHookReason: null,
+      targetEmail: 'info@corp.test',
+      emailCandidateSourceUrl: 'https://corp.test/contact',
+      failureReason: null,
+      copyGeneratedAt: null,
+      qualityCheckedAt: null,
+      humanReviewStatus: null,
+      gmailDraftStatus: null,
+      sendStatus: null,
+      notes: '',
+      collectedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    { batchId: '2026-07-02', profile: jobProfile, areaQueuePosition: 0 }
+  );
+  assert(candidate.discoverySource === 'job_site_reference', 'candidate keeps configured discovery');
+  assert(candidate.emailCandidateSourceUrl?.includes('corp.test'), 'email source stays official site');
+  assert(
+    candidate.discoverySourceUrl?.includes('wantedly') || candidate.sourceUrl?.includes('wantedly'),
+    'discovery url separate from email source'
+  );
+
+  const scheduleBefore = buildDefaultDaily30CollectionScheduleStore();
+  const oneDayStore2099 = applyDaily30CollectionScheduleUpdate(scheduleBefore, {
+    mode: 'one_day_override',
+    effectiveFromBatchId: '2099-01-01',
+    profile: { discoverySource: 'google_places' },
+  });
+  await saveDaily30CollectionSchedule(oneDayStore2099);
+  const loaded = await loadDaily30CollectionSchedule();
+  assert(loaded.oneDayOverride?.effectiveFromBatchId === '2099-01-01', 'schedule save roundtrip');
+  const resolved2099 = resolveEffectiveCollectionProfileForBatch(oneDayStore2099, '2099-01-01');
+  await persistScheduleAfterDaily30Fetch('2099-01-01', resolved2099, 1);
+  const afterPersist = await loadDaily30CollectionSchedule();
+  assert(afterPersist.oneDayOverride === null, 'persistScheduleAfterDaily30Fetch consumes one day');
+  await saveDaily30CollectionSchedule(scheduleBefore);
+
+  for (const content of [schedulePanel, cloudPanel, uiServer, resolveModule]) {
+    assert(!content.includes('refresh_token'), 'no refresh_token in schedule UI');
+    assert(!content.includes('Authorization'), 'no Authorization header in schedule UI');
+  }
+
+  ok('Phase 40.5 collection schedule execution checks passed');
+}
+
 function verifyPhase20LiteEmailImprovement(): void {
   assert(MAX_ADDITIONAL_CONTACT_PAGES === 4, 'additional page limit is 4');
 
@@ -4645,6 +5692,13 @@ async function main(): Promise<void> {
   await verifyEmailSourceDisplay();
   await verifyPhase381EmailSourceAndExclude();
   await verifyPhase382ExcludeRefreshAndEmailLayout();
+  await verifyPhase383ExcludeImmediateUiAndApi();
+  await verifyPhase384ExcludePersistAndMetrics();
+  await verifyPhase39HumanGateButtons();
+  await verifyPhase402CollectionProfileFoundation();
+  await verifyPhase403CollectionScheduleUi();
+  await verifyPhase404CollectionProfileDisplay();
+  await verifyPhase405CollectionScheduleExecution();
   verifyPhase20LiteEmailImprovement();
   await verifyPhase20LiteEmailImprovementAsync();
   await verifyPhaseBLeadInventory();

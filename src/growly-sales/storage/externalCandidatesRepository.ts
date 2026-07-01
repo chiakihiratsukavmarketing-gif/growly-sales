@@ -6,6 +6,7 @@ import { isGcsStorageBackend } from '../config/storageBackend.js';
 import { getExternalCandidatesCsvPath, getExternalCandidatesJsonPath } from '../config/paths.js';
 import { EXTERNAL_CANDIDATES_JSON } from './jsonDocumentNames.js';
 import { readJsonDocument, writeJsonDocument } from './jsonDocumentStorage.js';
+import { localReadJson, localWriteJson } from './localJsonStorage.js';
 
 const EMPTY_STORE: ExternalCandidatesStore = {
   candidates: [],
@@ -19,10 +20,17 @@ function escapeCsv(value: string): string {
 }
 
 export async function loadExternalCandidatesFromJson(
-  _filePath = getExternalCandidatesJsonPath()
+  filePath?: string
 ): Promise<ExternalLeadCandidate[]> {
+  const canonicalPath = getExternalCandidatesJsonPath();
+  const resolvedPath = filePath ?? canonicalPath;
   try {
-    const raw = await readJsonDocument(EXTERNAL_CANDIDATES_JSON);
+    let raw: string | null;
+    if (filePath && resolvedPath !== canonicalPath) {
+      raw = await localReadJson(resolvedPath);
+    } else {
+      raw = await readJsonDocument(EXTERNAL_CANDIDATES_JSON);
+    }
     if (!raw) return [];
     const parsed = JSON.parse(raw) as ExternalCandidatesStore | ExternalLeadCandidate[];
     if (Array.isArray(parsed)) return enrichExternalLeadCandidates(parsed);
@@ -38,16 +46,27 @@ export async function loadExternalCandidatesFromJson(
 
 export async function saveExternalCandidatesToJson(
   candidates: ExternalLeadCandidate[],
-  filePath = getExternalCandidatesJsonPath(),
+  filePath?: string,
   note = EMPTY_STORE.note
 ): Promise<void> {
-  void filePath;
+  const canonicalPath = getExternalCandidatesJsonPath();
+  const resolvedPath = filePath ?? canonicalPath;
   const store: ExternalCandidatesStore = {
     candidates,
     updatedAt: new Date().toISOString(),
     note,
   };
-  await writeJsonDocument(EXTERNAL_CANDIDATES_JSON, JSON.stringify(store, null, 2));
+  const jsonText = JSON.stringify(store, null, 2);
+  if (filePath && resolvedPath !== canonicalPath) {
+    await localWriteJson(resolvedPath, jsonText);
+    return;
+  }
+  await writeJsonDocument(EXTERNAL_CANDIDATES_JSON, jsonText);
+}
+
+/** 保存後に canonical ストレージから再読み込み（永続化確認用） */
+export async function reloadExternalCandidatesFromStorage(): Promise<ExternalLeadCandidate[]> {
+  return loadExternalCandidatesFromJson();
 }
 
 export async function saveExternalCandidatesToCsv(

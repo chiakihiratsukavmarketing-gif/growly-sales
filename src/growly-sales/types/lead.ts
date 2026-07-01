@@ -48,6 +48,15 @@ export const SEND_STATUSES: readonly SendStatus[] = [
   'blocked',
 ];
 
+import type {
+  Daily30AreaStrategy,
+  Daily30CollectionMode,
+  Daily30DiscoverySource,
+  Daily30DiscoverySourceSite,
+  Daily30IndustryCategory,
+  Daily30SourceComplianceStatus,
+} from '../candidates/daily30CollectionProfile.js';
+
 export type ReplyStatus =
   | 'none'
   | 'no_reply'
@@ -199,6 +208,20 @@ export interface Lead {
   source?: string | null;
   /** Phase 23: Daily 30 パイプライン状態 */
   daily30PipelineStatus?: Daily30PipelineStatus | null;
+  /** Phase 40.2: 収集プロファイル（optional・後方互換） */
+  collectionProfileId?: string | null;
+  collectionProfileName?: string | null;
+  collectionMode?: Daily30CollectionMode | null;
+  industryCategory?: Daily30IndustryCategory | null;
+  areaStrategy?: Daily30AreaStrategy | null;
+  areaQueuePosition?: number | null;
+  discoverySource?: Daily30DiscoverySource | null;
+  discoverySourceSite?: Daily30DiscoverySourceSite | null;
+  discoverySourceLabel?: string | null;
+  discoverySourceUrl?: string | null;
+  sourceComplianceStatus?: Daily30SourceComplianceStatus | null;
+  sourceComplianceNote?: string | null;
+  collectionRunId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -272,6 +295,19 @@ export function createEmptyLead(partial: Partial<Lead> & Pick<Lead, 'companyName
     collectionBatchId: null,
     source: null,
     daily30PipelineStatus: null,
+    collectionProfileId: null,
+    collectionProfileName: null,
+    collectionMode: null,
+    industryCategory: null,
+    areaStrategy: null,
+    areaQueuePosition: null,
+    discoverySource: null,
+    discoverySourceSite: null,
+    discoverySourceLabel: null,
+    discoverySourceUrl: null,
+    sourceComplianceStatus: null,
+    sourceComplianceNote: null,
+    collectionRunId: null,
     createdAt: now,
     updatedAt: now,
     ...partial,

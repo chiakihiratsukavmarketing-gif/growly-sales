@@ -5,7 +5,7 @@ import { loadTargetProfile } from '../config/targetProfile.js';
 import { loadOfferProfile } from '../config/offerProfile.js';
 import { isExternalFetchConfigured } from '../config/env.js';
 import { buildDaily30Dashboard, describeDaily30AreaExpansion } from '../candidates/buildDaily30Dashboard.js';
-import { fetchDaily30Candidates, buildDaily30FetchPlan } from '../candidates/fetchDaily30Candidates.js';
+import { fetchDaily30Candidates, buildDaily30FetchPlanAsync } from '../candidates/fetchDaily30Candidates.js';
 import { FETCH_DAILY_30_CONFIRM_TOKEN, GENERATE_DAILY_30_COPY_CONFIRM_TOKEN, IMPORT_DAILY_30_DRAFT_CANDIDATES_CONFIRM_TOKEN } from '../scripts/externalCandidateCliTokens.js';
 import { REPLY_MANAGEMENT_API_STATUSES } from '../workflow/replyManagementValidation.js';
 import {
@@ -63,7 +63,23 @@ import {
   excludeDaily30Candidate,
   filterDaily30VisibleCandidates,
   isDaily30HumanExcludedCandidate,
+  toExcludeFailureResponse,
 } from '../workflow/excludeDaily30Candidate.js';
+import { ensureProjectEnvLoaded } from '../config/env.js';
+import { describeStorageBackendStatus } from '../config/storageBackend.js';
+import { getTomorrowBatchIdJst, todayBatchIdJst } from '../candidates/daily30AreaConfig.js';
+import {
+  resolveEffectiveCollectionProfileForBatch,
+  formatScheduleSourceLabel,
+} from '../candidates/resolveDaily30CollectionSchedule.js';
+import {
+  loadDaily30CollectionSchedule,
+  saveDaily30CollectionSchedule,
+} from '../storage/daily30CollectionScheduleRepository.js';
+import {
+  applyDaily30CollectionScheduleUpdate,
+  type Daily30ScheduleUpdateInput,
+} from '../candidates/updateDaily30CollectionSchedule.js';
 import {
   markDealStatus,
   markFollowUpNeeded,
@@ -416,7 +432,13 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
     }
 
     if (req.method === 'POST' && pathname === '/api/daily30-candidates/exclude') {
-      const body = await readJsonBody<{ candidateId?: string; reason?: string }>(req);
+      const body = await readJsonBody<{
+        candidateId?: string;
+        reason?: string;
+        companyName?: string;
+        email?: string;
+        officialSiteUrl?: string;
+      }>(req);
       const candidateId = body.candidateId?.trim();
       const reason = body.reason?.trim() ?? '';
       if (!candidateId) {
@@ -424,18 +446,29 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
         return;
       }
       try {
-        const result = await excludeDaily30Candidate(candidateId, reason);
+        const result = await excludeDaily30Candidate(candidateId, reason, {
+          lookupHints: {
+            companyName: body.companyName?.trim(),
+            email: body.email?.trim(),
+            officialSiteUrl: body.officialSiteUrl?.trim(),
+          },
+        });
         sendJson(res, 200, {
           ...result,
           generatedAt: new Date().toISOString(),
           message: '候補を除外しました（論理削除・既存Leadは削除していません）',
         });
       } catch (err) {
+        const failure = toExcludeFailureResponse(err);
+        if (failure.errorCode === 'EXCLUDE_PERSIST_FAILED') {
+          sendJson(res, 409, failure);
+          return;
+        }
         sendApiError(
           res,
           400,
           pathname,
-          err instanceof Error ? err.message : '候補の除外に失敗しました'
+          failure.safeMessage
         );
       }
       return;
@@ -475,28 +508,80 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
       return;
     }
 
+    if (req.method === 'GET' && pathname === '/api/daily30-collection-schedule') {
+      const schedule = await loadDaily30CollectionSchedule();
+      const todayBatchId = todayBatchIdJst();
+      const resolvedForToday = resolveEffectiveCollectionProfileForBatch(schedule, todayBatchId);
+      const resolvedForTomorrow = resolveEffectiveCollectionProfileForBatch(
+        schedule,
+        getTomorrowBatchIdJst()
+      );
+      sendJson(res, 200, {
+        schedule,
+        nextEffectiveBatchId: getTomorrowBatchIdJst(),
+        resolvedForToday,
+        resolvedForTomorrow,
+        generatedAt: new Date().toISOString(),
+        note: '収集スケジュール。Cloud Run / 手動 FETCH は当日 batchId で profile を解決して実行します。',
+      });
+      return;
+    }
+
+    if (req.method === 'POST' && pathname === '/api/daily30-collection-schedule') {
+      const body = await readJsonBody<Daily30ScheduleUpdateInput>(req);
+      if (!body.mode?.trim()) {
+        sendApiError(res, 400, pathname, 'mode が必要です');
+        return;
+      }
+      try {
+        const current = await loadDaily30CollectionSchedule();
+        const updated = applyDaily30CollectionScheduleUpdate(current, body);
+        await saveDaily30CollectionSchedule(updated);
+        sendJson(res, 200, {
+          schedule: updated,
+          message: '収集スケジュールを保存しました。次回 Daily 30 実行時に反映されます。',
+          generatedAt: new Date().toISOString(),
+        });
+      } catch (err) {
+        sendApiError(
+          res,
+          500,
+          pathname,
+          err instanceof Error ? err.message : '収集スケジュールの保存に失敗しました'
+        );
+      }
+      return;
+    }
+
     if (req.method === 'GET' && pathname === '/api/daily30-dashboard') {
       const leads = await loadLeadsOptionalForDaily30();
       const cloudDashboard = await buildDaily30CloudDashboardPayload(leads);
-      const candidates = cloudDashboard.candidates;
+      const allCandidates = cloudDashboard.allCandidates;
+      const visibleCandidates = cloudDashboard.candidates;
       const cloudRunEntry = await getCloudRunEntryForBatch(cloudDashboard.batchId);
       const dashboard = buildDaily30Dashboard(
-        candidates,
+        allCandidates,
         leads,
         cloudDashboard.batchId,
         cloudRunEntry
       );
-      const draftPipeline = buildDaily30DraftPipelineProgress(candidates, leads, dashboard.batchId);
-      const operations = buildDaily30OperationsSummary(candidates, leads, dashboard.batchId);
-      const plan = buildDaily30FetchPlan();
-      const visibleCandidates = filterDaily30VisibleCandidates(candidates);
+      const draftPipeline = buildDaily30DraftPipelineProgress(
+        allCandidates,
+        leads,
+        dashboard.batchId
+      );
+      const operations = buildDaily30OperationsSummary(
+        allCandidates,
+        leads,
+        dashboard.batchId
+      );
+      const plan = await buildDaily30FetchPlanAsync(cloudDashboard.batchId);
       const emailFoundForHints = visibleCandidates.filter((c) => c.pipelineStatus === 'email_found');
       const approvalBlockHints = buildDaily30LeadApprovalBlockHints(
         emailFoundForHints,
         leads,
-        candidates
+        allCandidates
       );
-      const humanExcludedCount = candidates.filter(isDaily30HumanExcludedCandidate).length;
       sendJson(res, 200, {
         ...cloudDashboard,
         dashboard,
@@ -505,7 +590,7 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
         areaExpansion: describeDaily30AreaExpansion(),
         plan,
         approvalBlockHints,
-        humanExcludedCount,
+        humanExcludedCount: dashboard.humanExcludedCount,
         generatedAt: new Date().toISOString(),
         note: 'Daily 30 集計。Gmail送信・下書き自動作成は行いません。',
       });
@@ -841,7 +926,9 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
 }
 
 export function startUiServer(): void {
+  ensureProjectEnvLoaded();
   const info = getGrowlySalesPathInfo();
+  const storage = describeStorageBackendStatus();
 
   const server = createServer((req, res) => {
     void handleUiRequest(req, res);
@@ -853,8 +940,9 @@ export function startUiServer(): void {
     console.log(`  Project root: ${info.projectRoot}`);
     console.log(`  Leads path:   ${info.leadsPath}`);
     console.log(`  Drafts path:  ${info.draftsDir}`);
+    console.log(`  Storage:      ${storage.backend} (${storage.externalCandidatesUri})`);
     console.log(`  CWD:          ${info.cwd}`);
     console.log(`  Reply API:    ${REPLY_MANAGEMENT_API_STATUSES.join(', ')}`);
-    console.log('  自動送信なし / ローカルJSON保存のみ');
+    console.log('  自動送信なし / 候補は GROWLY_STORAGE_BACKEND に従って保存');
   });
 }

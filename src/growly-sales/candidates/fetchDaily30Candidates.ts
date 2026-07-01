@@ -10,9 +10,20 @@ import { isApiProductionEnabled } from '../config/env.js';
 import {
   DAILY_30_AREA_EXPANSION,
   buildDaily30QueriesForArea,
-  todayBatchId,
+  filterDaily30ExecutionAreas,
+  todayBatchIdJst,
   type Daily30AreaSpec,
 } from './daily30AreaConfig.js';
+import { applyDaily30DefaultCollectionProfile } from './daily30CollectionProfile.js';
+import {
+  loadDaily30CollectionSchedule,
+  saveDaily30CollectionSchedule,
+} from '../storage/daily30CollectionScheduleRepository.js';
+import {
+  consumeScheduleAfterRun,
+  resolveEffectiveCollectionProfileForBatch,
+  type ResolvedDaily30CollectionRunContext,
+} from './resolveDaily30CollectionSchedule.js';
 import {
   DAILY_30_MAX_COLLECTED_CANDIDATES,
   DAILY_30_MAX_DURATION_MS,
@@ -47,9 +58,11 @@ export interface Daily30FetchStats {
   duplicates: number;
   emailChecksRun: number;
   areasUsed: string[];
+  areasAttempted: number;
   reachedTarget: boolean;
   stoppedReason: Daily30StoppedReason;
   durationMs: number;
+  runContext?: ResolvedDaily30CollectionRunContext;
 }
 
 function extractCompanyNameFromWebResult(title: string, url: string): string {
@@ -198,19 +211,63 @@ async function verifyPendingBatchCandidates(input: {
   return { workingCandidates, emailChecksRun };
 }
 
+export interface Daily30FetchOptions {
+  batchId?: string;
+  verifyEmails?: boolean;
+  collectionRunId?: string | null;
+  /** 事前解決済み run context（dryRun プレビュー等） */
+  runContext?: ResolvedDaily30CollectionRunContext;
+  /** true のとき schedule 消費をスキップ（呼び出し側で制御） */
+  skipScheduleConsume?: boolean;
+}
+
+export async function resolveDaily30FetchRunContext(
+  batchId: string
+): Promise<ResolvedDaily30CollectionRunContext> {
+  try {
+    const schedule = await loadDaily30CollectionSchedule();
+    return resolveEffectiveCollectionProfileForBatch(schedule, batchId);
+  } catch {
+    return resolveEffectiveCollectionProfileForBatch(null, batchId, { loadFailed: true });
+  }
+}
+
+export async function persistScheduleAfterDaily30Fetch(
+  batchId: string,
+  runContext: ResolvedDaily30CollectionRunContext,
+  areasAttempted: number
+): Promise<void> {
+  try {
+    const schedule = await loadDaily30CollectionSchedule();
+    const updated = consumeScheduleAfterRun(schedule, {
+      batchId,
+      scheduleSource: runContext.scheduleSource,
+      areasAttempted,
+    });
+    await saveDaily30CollectionSchedule(updated);
+  } catch {
+    // schedule 更新失敗で収集結果を落とさない
+  }
+}
+
 export async function fetchDaily30Candidates(
   profile: TargetProfile,
   existingLeads: Lead[],
   existingCandidates: ExternalLeadCandidate[] = [],
-  options?: { batchId?: string; verifyEmails?: boolean }
+  options?: Daily30FetchOptions
 ): Promise<{ candidates: ExternalLeadCandidate[]; stats: Daily30FetchStats }> {
   if (!isApiProductionEnabled()) {
     throw new Error('API_PRODUCTION_ENABLED is not true');
   }
 
   const startedMs = Date.now();
-  const batchId = options?.batchId ?? todayBatchId();
+  const batchId = options?.batchId ?? todayBatchIdJst();
   const verifyEmails = options?.verifyEmails !== false;
+  const runContext =
+    options?.runContext ?? (await resolveDaily30FetchRunContext(batchId));
+  const profileSnapshot = runContext.profile;
+  const executionAreas = runContext.plannedAreas;
+  let areasAttempted = 0;
 
   let workingCandidates = [...existingCandidates];
   const initialCount = workingCandidates.length;
@@ -235,9 +292,11 @@ export async function fetchDaily30Candidates(
         placesResults,
         webResults,
         areasUsed,
+        areasAttempted,
         emailChecksRun,
         stoppedReason,
         startedMs,
+        runContext,
       }),
     };
   }
@@ -268,14 +327,16 @@ export async function fetchDaily30Candidates(
         placesResults,
         webResults,
         areasUsed,
+        areasAttempted,
         emailChecksRun,
         stoppedReason,
         startedMs,
+        runContext,
       }),
     };
   }
 
-  for (const area of DAILY_30_AREA_EXPANSION) {
+  for (const area of executionAreas) {
     const metricsBeforeArea = countDaily30BatchMetrics(workingCandidates, batchId);
     const limitStop = shouldStopCollection({ metrics: metricsBeforeArea, startedMs, placesResults });
     if (limitStop) {
@@ -284,6 +345,7 @@ export async function fetchDaily30Candidates(
     }
 
     areasUsed.push(area.prefecture);
+    areasAttempted += 1;
 
     const { raw, queriesRun: q, placesResults: p, webResults: w } = await fetchAreaCandidates(
       area,
@@ -302,7 +364,16 @@ export async function fetchDaily30Candidates(
 
     const metrics = countDaily30BatchMetrics(workingCandidates, batchId);
     const room = DAILY_30_MAX_COLLECTED_CANDIDATES - metrics.totalCollected;
-    const toAdd = enrichExternalLeadCandidates(accepted.slice(0, Math.max(0, room)));
+    const toAdd = enrichExternalLeadCandidates(
+      accepted.slice(0, Math.max(0, room)).map((c) =>
+        applyDaily30DefaultCollectionProfile(c, {
+          batchId,
+          areaQueuePosition: area.collectionPriority - 1,
+          collectionRunId: options?.collectionRunId ?? null,
+          profile: profileSnapshot,
+        })
+      )
+    );
 
     for (const c of toAdd) {
       workingCandidates = upsertCandidate(workingCandidates, c);
@@ -328,7 +399,7 @@ export async function fetchDaily30Candidates(
     }
   }
 
-  if (areasUsed.length >= DAILY_30_AREA_EXPANSION.length) {
+  if (areasUsed.length >= executionAreas.length) {
     areasExhausted = true;
   }
 
@@ -342,13 +413,11 @@ export async function fetchDaily30Candidates(
       placesResults,
       areasExhausted,
       areasUsedCount: areasUsed.length,
-      totalAreas: DAILY_30_AREA_EXPANSION.length,
+      totalAreas: executionAreas.length,
     });
   }
 
-  return {
-    candidates: workingCandidates,
-    stats: buildFetchStats({
+  const stats = buildFetchStats({
       batchId,
       workingCandidates,
       initialCount,
@@ -356,10 +425,20 @@ export async function fetchDaily30Candidates(
       placesResults,
       webResults,
       areasUsed,
+      areasAttempted,
       emailChecksRun,
       stoppedReason,
       startedMs,
-    }),
+      runContext,
+    });
+
+  if (!options?.skipScheduleConsume && areasAttempted > 0) {
+    await persistScheduleAfterDaily30Fetch(batchId, runContext, areasAttempted);
+  }
+
+  return {
+    candidates: workingCandidates,
+    stats,
   };
 }
 
@@ -371,9 +450,11 @@ function buildFetchStats(input: {
   placesResults: number;
   webResults: number;
   areasUsed: string[];
+  areasAttempted: number;
   emailChecksRun: number;
   stoppedReason: Daily30StoppedReason;
   startedMs: number;
+  runContext: ResolvedDaily30CollectionRunContext;
 }): Daily30FetchStats {
   const metrics = countDaily30BatchMetrics(input.workingCandidates, input.batchId);
   const acceptedNew = Math.max(0, input.workingCandidates.length - input.initialCount);
@@ -398,9 +479,33 @@ function buildFetchStats(input: {
     duplicates: metrics.duplicates,
     emailChecksRun: input.emailChecksRun,
     areasUsed: input.areasUsed,
+    areasAttempted: input.areasAttempted,
     reachedTarget: metrics.reachedTarget,
     stoppedReason: input.stoppedReason,
     durationMs: Date.now() - input.startedMs,
+    runContext: input.runContext,
+  };
+}
+
+/** dry-run: schedule 解決済みエリアプラン（外部APIなし） */
+export async function buildDaily30FetchPlanAsync(
+  batchId: string = todayBatchIdJst()
+): Promise<{
+  target: number;
+  targetEmailFound: number;
+  maxCollectedCandidates: number;
+  areas: Daily30AreaSpec[];
+  note: string;
+  runContext: ResolvedDaily30CollectionRunContext;
+}> {
+  const runContext = await resolveDaily30FetchRunContext(batchId);
+  return {
+    target: DAILY_30_TARGET_EMAIL_FOUND,
+    targetEmailFound: DAILY_30_TARGET_EMAIL_FOUND,
+    maxCollectedCandidates: DAILY_30_MAX_COLLECTED_CANDIDATES,
+    areas: runContext.plannedAreas,
+    note: '収集スケジュールに基づくエリア順。東京都は対象外。FETCH_DAILY_30 明示時のみ実行。',
+    runContext,
   };
 }
 
@@ -416,7 +521,7 @@ export function buildDaily30FetchPlan(): {
     target: DAILY_30_TARGET_EMAIL_FOUND,
     targetEmailFound: DAILY_30_TARGET_EMAIL_FOUND,
     maxCollectedCandidates: DAILY_30_MAX_COLLECTED_CANDIDATES,
-    areas: [...DAILY_30_AREA_EXPANSION],
-    note: '宮城で email_found 不足時に福島→北関東（茨城→栃木→群馬）へ拡大。FETCH_DAILY_30 明示時のみ実行。',
+    areas: filterDaily30ExecutionAreas(DAILY_30_AREA_EXPANSION),
+    note: '宮城→福島→山形→北関東（茨城→栃木→群馬）へ拡大。東京都は対象外。FETCH_DAILY_30 明示時のみ実行。',
   };
 }

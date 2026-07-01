@@ -1,7 +1,7 @@
 import type { Lead } from '../types/lead.js';
 import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTypes.js';
 import { DAILY_30_TARGET } from './daily30CandidateStatus.js';
-import { todayBatchId } from './daily30AreaConfig.js';
+import { todayBatchIdJst } from './daily30AreaConfig.js';
 import { isDaily30ReadyForDraftImportCandidate } from './getDaily30DraftImportBlockReason.js';
 import { selectGmailDraftTabLeads } from '../outreach/outreachPolicy.js';
 
@@ -29,7 +29,7 @@ function isTodayBatchCandidate(c: ExternalLeadCandidate, batchId: string): boole
 export function buildDaily30DraftPipelineProgress(
   candidates: ExternalLeadCandidate[],
   leads: Lead[],
-  batchId = todayBatchId()
+  batchId = todayBatchIdJst()
 ): Daily30DraftPipelineProgress {
   const todayCandidates = candidates.filter((c) => isTodayBatchCandidate(c, batchId));
   const readyForDraftExternal = todayCandidates.filter(

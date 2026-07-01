@@ -1,3 +1,4 @@
+import { useCallback, useState } from 'react';
 import { SectionCard } from './SectionCard.js';
 import { SummaryStatCard } from './SummaryStatCard.js';
 import { Daily30CloudResultsPanel } from './Daily30CloudResultsPanel.js';
@@ -5,6 +6,7 @@ import { Daily30LeadCandidatesPanel } from './Daily30LeadCandidatesPanel.js';
 import { Daily30DraftImportPanel } from './Daily30DraftImportPanel.js';
 import { PageHeader } from './common/PageHeader.js';
 import { DevDetails } from './common/DevDetails.js';
+import { Daily30CollectionSchedulePanel } from './Daily30CollectionSchedulePanel.js';
 import type { Daily30DashboardResponse } from './daily30Api.js';
 import { Daily30OperationsPanel, Daily30SafetyRulesPanel } from './Daily30OperationsPanel.js';
 import { Daily30CloudStatusPanel } from './Daily30CloudStatusPanel.js';
@@ -27,6 +29,19 @@ export function CandidateCollectionView({
   refreshKey = 0,
   onDataChanged,
 }: CandidateCollectionViewProps) {
+  const [sessionExcludedIds, setSessionExcludedIds] = useState<ReadonlySet<string>>(
+    () => new Set()
+  );
+
+  const markExcluded = useCallback((candidateId: string) => {
+    setSessionExcludedIds((prev) => {
+      if (prev.has(candidateId)) return prev;
+      const next = new Set(prev);
+      next.add(candidateId);
+      return next;
+    });
+  }, []);
+
   const d = daily30?.dashboard;
   const cloudOk = daily30?.ok !== false && !daily30Loading;
   const target = d?.targetEmailFound ?? d?.target ?? 30;
@@ -85,12 +100,22 @@ export function CandidateCollectionView({
         ) : null}
       </SectionCard>
 
+      <SectionCard title="明日の収集設定" className="candidate-collection-schedule">
+        <Daily30CollectionSchedulePanel
+          onError={onError}
+          onSuccess={onSuccess}
+          refreshKey={refreshKey}
+        />
+      </SectionCard>
+
       <SectionCard title="1. 収集結果">
         <Daily30CloudResultsPanel
           onError={onError}
           onSuccess={onSuccess}
           refreshKey={refreshKey}
           onChanged={onDataChanged}
+          sessionExcludedIds={sessionExcludedIds}
+          onMarkExcluded={markExcluded}
         />
         <DevDetails title="手動実行（開発者向け）">
           <Daily30DashboardPanel
@@ -107,6 +132,8 @@ export function CandidateCollectionView({
           onSuccess={onSuccess}
           refreshKey={refreshKey}
           onChanged={onDataChanged}
+          sessionExcludedIds={sessionExcludedIds}
+          onMarkExcluded={markExcluded}
         />
       </SectionCard>
 

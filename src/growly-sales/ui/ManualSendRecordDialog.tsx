@@ -1,5 +1,6 @@
 import type { ManualGmailSendPreview } from '../workflow/recordManualGmailSent.js';
 import { EmailSourceConfirmBlock } from './EmailSourceDisplay.js';
+import { CollectionProfileDisplay } from './CollectionProfileDisplay.js';
 
 interface ManualSendRecordDialogProps {
   preview: ManualGmailSendPreview;
@@ -69,6 +70,24 @@ export function ManualSendRecordDialog({
             batchId: preview.batchId,
             source: preview.source,
           }}
+        />
+        <CollectionProfileDisplay
+          info={preview.collectionProfile}
+          variant="compact"
+          emailSourceInfo={{
+            email: preview.to,
+            emailSourceUrl: preview.emailSourceUrl,
+            emailSourceLabel: preview.emailSourceLabel,
+            sourcePageType: 'unknown',
+            officialSiteUrl: preview.officialSiteUrl,
+            isOfficialSiteOrigin: preview.isOfficialSiteOrigin,
+            isPlaceholderEmail: preview.isPlaceholderEmail,
+            isPersonalEmail: preview.isPersonalEmail,
+            checkedUrls: preview.emailSourceUrl ? [preview.emailSourceUrl] : [],
+            batchId: preview.batchId,
+            source: preview.source,
+          }}
+          showEmailSource={Boolean(preview.to) && preview.discoverySource === 'job_site_reference'}
         />
         <div className="modal-actions">
           <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={recording}>
