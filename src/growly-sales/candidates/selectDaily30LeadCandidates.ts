@@ -1,5 +1,10 @@
 import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTypes.js';
 import { isDaily30CandidateVisibleInLists } from './daily30CandidateVisibility.js';
+import { MANUAL_EXTERNAL_REFERENCE_PROFILE_ID } from './manualExternalReferenceConstants.js';
+
+export function isManualExternalReferenceCandidate(candidate: ExternalLeadCandidate): boolean {
+  return candidate.collectionProfileId === MANUAL_EXTERNAL_REFERENCE_PROFILE_ID;
+}
 
 function hasWebsiteUrl(candidate: ExternalLeadCandidate): boolean {
   return Boolean(candidate.websiteUrl?.trim() || candidate.officialSiteUrl?.trim());
@@ -38,9 +43,31 @@ export function isDaily30LeadReviewCandidate(candidate: ExternalLeadCandidate): 
   return true;
 }
 
+/** 手動外部参照: Lead化承認待ち（メール未確認でも一覧に表示） */
+export function isDaily30ManualExternalReferenceApprovalPending(
+  candidate: ExternalLeadCandidate
+): boolean {
+  if (!isDaily30CandidateVisibleInLists(candidate)) return false;
+  if (!isManualExternalReferenceCandidate(candidate)) return false;
+  if (candidate.importStatus === 'approved_for_lead') return false;
+  if (
+    candidate.importStatus === 'imported' ||
+    candidate.importStatus === 'duplicate' ||
+    candidate.importStatus === 'excluded'
+  ) {
+    return false;
+  }
+  if (candidate.pipelineStatus === 'duplicate' || candidate.pipelineStatus === 'excluded') return false;
+  if (!candidate.companyName?.trim()) return false;
+  return true;
+}
+
 /** Lead化承認待ち（レビュー対象かつ未承認） */
 export function isDaily30LeadApprovalPending(candidate: ExternalLeadCandidate): boolean {
-  return isDaily30LeadReviewCandidate(candidate) && candidate.importStatus !== 'approved_for_lead';
+  return (
+    isDaily30LeadReviewCandidate(candidate) ||
+    isDaily30ManualExternalReferenceApprovalPending(candidate)
+  ) && candidate.importStatus !== 'approved_for_lead';
 }
 
 /** Lead化承認済み（営業文生成対象） */
@@ -74,6 +101,12 @@ export function selectDaily30LeadApprovalPending(
   candidates: ExternalLeadCandidate[]
 ): ExternalLeadCandidate[] {
   return candidates.filter(isDaily30LeadApprovalPending);
+}
+
+export function selectDaily30ManualExternalReferenceApprovalPending(
+  candidates: ExternalLeadCandidate[]
+): ExternalLeadCandidate[] {
+  return candidates.filter(isDaily30ManualExternalReferenceApprovalPending);
 }
 
 export function selectDaily30CopyPipelineTargets(

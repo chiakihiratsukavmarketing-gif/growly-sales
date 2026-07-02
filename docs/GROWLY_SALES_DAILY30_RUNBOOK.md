@@ -33,23 +33,33 @@
 - **API:** `GET/POST /api/daily30-collection-schedule`
 - **Lead一覧 / 候補一覧:** 収集プロファイル表示・フィルター（Phase 40.4）
 - **実行:** Cloud Run / 手動 FETCH が schedule を解決して実行（Phase 40.5）
-- **注意:** 本番 Cloud Run へ反映するには再デプロイが必要
+- **外部参考:** discoverySource と emailSource の分離・Lead化ブロック（Phase 40.6 安全基盤。実巡回は未実装）
+- **承認準備:** Phase 41.1 — `docs/GROWLY_SALES_EXTERNAL_REFERENCE_APPROVAL.md`
+- **手動外部参照:** Phase 41.2 — 候補収集タブ「外部参照URLから候補追加」（掲載元URLへ自動アクセスなし）
+- **手動外部参照 UI 確認:** Phase 41.2.1 — 実運用 UI で登録・成功表示・一覧更新を確認済み
+- **外部参照 adapter 基盤:** Phase 41.3 — 承認 config / dry-run 計画 / rate limit（実巡回なし）
+- **外部参照 Daily 30 補完:** Phase 41.4 — execution plan 参照・手動URL候補参照・state/UI 記録（**実サイトアクセスなし**）
+- **API:** `GET/POST /api/daily30-collection-schedule` / `GET /api/daily30-external-reference/approval-status` / `POST /api/daily30-external-reference/manual`
+- **注意:** 本番 Cloud Run へ反映するには再デプロイが必要（40.5.1 済み）。**ローカル UI は `npm run growly-sales:ui` 再起動で最新 route を反映**（起動ログに `Phase41 APIs:` を確認）
 - スキーマ: `docs/GROWLY_SALES_COLLECTION_PROFILE_SCHEMA.md`
 
 ## 毎日の実行手順
 
-1. Growly Sales UI を開く
+1. Growly Sales UI を開く（`npm run growly-sales:ui` → http://localhost:3847）
 2. **候補収集**タブで Daily 30 進捗を確認
-3. 候補が足りなければ `FETCH_DAILY_30` で収集
-4. `email_found` を確認し **Lead化承認**
-5. `GENERATE_DAILY_30_COPY` で営業文生成・品質チェック
-6. `ready_for_draft` を確認
-7. `IMPORT_DAILY_30_DRAFT_CANDIDATES` で leads.json に取り込み（または1件ずつ）
-8. **下書き候補**タブで内容確認・人間承認
-9. `CREATE_DRAFTS` で Gmail 下書き作成
-10. Gmail 画面で確認して**手動送信**
-11. **送信記録**タブで `sent` / `manual_gmail` を記録
-12. **返信管理**で返信状況を確認（`replySummary` のみ保存）
+3. （任意）**外部参照URLから候補追加** — 求人サイト等の掲載 URL を手入力（掲載元へ自動アクセスなし。公式サイト enrich はオプション）
+4. （参照）DevDetails **外部参照 adapter 承認状態** — dry-run 可能サイトを確認（Phase 41.3）
+5. **外部参照補完** — 収集結果に表示（Phase 41.4）。未承認サイトは実アクセスしない
+6. 候補が足りなければ `FETCH_DAILY_30` で収集
+7. `email_found` を確認し **Lead化承認**
+8. `GENERATE_DAILY_30_COPY` で営業文生成・品質チェック
+9. `ready_for_draft` を確認
+10. `IMPORT_DAILY_30_DRAFT_CANDIDATES` で leads.json に取り込み（または1件ずつ）
+11. **下書き候補**タブで内容確認・人間承認
+12. `CREATE_DRAFTS` で Gmail 下書き作成
+13. Gmail 画面で確認して**手動送信**
+14. **送信記録**タブで `sent` / `manual_gmail` を記録
+15. **返信管理**で返信状況を確認（`replySummary` のみ保存）
 
 ## ゲートの意味
 
@@ -81,6 +91,9 @@
 
 | 症状 | 確認 |
 |------|------|
+| 候補収集タブに `Not found` | UI サーバー再起動（`npm run growly-sales:ui`）。起動ログに `Phase41 APIs:` があるか。Ctrl+F5 |
+| `/api/daily30-collection-schedule` 404 | 上記と同じ（古い UI サーバーが 3847 で稼働中の可能性） |
+| 手動 URL 登録が無反応 | `POST /api/daily30-external-reference/manual` が 200 か。パネル内のエラーバナーを確認 |
 | 収集できない | `.env` APIキー、`API_PRODUCTION_ENABLED=true`、`FETCH_DAILY_30` |
 | 営業文が生成されない | Lead化承認済みか、`GENERATE_DAILY_30_COPY` 入力 |
 | 取り込めない | `ready_for_draft` / 重複 / `needs_review` / `failureReason` |

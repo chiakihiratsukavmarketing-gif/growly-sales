@@ -101,7 +101,8 @@
 
 - ~~明日の収集設定 UI（40.3）~~ ✅ Phase 40.3 完了
 - ~~Cloud Run が schedule を読んで実行順を変える処理（40.5）~~ ✅ Phase 40.5 完了
-- 求人サイト・楽天の自動巡回（40.6）
+- ~~外部掲載サイト参考ルートの安全基盤（40.6）~~ ✅ Phase 40.6 完了
+- 求人サイト・楽天の**実巡回**（人間承認後・別 Phase）
 
 ## 8. Phase 40.3 — 明日の収集設定 UI
 
@@ -141,3 +142,50 @@
 - schedule を読み `selectedProfile` / `wouldConsumeOverride` / `warning` を返す
 - GCS 保存・schedule 消費・state 書き込みはしない
 - **verify:** `verifyPhase405CollectionScheduleExecution`
+
+## 11. Phase 40.6 — 外部掲載サイト参考ルート（安全基盤）
+
+**実装済み（実巡回なし）:**
+
+| モジュール | 役割 |
+|----------|------|
+| `adapters/discovery/` | `job_site_reference` / `rakuten_marketplace_reference` / `portal_site_reference` / `industry_directory_reference` / `manual_url` の reference-only スタブ |
+| `candidates/sourceCompliance.ts` | コンプライアンス判定・Lead化ブロック理由・メールソース sanitize |
+| `getDaily30LeadApprovalBlockReason.ts` | `blocked_by_policy` / 公式サイト未確認 / 外部掲載メールを Lead化不可 |
+| `enrichCandidateEmailFromWebsite.ts` | メール enrich は公式サイトドメイン内のみ |
+
+### sourceComplianceStatus
+
+| 値 | 意味 |
+|----|------|
+| `official_site_verified` | 公式サイト上で代表メール確認済み |
+| `official_site_not_found` | 公式サイト未特定（発見元 URL のみ等） |
+| `email_not_found` | 公式サイトにメールなし |
+| `blocked_by_policy` | 求人サイト・楽天・外部掲載メール / 個人・placeholder / ログイン必須等 |
+| `needs_human_review` | メールあり・確認元不明 / 公式配下外 |
+
+### 分離ルール（強制）
+
+- `discoverySourceUrl` → 発見元のみ（監査・UI 表示）
+- `emailCandidateSourceUrl` / `emailSourceUrl` → **公式サイト配下のみ**
+- 求人サイト・楽天 URL を `emailSourceUrl` として扱わない
+- **verify:** `verifyPhase406ExternalReferenceSafety`
+
+## 13. Phase 41.2 — 手動 URL 投入
+
+- **UI:** `Daily30ManualExternalReferencePanel`
+- **API:** `POST /api/daily30-external-reference/manual`
+- 掲載元URL → `discoverySourceUrl`（fetch なし）
+- オプション enrich → 公式サイトドメインのみ
+- **verify:** `verifyPhase412ManualExternalReference`
+
+## 12. Phase 41.1 — 外部参照収集 承認準備
+
+**ドキュメント:** `docs/GROWLY_SALES_EXTERNAL_REFERENCE_APPROVAL.md`
+
+- 対象サイト 14 種の評価・リスク表
+- 推奨実装順: 手動 URL → 業界団体 → 地域ポータル → 施工事例 → 楽天 → 求人（小→大）
+- Phase 41.2: 手動 URL 投入 UI/API（外部 URL へ **fetch しない**）
+- Phase 41.4: Daily 30 補完ルート接続（execution plan 参照・実アクセスなし）
+- Phase 41.5: 本運用α 完了判定
+- **実サイトアクセス:** Phase 41.1 では未実施

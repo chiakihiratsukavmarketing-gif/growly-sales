@@ -53,6 +53,11 @@ import {
   isGcsStorageBackend,
 } from '../config/storageBackend.js';
 import {
+  previewDaily30ExternalReferenceSupplement,
+  supplementResultToStateFields,
+  type Daily30ExternalReferenceSupplementResult,
+} from './daily30ExternalReferenceSupplement.js';
+import {
   classifyUnknownError,
   getDaily30CloudErrorDefinition,
   type Daily30CloudErrorCode,
@@ -101,6 +106,7 @@ export interface Daily30CloudAutoFetchResponse {
   scheduleWarnings?: string[];
   areasUsed?: string[];
   warning?: string;
+  externalReferenceSupplement?: Daily30ExternalReferenceSupplementResult;
 }
 
 export interface Daily30CloudAutoFetchOptions {
@@ -221,6 +227,20 @@ async function finalizeRun(
     errorCode: entry.errorCode,
     recoveryHint: entry.recoveryHint,
   });
+}
+
+function attachSupplementToEntry(
+  entry: Daily30CloudRunStateEntry,
+  supplement: Daily30ExternalReferenceSupplementResult | undefined
+): Daily30CloudRunStateEntry {
+  if (!supplement) return entry;
+  return { ...entry, ...supplementResultToStateFields(supplement) };
+}
+
+function supplementResponseFields(
+  supplement: Daily30ExternalReferenceSupplementResult | undefined
+): Pick<Daily30CloudAutoFetchResponse, 'externalReferenceSupplement'> {
+  return supplement ? { externalReferenceSupplement: supplement } : {};
 }
 
 function scheduleWarningText(warnings: Daily30ScheduleWarning[]): string | null {
@@ -438,6 +458,14 @@ export async function runDaily30CloudAutoFetch(
 
   if (dryRun) {
     const metrics = countBatchMetrics(existingCandidates, batchId);
+    const supplement = await previewDaily30ExternalReferenceSupplement({
+      profile: runContext.profile,
+      batchId,
+      emailFound: metrics.emailFound,
+      reachedTarget: metrics.reachedTarget,
+      existingCandidates,
+      prefecture: runContext.plannedAreaPrefectures[0] ?? null,
+    });
     const finishedAt = new Date().toISOString();
     return buildResponse({
       ok: true,
@@ -459,6 +487,7 @@ export async function runDaily30CloudAutoFetch(
       existingCount: existingCandidates.length,
       ...scheduleFields,
       warning: scheduleFields.scheduleWarnings?.[0],
+      ...supplementResponseFields(supplement),
     });
   }
 
@@ -745,22 +774,25 @@ export async function runDaily30CloudAutoFetch(
       scheduleConsumedAt: runContext.wouldConsumeOverride ? finishedAt : null,
       scheduleConsumedBatchId: runContext.wouldConsumeOverride ? batchId : null,
     };
-    const entry = makeStateEntry(
-      {
-        runId,
-        batchId,
-        mode: 'run',
-        status: runStatus,
-        startedAt,
-        finishedAt,
-        ...buildRunMetricsFields(metrics),
-        stoppedReason: stats.stoppedReason,
-        nextArea: afterDashboard.nextExploreArea,
-        force,
-        message,
-      },
-      env,
-      runCollectionMeta
+    const entry = attachSupplementToEntry(
+      makeStateEntry(
+        {
+          runId,
+          batchId,
+          mode: 'run',
+          status: runStatus,
+          startedAt,
+          finishedAt,
+          ...buildRunMetricsFields(metrics),
+          stoppedReason: stats.stoppedReason,
+          nextArea: afterDashboard.nextExploreArea,
+          force,
+          message,
+        },
+        env,
+        runCollectionMeta
+      ),
+      stats.externalReferenceSupplement
     );
     return finalizeRun(
       entry,
@@ -781,6 +813,7 @@ export async function runDaily30CloudAutoFetch(
         ...scheduleFields,
         areasUsed: stats.areasUsed,
         warning: scheduleFields.scheduleWarnings?.[0],
+        ...supplementResponseFields(stats.externalReferenceSupplement),
       },
       { skipStateWrite }
     );

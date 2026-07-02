@@ -12,6 +12,8 @@ import {
   type Daily30CollectionScheduleResponse,
 } from './daily30CollectionScheduleApi.js';
 import { DevDetails } from './common/DevDetails.js';
+import { InfoBanner } from './InfoBanner.js';
+import { isDevApiErrorMessage, toUserFacingApiError } from './displayLabels.js';
 import { Daily30CollectionScheduleEditDialog } from './Daily30CollectionScheduleEditDialog.js';
 import { Daily30RunCollectionProfileSummary } from './Daily30RunCollectionProfileSummary.js';
 
@@ -43,21 +45,30 @@ export function Daily30CollectionSchedulePanel({
 }: Daily30CollectionSchedulePanelProps) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<Daily30CollectionScheduleResponse | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadDevError, setLoadDevError] = useState<string | null>(null);
   const [showEdit, setShowEdit] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
+    setLoadDevError(null);
     try {
       const response = await fetchDaily30CollectionSchedule();
       setData(response);
     } catch (err) {
+      const message =
+        err instanceof Error ? err.message : '収集スケジュールの読み込みに失敗しました';
       setData(null);
-      onError(err instanceof Error ? err.message : '収集スケジュールの読み込みに失敗しました');
+      setLoadError(toUserFacingApiError(message));
+      if (isDevApiErrorMessage(message)) {
+        setLoadDevError(message);
+      }
     } finally {
       setLoading(false);
     }
-  }, [onError]);
+  }, []);
 
   useEffect(() => {
     void load();
@@ -86,6 +97,17 @@ export function Daily30CollectionSchedulePanel({
   return (
     <div className="daily30-collection-schedule-panel">
       {loading && <p className="hint">収集設定を読み込み中…</p>}
+      {loadError ? <InfoBanner variant="warn">{loadError}</InfoBanner> : null}
+      {loadDevError ? (
+        <DevDetails title="収集設定の読み込みエラー（開発者向け）">
+          <p className="mono-cell">{loadDevError}</p>
+        </DevDetails>
+      ) : null}
+      {!loading && !schedule && loadError ? (
+        <p className="hint collection-schedule-disabled-hint">
+          収集設定は表示できませんが、下の収集結果・Lead化承認は引き続き利用できます。
+        </p>
+      ) : null}
 
       {!loading && schedule && active && (
         <>

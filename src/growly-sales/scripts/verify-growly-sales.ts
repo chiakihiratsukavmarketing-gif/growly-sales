@@ -5323,6 +5323,738 @@ async function verifyPhase405CollectionScheduleExecution(): Promise<void> {
   ok('Phase 40.5 collection schedule execution checks passed');
 }
 
+async function verifyPhase406ExternalReferenceSafety(): Promise<void> {
+  const complianceSrc = await readFile(join(SRC_ROOT, 'candidates/sourceCompliance.ts'), 'utf-8');
+  const enrichSrc = await readFile(join(SRC_ROOT, 'candidates/enrichCandidateEmailFromWebsite.ts'), 'utf-8');
+  const approvalSrc = await readFile(
+    join(SRC_ROOT, 'candidates/getDaily30LeadApprovalBlockReason.ts'),
+    'utf-8'
+  );
+  const discoveryIndex = await readFile(join(SRC_ROOT, 'adapters/discovery/index.ts'), 'utf-8');
+  const discoveryTypes = await readFile(join(SRC_ROOT, 'adapters/discovery/types.ts'), 'utf-8');
+  const cloudFetch = await readFile(join(SRC_ROOT, 'candidates/runDaily30CloudAutoFetch.ts'), 'utf-8');
+  const gmailAdapter = await readFile(join(SRC_ROOT, 'integrations/gmail/gmailDraftAdapter.ts'), 'utf-8');
+
+  assert(complianceSrc.includes('evaluateSourceCompliance'), 'sourceCompliance evaluator exists');
+  assert(complianceSrc.includes('blocked_by_policy'), 'sourceCompliance has blocked_by_policy');
+  assert(complianceSrc.includes('filterUrlsToOfficialSiteDomain'), 'official domain filter exists');
+  assert(complianceSrc.includes('getLeadApprovalComplianceBlockReason'), 'lead approval compliance block');
+  assert(enrichSrc.includes('sanitizeCandidateEmailSources'), 'enrich uses sanitize');
+  assert(enrichSrc.includes('filterUrlsToOfficialSiteDomain'), 'enrich filters to official domain');
+  assert(enrichSrc.includes('discoverySourceUrl'), 'enrich references discovery separation');
+  assert(approvalSrc.includes('getLeadApprovalComplianceBlockReason'), 'approval uses compliance block');
+  assert(discoveryIndex.includes('job_site_reference'), 'discovery registry has job site');
+  assert(discoveryIndex.includes('rakuten_marketplace_reference'), 'discovery registry has rakuten');
+  assert(discoveryTypes.includes('referenceOnly: true'), 'discovery adapters are reference only');
+  assert(!cloudFetch.includes('messages.send'), 'phase40.6 no gmail send');
+  assert(!gmailAdapter.includes('messages.send'), 'gmail adapter no messages.send');
+  assert(!cloudFetch.includes('users.drafts.create'), 'cloud fetch no drafts create');
+
+  const {
+    evaluateSourceCompliance,
+    getLeadApprovalComplianceBlockReason,
+    isUrlOnOfficialSiteDomain,
+    isEmailSourceFromExternalListingSite,
+    sanitizeCandidateEmailSources,
+    classifyExternalEmailBlockReason,
+  } = await import('../candidates/sourceCompliance.js');
+  const {
+    getDiscoveryReferenceAdapter,
+    isDiscoveryReferenceImplemented,
+    runDiscoveryReferenceStub,
+    REFERENCE_ONLY_DISCOVERY_SOURCES,
+  } = await import('../adapters/discovery/index.js');
+  const { getDaily30LeadApprovalBlockReason } = await import(
+    '../candidates/getDaily30LeadApprovalBlockReason.js'
+  );
+  const { resolveEmailSourceFromCandidate } = await import(
+    '../candidates/resolveEmailSourceDisplay.js'
+  );
+
+  for (const source of REFERENCE_ONLY_DISCOVERY_SOURCES) {
+    const adapter = getDiscoveryReferenceAdapter(source);
+    assert(adapter !== null, `discovery adapter registered: ${source}`);
+    assert(adapter?.referenceOnly === true, `${source} is referenceOnly`);
+    assert(!isDiscoveryReferenceImplemented(source), `${source} crawl not implemented`);
+  }
+
+  const stubResult = await runDiscoveryReferenceStub({
+    discoverySource: 'job_site_reference',
+    discoverySourceSite: 'wantedly',
+    discoverySourceUrl: 'https://www.wantedly.com/companies/example',
+    batchId: '2026-07-02',
+  });
+  assert(stubResult.referenceOnly === true, 'stub returns referenceOnly');
+  assert(stubResult.candidates.length === 0, 'stub does not crawl');
+  assert(stubResult.implementationPending === true, 'stub marks implementation pending');
+
+  const jobDiscoveryCandidate = {
+    externalCandidateId: 'phase406-job',
+    sourceType: 'google_places' as const,
+    companyName: 'Job Ref Co',
+    area: '宮城県',
+    industry: '工務店',
+    websiteUrl: 'https://corp.example/',
+    officialSiteUrl: 'https://corp.example/',
+    phoneNumber: null,
+    address: null,
+    googlePlaceId: null,
+    sourceUrl: 'https://www.wantedly.com/companies/corp',
+    sourceQuery: 'q',
+    category: '工務店',
+    contactFormUrl: null,
+    emailCandidates: ['info@corp.example'],
+    confidenceScore: 0.8,
+    importStatus: 'preview' as const,
+    riskLevel: 'low' as const,
+    duplicateReason: '',
+    duplicateKey: 'k-job',
+    pipelineStatus: 'email_found' as const,
+    prefecture: '宮城県',
+    regionGroup: '宮城' as const,
+    collectionPriority: 1,
+    collectionAreaSource: '宮城県',
+    collectionBatchId: '2026-07-02',
+    emailCandidateSourceUrls: ['https://corp.example/contact'],
+    emailVerifiedAt: null,
+    generatedEmailSubject: null,
+    generatedEmailBody: null,
+    generatedCustomHook: null,
+    generatedCustomHookReason: null,
+    targetEmail: 'info@corp.example',
+    emailCandidateSourceUrl: 'https://corp.example/contact',
+    failureReason: null,
+    copyGeneratedAt: null,
+    qualityCheckedAt: null,
+    humanReviewStatus: null,
+    gmailDraftStatus: null,
+    sendStatus: null,
+    notes: '',
+    collectedAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    discoverySource: 'job_site_reference' as const,
+    discoverySourceSite: 'wantedly' as const,
+    discoverySourceUrl: 'https://www.wantedly.com/companies/corp',
+  };
+
+  assert(
+    jobDiscoveryCandidate.discoverySourceUrl?.includes('wantedly'),
+    'job site URL on discoverySourceUrl'
+  );
+  assert(
+    isUrlOnOfficialSiteDomain('https://corp.example/contact', jobDiscoveryCandidate),
+    'official email source on corp domain'
+  );
+  const emailDisplay = resolveEmailSourceFromCandidate(jobDiscoveryCandidate);
+  assert(
+    emailDisplay.emailSourceUrl !== jobDiscoveryCandidate.discoverySourceUrl,
+    'job site URL not used as emailSourceUrl'
+  );
+  assert(emailDisplay.isOfficialSiteOrigin, 'official email source origin');
+
+  const jobSiteEmailCandidate = {
+    ...jobDiscoveryCandidate,
+    emailCandidateSourceUrl: 'https://www.wantedly.com/companies/corp/contact',
+    emailCandidateSourceUrls: ['https://www.wantedly.com/companies/corp/contact'],
+  };
+  assert(
+    isEmailSourceFromExternalListingSite(jobSiteEmailCandidate),
+    'wantedly email source detected as external listing'
+  );
+  assert(
+    evaluateSourceCompliance(jobSiteEmailCandidate).status === 'blocked_by_policy',
+    'job site email blocked_by_policy'
+  );
+  assert(
+    classifyExternalEmailBlockReason(jobSiteEmailCandidate)?.includes('求人'),
+    'job site block reason mentions job site'
+  );
+
+  const rakutenEmailCandidate = {
+    ...jobDiscoveryCandidate,
+    discoverySource: 'rakuten_marketplace_reference' as const,
+    discoverySourceUrl: 'https://item.rakuten.co.jp/shop/example/',
+    emailCandidateSourceUrl: 'https://item.rakuten.co.jp/shop/example/contact',
+    emailCandidateSourceUrls: ['https://item.rakuten.co.jp/shop/example/contact'],
+  };
+  assert(
+    evaluateSourceCompliance(rakutenEmailCandidate).status === 'blocked_by_policy',
+    'rakuten email blocked_by_policy'
+  );
+  assert(
+    classifyExternalEmailBlockReason(rakutenEmailCandidate)?.includes('楽天'),
+    'rakuten block reason'
+  );
+
+  const discoveryOnlyCandidate = {
+    ...jobDiscoveryCandidate,
+    websiteUrl: null,
+    officialSiteUrl: null,
+    emailCandidates: [],
+    targetEmail: null,
+    emailCandidateSourceUrl: null,
+    emailCandidateSourceUrls: [],
+  };
+  assert(
+    evaluateSourceCompliance(discoveryOnlyCandidate).status === 'official_site_not_found',
+    'discovery only without official site'
+  );
+  assert(
+    getLeadApprovalComplianceBlockReason(discoveryOnlyCandidate)?.includes('公式サイト'),
+    'discovery only blocks lead approval'
+  );
+
+  const verifiedCandidate = {
+    ...jobDiscoveryCandidate,
+    sourceComplianceStatus: 'official_site_verified' as const,
+  };
+  assert(
+    evaluateSourceCompliance(verifiedCandidate).status === 'official_site_verified',
+    'official verified path'
+  );
+  assert(
+    getLeadApprovalComplianceBlockReason(verifiedCandidate) === null,
+    'verified candidate no compliance block'
+  );
+
+  const blockedCandidate = {
+    ...jobSiteEmailCandidate,
+    sourceComplianceStatus: 'blocked_by_policy' as const,
+    sourceComplianceNote: '求人サイト上のメール',
+  };
+  const blockedHint = getDaily30LeadApprovalBlockReason(blockedCandidate, [], []);
+  assert(blockedHint?.canApprove === false, 'blocked_by_policy cannot approve');
+  assert(
+    blockedHint?.blockReason.includes('ポリシー') || blockedHint?.blockReason.includes('求人'),
+    'blocked approval reason surfaced'
+  );
+
+  const sanitized = sanitizeCandidateEmailSources(jobSiteEmailCandidate);
+  assert(sanitized.emailCandidates.length === 0, 'sanitize clears job site emails');
+  assert(
+    !sanitized.emailCandidateSourceUrls.some((u) => u.includes('wantedly')),
+    'sanitize removes wantedly from email sources'
+  );
+  assert(sanitized.sourceComplianceStatus === 'blocked_by_policy', 'sanitize sets blocked status');
+
+  const placeholderCandidate = {
+    ...jobDiscoveryCandidate,
+    targetEmail: 'xxx@example.com',
+    emailCandidates: ['xxx@example.com'],
+    emailCandidateSourceUrl: 'https://corp.example/contact',
+  };
+  assert(
+    evaluateSourceCompliance(placeholderCandidate).status === 'blocked_by_policy',
+    'placeholder blocked'
+  );
+
+  for (const content of [complianceSrc, enrichSrc, approvalSrc, discoveryIndex]) {
+    assert(!content.includes('refresh_token'), 'phase40.6 no refresh_token in sources');
+    assert(!content.includes('DAILY30_CLOUD_RUN_TOKEN'), 'phase40.6 no cloud token in sources');
+  }
+
+  ok('Phase 40.6 external reference safety checks passed');
+}
+
+async function verifyPhase412ManualExternalReference(): Promise<void> {
+  const uiServer = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
+  const createSrc = await readFile(
+    join(SRC_ROOT, 'candidates/createManualExternalReferenceCandidate.ts'),
+    'utf-8'
+  );
+  const panel = await readFile(
+    join(SRC_ROOT, 'ui/Daily30ManualExternalReferencePanel.tsx'),
+    'utf-8'
+  );
+  const apiClient = await readFile(
+    join(SRC_ROOT, 'ui/daily30ManualExternalReferenceApi.ts'),
+    'utf-8'
+  );
+  const collectionView = await readFile(join(SRC_ROOT, 'ui/CandidateCollectionView.tsx'), 'utf-8');
+  const enrichSrc = await readFile(join(SRC_ROOT, 'candidates/enrichCandidateEmailFromWebsite.ts'), 'utf-8');
+  const approvalSrc = await readFile(
+    join(SRC_ROOT, 'candidates/getDaily30LeadApprovalBlockReason.ts'),
+    'utf-8'
+  );
+  const cloudFetch = await readFile(join(SRC_ROOT, 'candidates/runDaily30CloudAutoFetch.ts'), 'utf-8');
+
+  assert(uiServer.includes('/api/daily30-external-reference/manual'), 'manual external reference API route');
+  assert(uiServer.includes('createManualExternalReferenceCandidate'), 'uiServer uses create manual service');
+  assert(createSrc.includes('discoverySourceUrl'), 'create stores discoverySourceUrl');
+  assert(createSrc.includes('MANUAL_EXTERNAL_REFERENCE_PROFILE_ID'), 'manual profile id constant');
+  assert(createSrc.includes('collectionMode: \'manual\''), 'collectionMode manual');
+  assert(createSrc.includes('todayBatchIdJst'), 'JST batchId for manual candidate');
+  assert(!createSrc.includes('fetch(discoverySourceUrl'), 'no fetch on discovery url');
+  assert(!createSrc.includes('extractWebsiteContacts(discovery'), 'no enrich on discovery url');
+  assert(createSrc.includes('shouldEnrichOfficialSiteEmail'), 'enrich option supported');
+  assert(panel.includes('外部参照URLから候補追加') || panel.includes('外部参照'), 'manual panel exists');
+  assert(collectionView.includes('Daily30ManualExternalReferencePanel'), 'panel embedded in collection view');
+  assert(approvalSrc.includes('isDaily30ManualExternalReferenceApprovalPending'), 'manual lead approval pending');
+  assert(approvalSrc.includes('getManualExternalReferenceBlockReason'), 'manual block reasons');
+  assert(!cloudFetch.includes('messages.send'), 'phase41.2 no gmail send');
+  assert(!cloudFetch.includes('users.drafts.create'), 'phase41.2 no drafts create');
+
+  const {
+    createManualExternalReferenceCandidate,
+    validateManualExternalReferenceInput,
+  } = await import('../candidates/createManualExternalReferenceCandidate.js');
+  const { getDaily30LeadApprovalBlockReason } = await import(
+    '../candidates/getDaily30LeadApprovalBlockReason.js'
+  );
+  const { isDaily30ManualExternalReferenceApprovalPending } = await import(
+    '../candidates/selectDaily30LeadCandidates.js'
+  );
+  const { evaluateSourceCompliance } = await import('../candidates/sourceCompliance.js');
+  const { MANUAL_EXTERNAL_REFERENCE_PROFILE_ID } = await import(
+    '../candidates/manualExternalReferenceConstants.js'
+  );
+  const { todayBatchIdJst } = await import('../candidates/daily30AreaConfig.js');
+  const { resolveEmailSourceFromCandidate } = await import(
+    '../candidates/resolveEmailSourceDisplay.js'
+  );
+
+  const validationError = validateManualExternalReferenceInput({
+    discoverySourceUrl: '',
+    discoverySource: 'job_site_reference',
+    companyName: 'Test',
+  });
+  assert(validationError !== null, 'validation rejects empty discovery url');
+
+  const tokyoError = validateManualExternalReferenceInput({
+    discoverySourceUrl: 'https://www.wantedly.com/companies/tokyo',
+    discoverySource: 'job_site_reference',
+    companyName: 'Tokyo Co',
+    prefecture: '東京都',
+  });
+  assert(tokyoError?.includes('東京'), 'tokyo rejected at validation');
+
+  const { candidate, warnings } = await createManualExternalReferenceCandidate(
+    {
+      discoverySourceUrl: 'https://www.wantedly.com/companies/phase412-test',
+      discoverySource: 'job_site_reference',
+      discoverySourceSite: 'wantedly',
+      companyName: 'Phase412 Test Co',
+      officialSiteUrl: 'https://phase412-test.example/',
+      prefecture: '宮城県',
+      industryCategory: 'housing',
+      manualNote: 'verify only',
+      shouldEnrichOfficialSiteEmail: false,
+    },
+    []
+  );
+
+  assert(candidate.collectionProfileId === MANUAL_EXTERNAL_REFERENCE_PROFILE_ID, 'manual profile id');
+  assert(candidate.collectionMode === 'manual', 'manual collection mode');
+  assert(candidate.discoverySource === 'job_site_reference', 'discovery source saved');
+  assert(candidate.discoverySourceSite === 'wantedly', 'discovery site saved');
+  assert(candidate.discoverySourceUrl?.includes('wantedly'), 'discovery url saved');
+  assert(candidate.discoverySourceLabel?.includes('Wantedly'), 'discovery label generated');
+  assert(candidate.collectionBatchId === todayBatchIdJst(), 'JST batch id');
+  assert(warnings.includes('external_reference_url_is_discovery_only'), 'discovery only warning');
+  assert(isDaily30ManualExternalReferenceApprovalPending(candidate), 'manual pending in approval list');
+
+  const emailDisplay = resolveEmailSourceFromCandidate(candidate);
+  assert(
+    emailDisplay.emailSourceUrl !== candidate.discoverySourceUrl,
+    'discovery url not email source url'
+  );
+
+  const noOfficial = await createManualExternalReferenceCandidate(
+    {
+      discoverySourceUrl: 'https://www.wantedly.com/companies/no-official',
+      discoverySource: 'job_site_reference',
+      discoverySourceSite: 'wantedly',
+      companyName: 'No Official Co',
+      prefecture: '宮城県',
+      shouldEnrichOfficialSiteEmail: false,
+    },
+    []
+  );
+  const noOfficialBlock = getDaily30LeadApprovalBlockReason(noOfficial.candidate, [], []);
+  assert(noOfficialBlock?.canApprove === false, 'no official site blocks approval');
+
+  const rakutenBlocked = evaluateSourceCompliance({
+    officialSiteUrl: 'https://shop.example/',
+    websiteUrl: 'https://shop.example/',
+    targetEmail: 'info@shop.example',
+    emailCandidates: ['info@shop.example'],
+    emailCandidateSourceUrl: 'https://item.rakuten.co.jp/shop/contact',
+    emailCandidateSourceUrls: ['https://item.rakuten.co.jp/shop/contact'],
+    discoverySourceUrl: 'https://item.rakuten.co.jp/shop/',
+    sourceUrl: null,
+    discoverySource: 'rakuten_marketplace_reference',
+    prefecture: '宮城県',
+  });
+  assert(rakutenBlocked.status === 'blocked_by_policy', 'rakuten email blocked');
+
+  const jobSiteEmailBlock = getDaily30LeadApprovalBlockReason(
+    {
+      ...candidate,
+      externalCandidateId: 'blocked-job-email',
+      emailCandidates: ['info@phase412-test.example'],
+      targetEmail: 'info@phase412-test.example',
+      emailCandidateSourceUrl: 'https://www.wantedly.com/companies/phase412-test/contact',
+      emailCandidateSourceUrls: ['https://www.wantedly.com/companies/phase412-test/contact'],
+      sourceComplianceStatus: 'blocked_by_policy',
+      pipelineStatus: 'email_found',
+    },
+    [],
+    []
+  );
+  assert(jobSiteEmailBlock?.canApprove === false, 'job site email blocks approval');
+
+  for (const content of [uiServer, createSrc, panel]) {
+    assert(!content.includes('refresh_token'), 'phase41.2 no refresh_token');
+    assert(!content.includes('DAILY30_CLOUD_RUN_TOKEN'), 'phase41.2 no cloud token');
+  }
+
+  assert(apiClient.includes('readApiError'), 'phase41.2.1 manual api uses readApiError');
+  assert(panel.includes('InfoBanner'), 'phase41.2.1 inline error/success banner');
+  assert(panel.includes('toUserFacingApiError'), 'phase41.2.1 user facing submit errors');
+  assert(panel.includes('disabledReason'), 'phase41.2.1 disabled reason hint');
+
+  const apiErrorSrc = await readFile(join(SRC_ROOT, 'ui/apiError.ts'), 'utf-8');
+  const displayLabels = await readFile(join(SRC_ROOT, 'ui/displayLabels.ts'), 'utf-8');
+  const schedulePanel = await readFile(
+    join(SRC_ROOT, 'ui/Daily30CollectionSchedulePanel.tsx'),
+    'utf-8'
+  );
+  assert(apiErrorSrc.includes('parseApiErrorDev'), 'phase41.2.1 readApiError includes dev path');
+  assert(displayLabels.includes('toUserFacingApiError'), 'phase41.2.1 user facing api error helper');
+  assert(schedulePanel.includes('loadError'), 'phase41.2.1 schedule panel inline load error');
+
+  const { selectDaily30ManualExternalReferenceApprovalPending } = await import(
+    '../candidates/selectDaily30LeadCandidates.js'
+  );
+  assert(
+    typeof selectDaily30ManualExternalReferenceApprovalPending === 'function',
+    'phase41.2.1 manual pending selector exported'
+  );
+
+  const sameUrlEnriched = await createManualExternalReferenceCandidate(
+    {
+      discoverySourceUrl: 'https://phase412-same.example/',
+      discoverySource: 'manual_url',
+      companyName: 'Same Url Co',
+      officialSiteUrl: 'https://phase412-same.example/',
+      prefecture: '宮城県',
+      industryCategory: 'housing',
+      shouldEnrichOfficialSiteEmail: true,
+    },
+    []
+  );
+  assert(
+    sameUrlEnriched.warnings.includes('discovery_url_same_as_official_skipped'),
+    'phase41.2.1 same url enrich skipped with warning'
+  );
+
+  ok('Phase 41.2 manual external reference checks passed');
+}
+
+async function verifyPhase413ExternalReferenceAdapterFoundation(): Promise<void> {
+  const approvalConfig = await readFile(
+    join(SRC_ROOT, 'adapters/discovery/externalReferenceApprovalConfig.ts'),
+    'utf-8'
+  );
+  const executionPlan = await readFile(
+    join(SRC_ROOT, 'adapters/discovery/resolveDiscoveryAdapterExecutionPlan.ts'),
+    'utf-8'
+  );
+  const runWithPlan = await readFile(
+    join(SRC_ROOT, 'adapters/discovery/runDiscoveryReferenceWithPlan.ts'),
+    'utf-8'
+  );
+  const uiServer = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
+  const approvalPanel = await readFile(
+    join(SRC_ROOT, 'ui/Daily30ExternalReferenceApprovalPanel.tsx'),
+    'utf-8'
+  );
+  const cloudFetch = await readFile(join(SRC_ROOT, 'candidates/runDaily30CloudAutoFetch.ts'), 'utf-8');
+
+  assert(approvalConfig.includes('EXTERNAL_REFERENCE_APPROVAL_CONFIG'), 'approval config exists');
+  assert(approvalConfig.includes('approved_for_manual_url'), 'manual url approval status');
+  assert(approvalConfig.includes('approved_for_dry_run'), 'dry run approval status');
+  assert(executionPlan.includes('resolveDiscoveryAdapterExecutionPlan'), 'execution plan resolver');
+  assert(runWithPlan.includes('networkAccessPerformed: false'), 'no network in plan runner');
+  assert(uiServer.includes('/api/daily30-external-reference/approval-status'), 'approval status API');
+  assert(approvalPanel.includes('Daily30ExternalReferenceApprovalPanel'), 'approval panel exists');
+  assert(!cloudFetch.includes('messages.send'), 'phase41.3 no gmail send');
+  assert(!cloudFetch.includes('users.drafts.create'), 'phase41.3 no drafts create');
+  assert(!runWithPlan.includes('fetch('), 'phase41.3 runWithPlan no fetch');
+
+  const {
+    resolveDiscoveryAdapterExecutionPlan,
+    runDiscoveryReferenceWithPlan,
+    listExternalReferenceApprovalConfigs,
+  } = await import('../adapters/discovery/index.js');
+  const { previewDryRunDiscoveryPlans } = await import(
+    '../candidates/buildExternalReferenceApprovalSummary.js'
+  );
+
+  const manualPlan = resolveDiscoveryAdapterExecutionPlan({
+    discoverySource: 'manual_url',
+    dryRun: false,
+  });
+  assert(manualPlan.mode === 'manual_only', 'manual url is manual_only');
+  assert(manualPlan.canRun === false, 'manual url adapter auto run blocked');
+
+  const industryDryRun = resolveDiscoveryAdapterExecutionPlan({
+    discoverySource: 'industry_directory_reference',
+    dryRun: true,
+  });
+  assert(industryDryRun.canRun === true, 'industry dry run canRun');
+  assert(industryDryRun.mode === 'dry_run_only', 'industry dry run mode');
+  assert(industryDryRun.networkAccessAllowed === false, 'industry dry run no network');
+
+  const industryLive = resolveDiscoveryAdapterExecutionPlan({
+    discoverySource: 'industry_directory_reference',
+    dryRun: false,
+  });
+  assert(industryLive.canRun === false, 'industry live blocked without low frequency approval');
+  assert(industryLive.mode === 'dry_run_only', 'industry live mode dry_run_only');
+
+  const indeedPlan = resolveDiscoveryAdapterExecutionPlan({
+    discoverySource: 'job_site_reference',
+    discoverySourceSite: 'indeed',
+    dryRun: true,
+  });
+  assert(indeedPlan.mode === 'blocked', 'indeed blocked');
+  assert(indeedPlan.canRun === false, 'indeed cannot run');
+
+  const wantedlyPlan = resolveDiscoveryAdapterExecutionPlan({
+    discoverySource: 'job_site_reference',
+    discoverySourceSite: 'wantedly',
+    dryRun: true,
+  });
+  assert(wantedlyPlan.canRun === false, 'wantedly dry run blocked until approved');
+  assert(wantedlyPlan.reason === 'human_approval_required', 'wantedly needs approval');
+
+  const dryRunResult = await runDiscoveryReferenceWithPlan(
+    {
+      discoverySource: 'portal_site_reference',
+      prefecture: '宮城県',
+      industryCategory: 'housing',
+      batchId: 'phase413-verify',
+    },
+    { dryRun: true }
+  );
+  assert(dryRunResult.candidates.length === 0, 'dry run returns no candidates');
+  assert(dryRunResult.executionPlan?.networkAccessPerformed === false, 'dry run no network');
+  assert(dryRunResult.executionPlan?.dryRun === true, 'dry run flag set');
+
+  const blockedResult = await runDiscoveryReferenceWithPlan(
+    {
+      discoverySource: 'job_site_reference',
+      discoverySourceSite: 'indeed',
+      batchId: 'phase413-verify',
+    },
+    { dryRun: true }
+  );
+  assert(blockedResult.candidates.length === 0, 'blocked source empty candidates');
+  assert(blockedResult.executionPlan?.mode === 'blocked', 'blocked execution plan');
+
+  const configs = listExternalReferenceApprovalConfigs();
+  assert(configs.length >= 10, 'approval config entries');
+  assert(
+    configs.every((c) => !c.allowedFields.includes('emailCandidates' as never)),
+    'allowed fields exclude email'
+  );
+
+  const previews = await previewDryRunDiscoveryPlans();
+  assert(previews.length === 2, 'dry run preview targets');
+  assert(previews.every((p) => p.executionPlan?.networkAccessPerformed === false), 'preview no network');
+
+  ok('Phase 41.3 external reference adapter foundation checks passed');
+}
+
+async function verifyPhase414Daily30ExternalReferenceSupplement(): Promise<void> {
+  const fetchSrc = await readFile(join(SRC_ROOT, 'candidates/fetchDaily30Candidates.ts'), 'utf-8');
+  const cloudFetch = await readFile(join(SRC_ROOT, 'candidates/runDaily30CloudAutoFetch.ts'), 'utf-8');
+  const supplementSrc = await readFile(
+    join(SRC_ROOT, 'candidates/daily30ExternalReferenceSupplement.ts'),
+    'utf-8'
+  );
+  const cloudState = await readFile(join(SRC_ROOT, 'storage/daily30CloudRunState.ts'), 'utf-8');
+  const dashboard = await readFile(join(SRC_ROOT, 'candidates/buildDaily30CloudDashboard.ts'), 'utf-8');
+  const resultsPanel = await readFile(join(SRC_ROOT, 'ui/Daily30CloudResultsPanel.tsx'), 'utf-8');
+  const collectionView = await readFile(join(SRC_ROOT, 'ui/CandidateCollectionView.tsx'), 'utf-8');
+
+  assert(fetchSrc.includes('runDaily30ExternalReferenceSupplement'), 'fetch calls supplement');
+  assert(fetchSrc.includes('resolveDiscoveryAdapterExecutionPlan') === false, 'fetch uses supplement module not direct plan');
+  assert(supplementSrc.includes('resolveDiscoveryAdapterExecutionPlan'), 'supplement resolves execution plan');
+  assert(supplementSrc.includes('runDiscoveryReferenceWithPlan'), 'supplement invokes plan runner');
+  assert(supplementSrc.includes('listEligibleManualExternalReferenceCandidates'), 'manual candidates listed');
+  assert(supplementSrc.includes('MANUAL_EXTERNAL_REFERENCE_PROFILE_ID'), 'manual profile id used');
+  assert(supplementSrc.includes('blocked_by_policy'), 'blocked manual excluded');
+  assert(supplementSrc.includes('externalReferenceNetworkAccessPerformed: false'), 'network always false phase41.4');
+  assert(cloudFetch.includes('attachSupplementToEntry'), 'cloud fetch attaches supplement to state');
+  assert(cloudFetch.includes('previewDaily30ExternalReferenceSupplement'), 'dry run preview supplement');
+  assert(cloudState.includes('externalReferenceSupplementMode'), 'state has supplement mode');
+  assert(dashboard.includes('externalReferenceFieldsFromEntry'), 'dashboard exposes supplement fields');
+  assert(resultsPanel.includes('Daily30ExternalReferenceSupplementBanner'), 'results panel shows supplement');
+  assert(collectionView.includes('Daily30ExternalReferenceSupplementBanner'), 'collection view shows supplement');
+  assert(!cloudFetch.includes('messages.send'), 'phase41.4 no gmail send');
+  assert(!cloudFetch.includes('users.drafts.create'), 'phase41.4 no drafts create');
+
+  const {
+    runDaily30ExternalReferenceSupplement,
+    previewDaily30ExternalReferenceSupplement,
+    listEligibleManualExternalReferenceCandidates,
+    supplementResultToStateFields,
+  } = await import('../candidates/daily30ExternalReferenceSupplement.js');
+  const { resolveDiscoveryAdapterExecutionPlan } = await import('../adapters/discovery/index.js');
+  const { MANUAL_EXTERNAL_REFERENCE_PROFILE_ID } = await import(
+    '../candidates/manualExternalReferenceConstants.js'
+  );
+
+  const placesProfile = {
+    collectionProfileId: 'google-places-housing',
+    collectionProfileName: 'Google Places',
+    collectionMode: 'daily30' as const,
+    industryCategory: 'housing' as const,
+    areaStrategy: 'rotation' as const,
+    areaQueuePosition: 0,
+    discoverySource: 'google_places' as const,
+    discoverySourceSite: null,
+    discoverySourceLabel: 'Google Places',
+  };
+
+  const notApplicable = await runDaily30ExternalReferenceSupplement({
+    profile: placesProfile,
+    batchId: 'phase414-verify',
+    emailFound: 10,
+    reachedTarget: false,
+    existingCandidates: [],
+    dryRun: true,
+  });
+  assert(notApplicable.externalReferenceSupplementMode === 'not_applicable', 'places profile not applicable');
+  assert(notApplicable.externalReferenceNetworkAccessPerformed === false, 'not applicable no network');
+  assert(notApplicable.externalReferenceWarnings.includes('external_reference_not_applicable'), 'not applicable warning');
+
+  const portalProfile = {
+    ...placesProfile,
+    collectionProfileId: 'portal-reference',
+    discoverySource: 'portal_site_reference' as const,
+    discoverySourceSite: null,
+    discoverySourceLabel: '地域ポータル',
+  };
+  const dryRunPortal = await runDaily30ExternalReferenceSupplement({
+    profile: portalProfile,
+    batchId: 'phase414-verify',
+    emailFound: 5,
+    reachedTarget: false,
+    existingCandidates: [],
+    dryRun: true,
+  });
+  assert(dryRunPortal.externalReferenceSupplementAttempted === true, 'portal supplement attempted');
+  assert(dryRunPortal.externalReferenceSupplementMode === 'dry_run_only', 'portal dry run only');
+  assert(dryRunPortal.externalReferenceNetworkAccessPerformed === false, 'portal dry run no network');
+  assert(dryRunPortal.externalReferenceWarnings.includes('external_reference_dry_run_only'), 'dry run warning');
+
+  const wantedlyPlan = resolveDiscoveryAdapterExecutionPlan({
+    discoverySource: 'job_site_reference',
+    discoverySourceSite: 'wantedly',
+    dryRun: false,
+  });
+  const wantedlyProfile = {
+    ...placesProfile,
+    collectionProfileId: 'wantedly-ref',
+    discoverySource: 'job_site_reference' as const,
+    discoverySourceSite: 'wantedly' as const,
+  };
+  const skipped = await runDaily30ExternalReferenceSupplement({
+    profile: wantedlyProfile,
+    batchId: 'phase414-verify',
+    emailFound: 0,
+    reachedTarget: false,
+    existingCandidates: [],
+    dryRun: false,
+  });
+  assert(wantedlyPlan.canRun === false, 'wantedly plan cannot run');
+  assert(
+    skipped.externalReferenceSupplementMode === 'skipped_not_approved' ||
+      skipped.externalReferenceSupplementMode === 'blocked',
+    'wantedly skipped or blocked'
+  );
+  assert(skipped.externalReferenceNetworkAccessPerformed === false, 'wantedly no network');
+
+  const indeedPlan = resolveDiscoveryAdapterExecutionPlan({
+    discoverySource: 'job_site_reference',
+    discoverySourceSite: 'indeed',
+    dryRun: true,
+  });
+  assert(indeedPlan.mode === 'blocked', 'indeed blocked');
+  const indeedProfile = {
+    ...placesProfile,
+    discoverySource: 'job_site_reference' as const,
+    discoverySourceSite: 'indeed' as const,
+  };
+  const blocked = await runDaily30ExternalReferenceSupplement({
+    profile: indeedProfile,
+    batchId: 'phase414-verify',
+    emailFound: 0,
+    reachedTarget: false,
+    existingCandidates: [],
+  });
+  assert(blocked.externalReferenceSupplementMode === 'blocked', 'indeed supplement blocked');
+  assert(blocked.externalReferenceNetworkAccessPerformed === false, 'indeed no network');
+
+  const preview = await previewDaily30ExternalReferenceSupplement({
+    profile: portalProfile,
+    batchId: 'phase414-preview',
+    emailFound: 2,
+    reachedTarget: false,
+    existingCandidates: [],
+  });
+  assert(preview.externalReferenceNetworkAccessPerformed === false, 'preview no network');
+  assert(preview.externalReferenceSupplementMode === 'dry_run_only', 'preview dry run mode');
+
+  const manualBlocked = {
+    externalCandidateId: 'manual-blocked',
+    collectionProfileId: MANUAL_EXTERNAL_REFERENCE_PROFILE_ID,
+    sourceComplianceStatus: 'blocked_by_policy',
+    importStatus: 'preview',
+    pipelineStatus: 'collected',
+  } as import('../adapters/externalLeadCandidateTypes.js').ExternalLeadCandidate;
+  const manualOk = {
+    externalCandidateId: 'manual-ok',
+    collectionProfileId: MANUAL_EXTERNAL_REFERENCE_PROFILE_ID,
+    sourceComplianceStatus: 'needs_human_review',
+    importStatus: 'preview',
+    pipelineStatus: 'email_not_found',
+    discoverySourceUrl: 'https://example.com/listing',
+    emailSourceUrl: null,
+  } as import('../adapters/externalLeadCandidateTypes.js').ExternalLeadCandidate;
+  const manualStats = listEligibleManualExternalReferenceCandidates([manualBlocked, manualOk]);
+  assert(manualStats.available === 2, 'manual available count');
+  assert(manualStats.blocked === 1, 'manual blocked count');
+  assert(manualStats.eligible.length === 1, 'manual eligible excludes blocked');
+
+  const withManual = await runDaily30ExternalReferenceSupplement({
+    profile: placesProfile,
+    batchId: 'phase414-manual',
+    emailFound: 12,
+    reachedTarget: false,
+    existingCandidates: [manualOk],
+  });
+  assert(
+    withManual.externalReferenceManualCandidatesEligible === 1,
+    'manual eligible surfaced in supplement'
+  );
+  assert(
+    withManual.externalReferenceWarnings.includes('external_reference_manual_candidates_available'),
+    'manual available warning'
+  );
+
+  const stateFields = supplementResultToStateFields(dryRunPortal);
+  assert(stateFields.externalReferenceSupplementMode === 'dry_run_only', 'state fields mode');
+  assert(stateFields.externalReferenceNetworkAccessPerformed === false, 'state fields network false');
+  assert(typeof stateFields.externalReferenceDisplayMessage === 'string', 'state display message');
+
+  ok('Phase 41.4 Daily 30 external reference supplement checks passed');
+}
+
 function verifyPhase20LiteEmailImprovement(): void {
   assert(MAX_ADDITIONAL_CONTACT_PAGES === 4, 'additional page limit is 4');
 
@@ -5699,6 +6431,10 @@ async function main(): Promise<void> {
   await verifyPhase403CollectionScheduleUi();
   await verifyPhase404CollectionProfileDisplay();
   await verifyPhase405CollectionScheduleExecution();
+  await verifyPhase406ExternalReferenceSafety();
+  await verifyPhase412ManualExternalReference();
+  await verifyPhase413ExternalReferenceAdapterFoundation();
+  await verifyPhase414Daily30ExternalReferenceSupplement();
   verifyPhase20LiteEmailImprovement();
   await verifyPhase20LiteEmailImprovementAsync();
   await verifyPhaseBLeadInventory();

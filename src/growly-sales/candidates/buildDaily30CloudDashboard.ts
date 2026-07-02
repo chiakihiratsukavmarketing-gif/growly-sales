@@ -25,6 +25,7 @@ import { filterDaily30VisibleCandidates, countDaily30HumanExcluded, isDaily30Hum
 import { NEXT_SCHEDULED_RUN_LABEL, isCloudRunUrlConfigured, isCloudSchedulerConfigured } from '../config/cloudDeployConfig.js';
 import { countDaily30BatchMetrics } from './daily30BatchMetrics.js';
 import type { Daily30StoppedReason } from './daily30BatchMetrics.js';
+import type { ExternalReferenceSupplementMode } from './externalReferenceSupplementConstants.js';
 
 export class Daily30GcsReadError extends Error {
   constructor(message: string) {
@@ -75,6 +76,60 @@ export interface Daily30CloudDashboardPayload {
   lastRunScheduleWarning?: string | null;
   resolvedForToday?: Awaited<ReturnType<typeof resolveDaily30FetchRunContext>>;
   lastRunResolvedContext?: ReturnType<typeof buildRunContextFromCloudStateEntry>;
+  /** Phase 41.4: 外部参照補完（直近 Cloud Run エントリ由来） */
+  externalReferenceSupplementAttempted?: boolean;
+  externalReferenceSupplementMode?: ExternalReferenceSupplementMode | string;
+  externalReferenceDiscoverySource?: string;
+  externalReferenceDiscoverySourceSite?: string | null;
+  externalReferencePlanReason?: string;
+  externalReferenceWarnings?: string[];
+  externalReferenceNetworkAccessPerformed?: boolean;
+  externalReferenceCandidatesFound?: number;
+  externalReferenceCandidatesAccepted?: number;
+  externalReferenceHumanApprovalRequired?: boolean;
+  externalReferenceManualCandidatesAvailable?: number;
+  externalReferenceManualCandidatesEligible?: number;
+  plannedExternalReferenceNote?: string | null;
+  externalReferenceDisplayMessage?: string | null;
+}
+
+function externalReferenceFieldsFromEntry(
+  entry: Daily30CloudRunStateEntry | null,
+  batchId: string
+): Pick<
+  Daily30CloudDashboardPayload,
+  | 'externalReferenceSupplementAttempted'
+  | 'externalReferenceSupplementMode'
+  | 'externalReferenceDiscoverySource'
+  | 'externalReferenceDiscoverySourceSite'
+  | 'externalReferencePlanReason'
+  | 'externalReferenceWarnings'
+  | 'externalReferenceNetworkAccessPerformed'
+  | 'externalReferenceCandidatesFound'
+  | 'externalReferenceCandidatesAccepted'
+  | 'externalReferenceHumanApprovalRequired'
+  | 'externalReferenceManualCandidatesAvailable'
+  | 'externalReferenceManualCandidatesEligible'
+  | 'plannedExternalReferenceNote'
+  | 'externalReferenceDisplayMessage'
+> {
+  if (!entry || entry.batchId !== batchId) return {};
+  return {
+    externalReferenceSupplementAttempted: entry.externalReferenceSupplementAttempted,
+    externalReferenceSupplementMode: entry.externalReferenceSupplementMode,
+    externalReferenceDiscoverySource: entry.externalReferenceDiscoverySource,
+    externalReferenceDiscoverySourceSite: entry.externalReferenceDiscoverySourceSite,
+    externalReferencePlanReason: entry.externalReferencePlanReason,
+    externalReferenceWarnings: entry.externalReferenceWarnings,
+    externalReferenceNetworkAccessPerformed: entry.externalReferenceNetworkAccessPerformed,
+    externalReferenceCandidatesFound: entry.externalReferenceCandidatesFound,
+    externalReferenceCandidatesAccepted: entry.externalReferenceCandidatesAccepted,
+    externalReferenceHumanApprovalRequired: entry.externalReferenceHumanApprovalRequired,
+    externalReferenceManualCandidatesAvailable: entry.externalReferenceManualCandidatesAvailable,
+    externalReferenceManualCandidatesEligible: entry.externalReferenceManualCandidatesEligible,
+    plannedExternalReferenceNote: entry.plannedExternalReferenceNote,
+    externalReferenceDisplayMessage: entry.externalReferenceDisplayMessage,
+  };
 }
 
 function metricsFromRun(
@@ -255,6 +310,7 @@ export async function buildDaily30CloudDashboardPayload(
     resolvedForToday,
     lastRunResolvedContext:
       latestRun?.batchId === batchId ? buildRunContextFromCloudStateEntry(latestRun) : null,
+    ...externalReferenceFieldsFromEntry(latestRun, batchId),
   };
 }
 

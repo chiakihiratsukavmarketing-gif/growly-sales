@@ -1847,6 +1847,86 @@ body {
   font-size: 0.8rem;
 }
 
+.manual-external-reference-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.manual-external-reference-intro {
+  margin: 0 0 0.5rem;
+  line-height: 1.5;
+}
+
+.manual-external-reference-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.manual-external-reference-form input[type='url'],
+.manual-external-reference-form input[type='text'],
+.manual-external-reference-form textarea {
+  width: 100%;
+  max-width: 36rem;
+}
+
+.manual-external-reference-warnings {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.manual-external-reference-dup {
+  color: var(--warning-text, #b45309);
+}
+
+.manual-external-reference-result {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-subtle, #e5e7eb);
+}
+
+.external-reference-approval-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.external-reference-approval-intro {
+  margin: 0;
+}
+
+.external-reference-approval-table-wrap {
+  overflow-x: auto;
+}
+
+.external-reference-approval-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.external-reference-approval-table th,
+.external-reference-approval-table td {
+  border: 1px solid var(--color-border, #e5e7eb);
+  padding: 0.4rem 0.5rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.external-reference-approval-table th {
+  background: var(--bg-muted, #f8fafc);
+  font-weight: 600;
+}
+
+.external-reference-approval-notes {
+  max-width: 16rem;
+  font-size: 0.75rem;
+  color: var(--text-muted, #64748b);
+}
+
 .dev-json-block {
   margin: 0;
   padding: var(--space-md);

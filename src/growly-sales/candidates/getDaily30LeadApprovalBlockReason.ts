@@ -5,7 +5,20 @@ import {
   isPlaceholderEmailAddress,
   isPersonalEmailAddress,
 } from './resolveEmailSourceDisplay.js';
-import { isDaily30LeadReviewCandidate } from './selectDaily30LeadCandidates.js';
+import {
+  getLeadApprovalComplianceBlockReason,
+  getOfficialSiteUrl,
+  getPrimaryEmail,
+  getPrimaryEmailSourceUrl,
+  isEmailSourceFromExternalListingSite,
+} from './sourceCompliance.js';
+import { hostsMatchUrl } from '../adapters/discovery/externalReferenceHosts.js';
+import {
+  isDaily30LeadReviewCandidate,
+  isDaily30ManualExternalReferenceApprovalPending,
+  isManualExternalReferenceCandidate,
+} from './selectDaily30LeadCandidates.js';
+import { isDaily30PrefectureExcluded } from './daily30PrefectureRegistry.js';
 
 export interface Daily30LeadApprovalBlockHint {
   blockReason: string;
@@ -25,12 +38,45 @@ function extractDuplicateLeadName(reason: string): string | undefined {
   return undefined;
 }
 
+function getManualExternalReferenceBlockReason(
+  candidate: ExternalLeadCandidate
+): string | null {
+  if (candidate.prefecture?.trim() && isDaily30PrefectureExcluded(candidate.prefecture.trim())) {
+    return '東京都は対象外です';
+  }
+  if (!getOfficialSiteUrl(candidate)) {
+    return '公式サイト候補URLがありません';
+  }
+  const email = getPrimaryEmail(candidate);
+  if (!email) {
+    return '公式サイト上の代表メールが未確認です';
+  }
+  const emailSourceUrl = getPrimaryEmailSourceUrl(candidate);
+  if (!emailSourceUrl) {
+    return '公式サイトメールの確認元 URL がありません';
+  }
+  const discoveryUrl = candidate.discoverySourceUrl?.trim();
+  if (discoveryUrl && hostsMatchUrl(discoveryUrl, emailSourceUrl)) {
+    return '発見元URLをメール取得元として使用できません';
+  }
+  if (isEmailSourceFromExternalListingSite(candidate)) {
+    return '外部掲載サイト上のメールは使用できません';
+  }
+  if (candidate.pipelineStatus !== 'email_found') {
+    return '公式サイト上の代表メールが確認できていません';
+  }
+  return null;
+}
+
 export function getDaily30LeadApprovalBlockReason(
   candidate: ExternalLeadCandidate,
   existingLeads: Lead[],
   allCandidates: ExternalLeadCandidate[]
 ): Daily30LeadApprovalBlockHint | null {
-  if (!isDaily30LeadReviewCandidate(candidate)) {
+  const isStandardReview = isDaily30LeadReviewCandidate(candidate);
+  const isManualPending = isDaily30ManualExternalReferenceApprovalPending(candidate);
+
+  if (!isStandardReview && !isManualPending) {
     if (candidate.importStatus === 'approved_for_lead') {
       return { blockReason: '既にLead化承認済みです', canApprove: false };
     }
@@ -61,6 +107,24 @@ export function getDaily30LeadApprovalBlockReason(
       blockReason: '個人メールの可能性',
       canApprove: false,
     };
+  }
+
+  const complianceBlock = getLeadApprovalComplianceBlockReason(candidate);
+  if (complianceBlock) {
+    return {
+      blockReason: complianceBlock,
+      canApprove: false,
+    };
+  }
+
+  if (isManualExternalReferenceCandidate(candidate)) {
+    const manualBlock = getManualExternalReferenceBlockReason(candidate);
+    if (manualBlock) {
+      return {
+        blockReason: manualBlock,
+        canApprove: false,
+      };
+    }
   }
 
   return null;

@@ -65,6 +65,21 @@ export interface Daily30CloudRunStateEntry {
   effectiveFromBatchId?: string | null;
   scheduleConsumedAt?: string | null;
   scheduleConsumedBatchId?: string | null;
+  /** Phase 41.4: 外部参照補完 */
+  externalReferenceSupplementAttempted?: boolean;
+  externalReferenceSupplementMode?: string;
+  externalReferenceDiscoverySource?: Daily30DiscoverySource;
+  externalReferenceDiscoverySourceSite?: Daily30DiscoverySourceSite | null;
+  externalReferencePlanReason?: string;
+  externalReferenceWarnings?: string[];
+  externalReferenceNetworkAccessPerformed?: false;
+  externalReferenceCandidatesFound?: number;
+  externalReferenceCandidatesAccepted?: number;
+  externalReferenceHumanApprovalRequired?: boolean;
+  externalReferenceManualCandidatesAvailable?: number;
+  externalReferenceManualCandidatesEligible?: number;
+  plannedExternalReferenceNote?: string | null;
+  externalReferenceDisplayMessage?: string | null;
 }
 
 export interface Daily30CloudRunStateStore {
@@ -146,6 +161,20 @@ function normalizeEntry(raw: Partial<Daily30CloudRunStateEntry> & { batchId: str
     effectiveFromBatchId: raw.effectiveFromBatchId,
     scheduleConsumedAt: raw.scheduleConsumedAt,
     scheduleConsumedBatchId: raw.scheduleConsumedBatchId,
+    externalReferenceSupplementAttempted: raw.externalReferenceSupplementAttempted,
+    externalReferenceSupplementMode: raw.externalReferenceSupplementMode,
+    externalReferenceDiscoverySource: raw.externalReferenceDiscoverySource,
+    externalReferenceDiscoverySourceSite: raw.externalReferenceDiscoverySourceSite,
+    externalReferencePlanReason: raw.externalReferencePlanReason,
+    externalReferenceWarnings: raw.externalReferenceWarnings,
+    externalReferenceNetworkAccessPerformed: raw.externalReferenceNetworkAccessPerformed,
+    externalReferenceCandidatesFound: raw.externalReferenceCandidatesFound,
+    externalReferenceCandidatesAccepted: raw.externalReferenceCandidatesAccepted,
+    externalReferenceHumanApprovalRequired: raw.externalReferenceHumanApprovalRequired,
+    externalReferenceManualCandidatesAvailable: raw.externalReferenceManualCandidatesAvailable,
+    externalReferenceManualCandidatesEligible: raw.externalReferenceManualCandidatesEligible,
+    plannedExternalReferenceNote: raw.plannedExternalReferenceNote,
+    externalReferenceDisplayMessage: raw.externalReferenceDisplayMessage,
   };
 }
 

@@ -6,6 +6,7 @@
 **Phase 40.2 実装:** 型・JST batchId・都道府県レジストリ・schedule JSON・候補/Lead への profile 付与・verify。  
 **Phase 40.3 実装:** 候補収集タブ「明日の収集設定」UI + GET/POST API（保存のみ・Cloud Run 未連携）。
 **Phase 40.5 実装:** Cloud Run / fetch が schedule を読み、override 消費・areasUsed 記録・JST batchId 統一。  
+**Phase 40.6 実装:** 外部掲載サイト reference-only adapter + sourceCompliance + Lead化ブロック + メール分離ガード。実巡回なし。  
 詳細スキーマ: `docs/GROWLY_SALES_COLLECTION_PROFILE_SCHEMA.md`
 
 ---
@@ -493,7 +494,7 @@ SectionCard「1. 収集結果」         ← 既存
 
 **人間作業:** Cloud Run 再デプロイ（本番反映）
 
-### Phase 40.6 — 外部掲載サイト参考ルート（安全基盤）
+### Phase 40.6 — 外部掲載サイト参考ルート（安全基盤） ✅ 完了
 
 | タスク | ファイル |
 |--------|----------|
@@ -501,8 +502,64 @@ SectionCard「1. 収集結果」         ← 既存
 | コンプライアンスチェック | `candidates/sourceCompliance.ts` |
 | Lead化ブロック | `getDaily30LeadApprovalBlockReason.ts` |
 | メール分離強制 | `enrichCandidateEmailFromWebsite.ts` ガード |
+| verify | `verifyPhase406ExternalReferenceSafety` |
 
-**やらない:** 実際の求人サイト巡回（人間・方針承認後に別 Phase）
+**やらない（次 Phase）:** 実際の求人サイト・楽天・ポータル巡回（人間・方針承認後）
+
+---
+
+## 21. Phase 41 — 外部参照 Daily 30 本運用α（7/11〜11/11）
+
+**詳細:** `docs/GROWLY_SALES_EXTERNAL_REFERENCE_APPROVAL.md`
+
+| Phase | 名称 | 状態 |
+|-------|------|------|
+| 41.1 | 対象サイト・実装方針の承認準備 | ✅ 完了（2026-07-02） |
+| 41.2 | 手動 URL 投入型の外部参照候補化 | ✅ 完了（2026-07-02） |
+| 41.2.1 | 手動 URL 投入 UI 実動作確認 | ✅ 完了（2026-07-02） |
+| 41.3 | 許可済み外部参照 adapter の低頻度実装（基盤） | ✅ 完了（2026-07-02） |
+| 41.4 | Daily 30 補完ルートへの接続 | ✅ 完了（2026-07-02） |
+| 41.5 | 外部参照 Daily 30 本運用α 完了判定 | 次 |
+
+### Phase 41.4 成果（Daily 30 補完接続・実巡回なし）
+
+- `daily30ExternalReferenceSupplement.ts` — execution plan 参照・手動URL候補集計・warning / displayMessage
+- `fetchDaily30Candidates.ts` — 30件未達 / 早期停止時も supplement 実行
+- `runDaily30CloudAutoFetch.ts` — state / response に supplement フィールド
+- `buildDaily30CloudDashboard.ts` + `Daily30ExternalReferenceSupplementBanner` — UI 表示
+- `verifyPhase414Daily30ExternalReferenceSupplement`
+- **方針:** 未承認サイトは実アクセスしない。dry-run のみも実アクセスしない。`networkAccessPerformed` は常に false
+
+### Phase 41.3 成果（adapter 基盤・実巡回なし）
+
+- `externalReferenceApprovalConfig.ts` — サイト別 enabled / humanApproved / approvalStatus / rate limit
+- `resolveDiscoveryAdapterExecutionPlan()` — manual_only / dry_run_only / low_frequency_allowed / blocked
+- `runDiscoveryReferenceWithPlan()` — dry-run 計画のみ返却（networkAccessPerformed: false）
+- UI: `GET /api/daily30-external-reference/approval-status` + 承認状態テーブル
+- 取得フィールド: 会社名・公式サイト候補・掲載元 URL のみ（メールは外部掲載サイトから取得しない）
+- Daily 30 本体接続は Phase 41.4
+
+### Phase 41.2.1 成果（UI 実動作確認）
+
+- 候補収集タブで手動 URL 投入 → 候補登録 → 一覧更新まで確認
+- 古い UI サーバーによる 404（collection-schedule / manual API）を再起動で解消
+- API エラー表示改善（404 時に endpoint path を表示）
+- 収集設定 API 失敗時も候補収集タブ全体は利用可能（warning 扱い）
+- 安全ガード維持: 掲載元 URL 自動アクセスなし / email は公式サイトドメインのみ
+
+### Phase 41.3 方針（次）
+
+- adapter interface / whitelist / rate limit / dry-run / stub 拡張から着手
+- 外部サイト実巡回は**サイト別に人間承認後**
+- 求人サイト・楽天市場の本格巡回は**まだ行わない**
+
+### Phase 41.1 成果（調査のみ・実アクセスなし）
+
+- 14 カテゴリの対象サイト候補とリスク表
+- 推奨優先順位: 手動 URL → 業界団体 → 地域ポータル → … → 大規模求人自動は最後
+- 自動化可/不可の境界
+- Phase 41.2 仕様案（UI / API / verify）
+- 人間承認チェックリスト
 
 ---
 

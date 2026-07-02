@@ -55,8 +55,15 @@ import {
   importDaily30DraftCandidatesBulk,
 } from '../workflow/importDaily30DraftCandidates.js';
 import {
+  createManualExternalReferenceCandidate,
+  buildManualExternalReferenceResult,
+  type ManualExternalReferenceInput,
+} from '../candidates/createManualExternalReferenceCandidate.js';
+import { buildExternalReferenceApprovalSummary } from '../candidates/buildExternalReferenceApprovalSummary.js';
+import {
   selectDaily30LeadApprovalPending,
   selectDaily30LeadReviewCandidates,
+  selectDaily30ManualExternalReferenceApprovalPending,
 } from '../candidates/selectDaily30LeadCandidates.js';
 import { buildDaily30LeadApprovalBlockHints } from '../candidates/getDaily30LeadApprovalBlockReason.js';
 import {
@@ -414,8 +421,9 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
       const approvedForLead = visibleCandidates.filter(
         (c) => c.importStatus === 'approved_for_lead'
       );
+      const manualPending = selectDaily30ManualExternalReferenceApprovalPending(visibleCandidates);
       const approvalBlockHints = buildDaily30LeadApprovalBlockHints(
-        [...approvalPending, ...reviewCandidates],
+        [...approvalPending, ...reviewCandidates, ...manualPending],
         leads,
         candidates
       );
@@ -548,6 +556,39 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
           500,
           pathname,
           err instanceof Error ? err.message : '収集スケジュールの保存に失敗しました'
+        );
+      }
+      return;
+    }
+
+    if (req.method === 'GET' && pathname === '/api/daily30-external-reference/approval-status') {
+      const summary = await buildExternalReferenceApprovalSummary();
+      sendJson(res, 200, summary);
+      return;
+    }
+
+    if (req.method === 'POST' && pathname === '/api/daily30-external-reference/manual') {
+      const body = await readJsonBody<ManualExternalReferenceInput>(req);
+      try {
+        const existingCandidates = await loadExternalCandidatesFromJson();
+        const existingLeads = await loadLeadsOptionalForDaily30();
+        const { candidate, warnings, duplicateReason } = await createManualExternalReferenceCandidate(
+          body,
+          existingCandidates,
+          existingLeads
+        );
+        await persistExternalCandidates([...existingCandidates, candidate]);
+        sendJson(res, 200, {
+          ...buildManualExternalReferenceResult(candidate, warnings, duplicateReason),
+          generatedAt: new Date().toISOString(),
+          note: '手動外部参照候補を保存しました。掲載元URLへはアクセスしていません。',
+        });
+      } catch (err) {
+        sendApiError(
+          res,
+          400,
+          pathname,
+          err instanceof Error ? err.message : '手動外部参照候補の保存に失敗しました'
         );
       }
       return;
@@ -943,6 +984,9 @@ export function startUiServer(): void {
     console.log(`  Storage:      ${storage.backend} (${storage.externalCandidatesUri})`);
     console.log(`  CWD:          ${info.cwd}`);
     console.log(`  Reply API:    ${REPLY_MANAGEMENT_API_STATUSES.join(', ')}`);
+    console.log(
+      '  Phase41 APIs: GET/POST /api/daily30-collection-schedule, GET /api/daily30-external-reference/approval-status, POST /api/daily30-external-reference/manual'
+    );
     console.log('  自動送信なし / 候補は GROWLY_STORAGE_BACKEND に従って保存');
   });
 }

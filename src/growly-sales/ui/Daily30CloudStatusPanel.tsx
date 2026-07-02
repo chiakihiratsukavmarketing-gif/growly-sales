@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { SectionCard } from './SectionCard.js';
 import { InfoBanner } from './InfoBanner.js';
+import { DevDetails } from './common/DevDetails.js';
+import { isDevApiErrorMessage, toUserFacingApiError } from './displayLabels.js';
 import { fetchDaily30CloudStatus, type Daily30CloudStatusResponse } from './daily30CloudApi.js';
 
 interface Daily30CloudStatusPanelProps {
@@ -54,25 +56,46 @@ export function Daily30CloudStatusPanel({
 }: Daily30CloudStatusPanelProps) {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<Daily30CloudStatusResponse | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadDevError, setLoadDevError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
+    setLoadDevError(null);
     try {
       const data = await fetchDaily30CloudStatus();
       setStatus(data);
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Cloud 自動化状態の読み込みに失敗しました');
+      const message =
+        err instanceof Error ? err.message : 'Cloud 自動化状態の読み込みに失敗しました';
+      setStatus(null);
+      setLoadError(toUserFacingApiError(message));
+      if (isDevApiErrorMessage(message)) {
+        setLoadDevError(message);
+      }
     } finally {
       setLoading(false);
     }
-  }, [onError]);
+  }, []);
 
   useEffect(() => {
     void load();
   }, [load, refreshKey]);
 
   if (loading) return <p className="loading">Cloud 自動化状態を読み込み中…</p>;
-  if (!status) return null;
+  if (!status) {
+    return (
+      <SectionCard title="Cloud Scheduler（Daily 30 自動収集）" className="daily30-cloud-status-card">
+        {loadError ? <InfoBanner variant="warn">{loadError}</InfoBanner> : null}
+        {loadDevError ? (
+          <DevDetails title="Cloud 状態の読み込みエラー（開発者向け）">
+            <p className="mono-cell">{loadDevError}</p>
+          </DevDetails>
+        ) : null}
+      </SectionCard>
+    );
+  }
 
   const last = status.lastRun;
 

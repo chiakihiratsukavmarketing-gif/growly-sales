@@ -14,9 +14,17 @@ export function parseApiError(
 ): string {
   if (body && typeof body === 'object' && 'error' in body) {
     const err = body as ApiErrorResponse;
-    return err.error?.trim() || fallbackMessage;
+    const message = err.error?.trim() || fallbackMessage;
+    const endpoint = err.api?.trim() || api;
+    if (status === 404 || message === 'Not found') {
+      return `${message}: ${endpoint}`;
+    }
+    if (endpoint && endpoint !== message) {
+      return `${message} (${endpoint})`;
+    }
+    return message;
   }
-  return fallbackMessage;
+  return `${fallbackMessage} (HTTP ${status}, API: ${api})`;
 }
 
 /** 開発者向け詳細（折りたたみ表示用） */
@@ -42,7 +50,7 @@ export function parseApiErrorDev(
 export async function readApiError(res: Response, api: string, fallback: string): Promise<string> {
   try {
     const body = await res.json();
-    return parseApiError(api, res.status, body, fallback);
+    return parseApiErrorDev(api, res.status, body, fallback);
   } catch {
     return `${fallback} (HTTP ${res.status}, API: ${api})`;
   }

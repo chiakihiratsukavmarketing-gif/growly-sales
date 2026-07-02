@@ -77,6 +77,27 @@ export function isDevApiErrorMessage(message: string): boolean {
   );
 }
 
+export function extractApiEndpoint(message: string): string | null {
+  const pathMatch = message.match(/(\/api\/[^\s)—]+)/);
+  if (pathMatch) return pathMatch[1];
+  const apiMatch = message.match(/API:\s*(\S+)/);
+  return apiMatch?.[1] ?? null;
+}
+
+export function isApiNotFoundError(message: string): boolean {
+  return message.includes('Not found');
+}
+
+export function toUserFacingApiError(message: string): string {
+  const endpoint = extractApiEndpoint(message);
+  if (isApiNotFoundError(message)) {
+    return endpoint
+      ? `候補収集データの一部APIが見つかりません: ${endpoint}（UIサーバーを再起動してください）`
+      : '候補収集データの一部APIが見つかりません（UIサーバーを再起動してください）';
+  }
+  return toUserFacingError(message);
+}
+
 export function toUserFacingError(message: string): string {
   if (isDevApiErrorMessage(message)) {
     return 'データの読み込みに失敗しました。再読み込みしてください。';

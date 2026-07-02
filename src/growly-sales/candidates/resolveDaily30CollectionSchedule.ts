@@ -58,7 +58,7 @@ export function formatScheduleWarningLabel(warning: Daily30ScheduleWarning): str
     case 'schedule_profile_incomplete':
       return '収集スケジュールが不完全なため、デフォルト設定で実行します';
     case 'external_reference_collection_not_yet_implemented':
-      return '求人サイト参考は設定済みですが、外部掲載サイト探索は Phase 40.6 で実装予定です（実行は Google Places / 公式サイト検索）';
+      return '外部掲載サイト参考の安全基盤は整備済みです。実巡回は未実装のため、実行は Google Places / 公式サイト検索です';
     default:
       return warning;
   }

@@ -1,5 +1,6 @@
 import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTypes.js';
 import type { Lead } from '../types/lead.js';
+import { evaluateSourceCompliance } from './sourceCompliance.js';
 
 export type Daily30CollectionMode = 'auto_continue' | 'user_selected' | 'one_day_override' | 'manual';
 
@@ -45,7 +46,7 @@ export interface Daily30CollectionProfileSnapshot {
   areaStrategy: Daily30AreaStrategy;
   /** 探索キュー上の位置（都道府県レジストリの index を想定。未導入時は 0） */
   areaQueuePosition: number;
-  /** 発見元の分類（求人サイト等は reference のみ。Phase 40.6 で有効化予定） */
+  /** 発見元の分類（求人サイト等は reference のみ。Phase 40.6 安全基盤済み・実巡回は別 Phase） */
   discoverySource: Daily30DiscoverySource;
   discoverySourceSite: Daily30DiscoverySourceSite | null;
   discoverySourceLabel: string | null;
@@ -96,16 +97,22 @@ export function applyDaily30CollectionProfileSnapshot(
   };
 }
 
-/** emailSource 系と混同しないための最小コンプライアンス推定（Phase 40.2） */
+/** emailSource 系と混同しないためのコンプライアンス推定（Phase 40.2 → 40.6 で sourceCompliance に集約） */
 export function inferSourceComplianceStatus(
-  candidate: Pick<ExternalLeadCandidate, 'officialSiteUrl' | 'websiteUrl' | 'targetEmail' | 'emailCandidateSourceUrl'>
+  candidate: Pick<
+    ExternalLeadCandidate,
+    | 'officialSiteUrl'
+    | 'websiteUrl'
+    | 'targetEmail'
+    | 'emailCandidateSourceUrl'
+    | 'emailCandidateSourceUrls'
+    | 'emailCandidates'
+    | 'discoverySourceUrl'
+    | 'sourceUrl'
+    | 'discoverySource'
+  >
 ): Daily30SourceComplianceStatus {
-  const hasOfficial = Boolean(candidate.officialSiteUrl?.trim() || candidate.websiteUrl?.trim());
-  if (!hasOfficial) return 'official_site_not_found';
-  if (candidate.targetEmail?.trim() && candidate.emailCandidateSourceUrl?.trim()) {
-    return 'official_site_verified';
-  }
-  return 'email_not_found';
+  return evaluateSourceCompliance(candidate).status;
 }
 
 export function mapLegacySourceTypeToDiscoverySource(

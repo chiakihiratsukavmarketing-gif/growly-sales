@@ -38,6 +38,10 @@ import {
 } from './daily30BatchMetrics.js';
 import { applyDaily30DuplicateStatus } from './daily30Dedupe.js';
 import { enrichCandidateEmailFromWebsite } from './enrichCandidateEmailFromWebsite.js';
+import {
+  runDaily30ExternalReferenceSupplement,
+  type Daily30ExternalReferenceSupplementResult,
+} from './daily30ExternalReferenceSupplement.js';
 
 export interface Daily30FetchStats {
   batchId: string;
@@ -63,6 +67,7 @@ export interface Daily30FetchStats {
   stoppedReason: Daily30StoppedReason;
   durationMs: number;
   runContext?: ResolvedDaily30CollectionRunContext;
+  externalReferenceSupplement?: Daily30ExternalReferenceSupplementResult;
 }
 
 function extractCompanyNameFromWebResult(title: string, url: string): string {
@@ -219,6 +224,8 @@ export interface Daily30FetchOptions {
   runContext?: ResolvedDaily30CollectionRunContext;
   /** true のとき schedule 消費をスキップ（呼び出し側で制御） */
   skipScheduleConsume?: boolean;
+  /** true のとき外部参照補完は計画のみ（ネットワーク・保存なし） */
+  dryRun?: boolean;
 }
 
 export async function resolveDaily30FetchRunContext(
@@ -282,23 +289,20 @@ export async function fetchDaily30Candidates(
   const beforeMetrics = countDaily30BatchMetrics(workingCandidates, batchId);
   if (beforeMetrics.reachedTarget) {
     stoppedReason = 'target_email_found_reached';
-    return {
-      candidates: workingCandidates,
-      stats: buildFetchStats({
-        batchId,
-        workingCandidates,
-        initialCount,
-        queriesRun,
-        placesResults,
-        webResults,
-        areasUsed,
-        areasAttempted,
-        emailChecksRun,
-        stoppedReason,
-        startedMs,
-        runContext,
-      }),
-    };
+    return await fetchDaily30CandidatesEarlyReturn(workingCandidates, {
+      batchId,
+      workingCandidates,
+      initialCount,
+      queriesRun,
+      placesResults,
+      webResults,
+      areasUsed,
+      areasAttempted,
+      emailChecksRun,
+      stoppedReason,
+      startedMs,
+      runContext,
+    }, options);
   }
 
   ({ workingCandidates, emailChecksRun } = await verifyPendingBatchCandidates({
@@ -317,23 +321,20 @@ export async function fetchDaily30Candidates(
   });
   if (earlyStop) {
     stoppedReason = earlyStop;
-    return {
-      candidates: workingCandidates,
-      stats: buildFetchStats({
-        batchId,
-        workingCandidates,
-        initialCount,
-        queriesRun,
-        placesResults,
-        webResults,
-        areasUsed,
-        areasAttempted,
-        emailChecksRun,
-        stoppedReason,
-        startedMs,
-        runContext,
-      }),
-    };
+    return await fetchDaily30CandidatesEarlyReturn(workingCandidates, {
+      batchId,
+      workingCandidates,
+      initialCount,
+      queriesRun,
+      placesResults,
+      webResults,
+      areasUsed,
+      areasAttempted,
+      emailChecksRun,
+      stoppedReason,
+      startedMs,
+      runContext,
+    }, options);
   }
 
   for (const area of executionAreas) {
@@ -432,13 +433,83 @@ export async function fetchDaily30Candidates(
       runContext,
     });
 
-  if (!options?.skipScheduleConsume && areasAttempted > 0) {
+  const finalMetricsForSupplement = countDaily30BatchMetrics(workingCandidates, batchId);
+  const supplement = await runDaily30ExternalReferenceSupplement({
+    profile: profileSnapshot,
+    batchId,
+    emailFound: finalMetricsForSupplement.emailFound,
+    reachedTarget: finalMetricsForSupplement.reachedTarget,
+    existingCandidates: workingCandidates,
+    dryRun: options?.dryRun,
+    prefecture: executionAreas[0]?.prefecture ?? null,
+  });
+
+  if (
+    !options?.dryRun &&
+    supplement.externalReferenceCandidatesAccepted > 0 &&
+    supplement.acceptedCandidates.length > 0
+  ) {
+    for (const c of supplement.acceptedCandidates) {
+      workingCandidates = upsertCandidate(workingCandidates, c);
+    }
+  }
+
+  const statsWithSupplement = {
+    ...stats,
+    ...recountStatsAfterSupplement(workingCandidates, batchId, stats),
+    externalReferenceSupplement: supplement,
+  };
+
+  if (!options?.skipScheduleConsume && areasAttempted > 0 && !options?.dryRun) {
     await persistScheduleAfterDaily30Fetch(batchId, runContext, areasAttempted);
   }
 
   return {
     candidates: workingCandidates,
-    stats,
+    stats: statsWithSupplement,
+  };
+}
+
+function recountStatsAfterSupplement(
+  workingCandidates: ExternalLeadCandidate[],
+  batchId: string,
+  prior: Daily30FetchStats
+): Partial<Daily30FetchStats> {
+  const metrics = countDaily30BatchMetrics(workingCandidates, batchId);
+  const emailNotFound = metrics.noEmail + metrics.formOnly;
+  return {
+    collected: metrics.totalCollected,
+    totalCollected: metrics.totalCollected,
+    emailFound: metrics.emailFound,
+    formOnly: metrics.formOnly,
+    noEmail: metrics.noEmail,
+    emailNotFound,
+    excluded: metrics.excluded,
+    duplicates: metrics.duplicates,
+    reachedTarget: metrics.reachedTarget,
+    stoppedReason: metrics.reachedTarget ? 'target_email_found_reached' : prior.stoppedReason,
+  };
+}
+
+async function fetchDaily30CandidatesEarlyReturn(
+  workingCandidates: ExternalLeadCandidate[],
+  buildInput: Parameters<typeof buildFetchStats>[0],
+  options?: Daily30FetchOptions
+): Promise<{ candidates: ExternalLeadCandidate[]; stats: Daily30FetchStats }> {
+  const stats = buildFetchStats(buildInput);
+  const metrics = countDaily30BatchMetrics(workingCandidates, buildInput.batchId);
+  const supplement = await runDaily30ExternalReferenceSupplement({
+    profile: buildInput.runContext.profile,
+    batchId: buildInput.batchId,
+    emailFound: metrics.emailFound,
+    reachedTarget: metrics.reachedTarget,
+    existingCandidates: workingCandidates,
+    dryRun: options?.dryRun,
+    prefecture: buildInput.runContext.plannedAreaPrefectures[0] ?? null,
+  });
+  return {
+    candidates: workingCandidates,
+    stats: { ...stats, externalReferenceSupplement: supplement },
   };
 }
 

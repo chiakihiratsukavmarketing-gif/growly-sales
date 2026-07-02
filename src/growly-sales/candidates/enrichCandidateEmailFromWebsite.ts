@@ -2,6 +2,11 @@ import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTyp
 import { extractWebsiteContacts } from '../collectors/extractWebsiteContacts.js';
 import { DAILY_30_DOMAIN_DELAY_MS } from './daily30CandidateStatus.js';
 import { normalizeWebsiteUrl } from '../adapters/normalizeExternalLeadCandidate.js';
+import {
+  filterUrlsToOfficialSiteDomain,
+  getDiscoverySourceUrl,
+  sanitizeCandidateEmailSources,
+} from './sourceCompliance.js';
 
 const lastDomainAccess = new Map<string, number>();
 
@@ -28,19 +33,29 @@ async function waitForDomain(hostname: string): Promise<void> {
 
 /**
  * 公開サイトからメール候補を確認（トップ/会社概要/お問い合わせ等は extractWebsiteContacts が担当）。
- * 個人メールは classifyEmailCandidate 側で除外。
+ * Phase 40.6: メール取得は公式サイト URL ドメイン内のみ。discoverySourceUrl ドメインは採用しない。
  */
 export async function enrichCandidateEmailFromWebsite(
   candidate: ExternalLeadCandidate
 ): Promise<ExternalLeadCandidate> {
   const websiteUrl = normalizeWebsiteUrl(candidate.websiteUrl ?? candidate.officialSiteUrl);
   if (!websiteUrl) {
-    return {
+    return sanitizeCandidateEmailSources({
       ...candidate,
       pipelineStatus: candidate.pipelineStatus === 'duplicate' ? 'duplicate' : 'email_not_found',
       updatedAt: new Date().toISOString(),
       notes: [candidate.notes, '公式サイトURLなしのためメール確認不可'].filter(Boolean).join(' / '),
-    };
+    });
+  }
+
+  const discoveryUrl = getDiscoverySourceUrl(candidate);
+  if (discoveryUrl && discoveryUrl === websiteUrl) {
+    return sanitizeCandidateEmailSources({
+      ...candidate,
+      pipelineStatus: candidate.pipelineStatus === 'duplicate' ? 'duplicate' : 'email_not_found',
+      updatedAt: new Date().toISOString(),
+      notes: [candidate.notes, '発見元 URL を公式サイトとしてメール確認しません'].filter(Boolean).join(' / '),
+    });
   }
 
   const host = hostnameFromUrl(websiteUrl);
@@ -59,18 +74,21 @@ export async function enrichCandidateEmailFromWebsite(
           ? 'email_found'
           : 'email_not_found';
 
-    const sourceUrls = [
-      ...(candidate.emailCandidateSourceUrls ?? []),
-      ...(extraction.emailCandidateSourceUrls ?? []),
-      ...(extraction.sourceUrls ?? []),
-    ];
+    const sourceUrls = filterUrlsToOfficialSiteDomain(
+      [
+        ...(candidate.emailCandidateSourceUrls ?? []),
+        ...(extraction.emailCandidateSourceUrls ?? []),
+        ...(extraction.sourceUrls ?? []),
+      ],
+      { officialSiteUrl: candidate.officialSiteUrl ?? extraction.websiteUrl ?? websiteUrl, websiteUrl }
+    );
 
-    return {
+    const merged = sanitizeCandidateEmailSources({
       ...candidate,
       websiteUrl: extraction.websiteUrl || websiteUrl,
       officialSiteUrl: candidate.officialSiteUrl ?? extraction.websiteUrl ?? websiteUrl,
       emailCandidates: emails,
-      emailCandidateSourceUrls: [...new Set(sourceUrls)],
+      emailCandidateSourceUrls: sourceUrls,
       contactFormUrl: extraction.contactFormUrl ?? candidate.contactFormUrl,
       pipelineStatus,
       emailVerifiedAt: new Date().toISOString(),
@@ -81,18 +99,23 @@ export async function enrichCandidateEmailFromWebsite(
       notes: [
         candidate.notes,
         extraction.collectionStatus === 'failed' ? `メール確認失敗: ${extraction.error ?? ''}` : '',
+        sourceUrls.length === 0 && (extraction.emailCandidateSourceUrls?.length ?? 0) > 0
+          ? '外部掲載サイト由来 URL はメール取得元から除外'
+          : '',
       ]
         .filter(Boolean)
         .join(' / '),
-    };
+    });
+
+    return merged;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return {
+    return sanitizeCandidateEmailSources({
       ...candidate,
       pipelineStatus:
         candidate.pipelineStatus === 'duplicate' ? 'duplicate' : 'email_not_found',
       updatedAt: new Date().toISOString(),
       notes: [candidate.notes, `メール確認エラー: ${message}`].filter(Boolean).join(' / '),
-    };
+    });
   }
 }

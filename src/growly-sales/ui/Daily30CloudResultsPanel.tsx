@@ -15,6 +15,7 @@ import {
   Daily30CandidateList,
   pipelineCountChips,
 } from './Daily30CandidateCards.js';
+import { Daily30ExternalReferenceSupplementBanner } from './Daily30ExternalReferenceSupplementBanner.js';
 import { filterDaily30UiListCandidates } from './daily30ExcludeUi.js';
 
 interface Daily30CloudResultsPanelProps {
@@ -212,6 +213,8 @@ export function Daily30CloudResultsPanel({
       {data.lastRunScheduleWarning ? (
         <p className="hint warning-text daily30-run-profile-warning-banner">{data.lastRunScheduleWarning}</p>
       ) : null}
+
+      <Daily30ExternalReferenceSupplementBanner summary={data} />
 
       <DevDetails title="実行メタデータ（開発者向け）">
         <dl className="daily30-run-meta">

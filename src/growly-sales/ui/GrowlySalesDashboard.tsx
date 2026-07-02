@@ -32,7 +32,7 @@ import { SettingsView } from './SettingsView.js';
 import { CandidateCollectionView } from './CandidateCollectionView.js';
 import { PilotModeBanner } from './PilotModeBanner.js';
 import { DevDetails } from './common/DevDetails.js';
-import { isDevApiErrorMessage } from './displayLabels.js';
+import { isDevApiErrorMessage, toUserFacingApiError } from './displayLabels.js';
 import type { RecommendedActionTargetTab } from '../analytics/buildSalesDashboard.js';
 
 /** 営業フロー順（左サイドバー） */
@@ -172,6 +172,7 @@ export function GrowlySalesDashboard() {
   function handleViewError(message: string): void {
     if (isDevApiErrorMessage(message)) {
       setDevError(message);
+      setActionError(toUserFacingApiError(message));
       return;
     }
     setActionError(message);

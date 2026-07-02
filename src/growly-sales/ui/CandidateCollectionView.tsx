@@ -7,10 +7,12 @@ import { Daily30DraftImportPanel } from './Daily30DraftImportPanel.js';
 import { PageHeader } from './common/PageHeader.js';
 import { DevDetails } from './common/DevDetails.js';
 import { Daily30CollectionSchedulePanel } from './Daily30CollectionSchedulePanel.js';
+import { Daily30ManualExternalReferencePanel } from './Daily30ManualExternalReferencePanel.js';
+import { Daily30ExternalReferenceApprovalPanel } from './Daily30ExternalReferenceApprovalPanel.js';
 import type { Daily30DashboardResponse } from './daily30Api.js';
 import { Daily30OperationsPanel, Daily30SafetyRulesPanel } from './Daily30OperationsPanel.js';
 import { Daily30CloudStatusPanel } from './Daily30CloudStatusPanel.js';
-import { Daily30DashboardPanel } from './Daily30DashboardPanel.js';
+import { Daily30ExternalReferenceSupplementBanner } from './Daily30ExternalReferenceSupplementBanner.js';
 
 interface CandidateCollectionViewProps {
   daily30?: Daily30DashboardResponse | null;
@@ -98,6 +100,7 @@ export function CandidateCollectionView({
             総収集候補 {totalCollected}件 / フォームのみ {formOnly ?? 0}件 / 導線なし {noEmail ?? 0}件
           </p>
         ) : null}
+        {cloudOk ? <Daily30ExternalReferenceSupplementBanner summary={daily30} compact /> : null}
       </SectionCard>
 
       <SectionCard title="明日の収集設定" className="candidate-collection-schedule">
@@ -105,6 +108,14 @@ export function CandidateCollectionView({
           onError={onError}
           onSuccess={onSuccess}
           refreshKey={refreshKey}
+        />
+      </SectionCard>
+
+      <SectionCard title="外部参照URLから候補追加" className="candidate-manual-external-reference">
+        <Daily30ManualExternalReferencePanel
+          onError={onError}
+          onSuccess={onSuccess}
+          onChanged={onDataChanged}
         />
       </SectionCard>
 
@@ -145,6 +156,10 @@ export function CandidateCollectionView({
           onChanged={onDataChanged}
         />
       </SectionCard>
+
+      <DevDetails title="外部参照 adapter 承認状態（Phase 41.3）">
+        <Daily30ExternalReferenceApprovalPanel refreshKey={refreshKey} />
+      </DevDetails>
 
       <DevDetails title="運用フロー・開発者向け詳細">
         <ol className="daily30-flow-steps daily30-flow-steps-compact">

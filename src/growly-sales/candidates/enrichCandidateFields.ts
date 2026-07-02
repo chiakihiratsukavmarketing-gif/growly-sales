@@ -1,6 +1,6 @@
 import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTypes.js';
 import { externalCandidateDedupeKey } from '../adapters/dedupeExternalCandidates.js';
-import { inferSourceComplianceStatus } from './daily30CollectionProfile.js';
+import { evaluateSourceCompliance } from './sourceCompliance.js';
 
 /** 保存用フィールドを補完（既存JSONとの後方互換） */
 export function enrichExternalLeadCandidate(
@@ -52,7 +52,7 @@ export function enrichExternalLeadCandidate(
     sourceComplianceNote: candidate.sourceComplianceNote ?? null,
     collectionRunId: candidate.collectionRunId ?? null,
     sourceComplianceStatus:
-      candidate.sourceComplianceStatus ?? inferSourceComplianceStatus(candidate),
+      candidate.sourceComplianceStatus ?? evaluateSourceCompliance(candidate).status,
   };
 }
 

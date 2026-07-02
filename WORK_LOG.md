@@ -8,6 +8,214 @@
 
 ---
 
+## 2026-07-02 — Phase 41.4 Daily 30 補完ルート接続（execution plan 参照・実アクセスなし）
+
+**進行:** 外部参照 Daily 30 本運用α **10 / 11 フェーズ**  
+**現在地:** Phase 41.4 完了 → 次: Phase 41.5 本運用α 完了判定
+
+### 実装
+
+- `daily30ExternalReferenceSupplement.ts` — supplement 判定・手動URL候補参照・warning / displayMessage
+- `fetchDaily30Candidates.ts` — 通常収集後 / 早期 return 時に supplement 実行
+- `runDaily30CloudAutoFetch.ts` — state entry + response に supplement フィールド
+- `buildDaily30CloudDashboard.ts` — dashboard payload に supplement フィールド
+- `Daily30ExternalReferenceSupplementBanner.tsx` — 候補収集タブ / 今日の収集結果
+- `verifyPhase414Daily30ExternalReferenceSupplement`
+
+### 方針
+
+- `resolveDiscoveryAdapterExecutionPlan()` で canRun / mode を確認
+- 未承認 / dry-run / blocked → 外部アクセスなし、warning 記録
+- approved_for_low_frequency → adapter 呼び出しのみ（Phase 41.4: networkAccessPerformed 常に false）
+- 手動 URL（`manual-external-reference`）を補完候補として参照（`blocked_by_policy` 除外）
+- dryRun: plan 確認のみ。state / GCS / schedule 変更なし
+- メール取得ガード維持（外部掲載サイトメール禁止・公式サイトのみ）
+
+### Cloud Run
+
+- **再デプロイ:** 必要（人間確認後・未実施）
+- **Scheduler / Secret / force:** 不要
+
+### verify
+
+- Phase 41.4 ✅（全体 verify は既存失敗あり）
+
+### 次
+
+- Phase 41.5: 本運用α 完了判定（再デプロイ後の本番 1 回確認）
+
+---
+
+## 2026-07-02 — Phase 41.3 許可済み外部参照 adapter 基盤（低頻度実装前段）
+
+**進行:** 外部参照 Daily 30 本運用α **9 / 11 フェーズ**  
+**現在地:** Phase 41.3 完了 → 次: Phase 41.4 Daily 30 補完ルート接続
+
+### 実装
+
+- `externalReferenceApprovalConfig.ts` — サイト別承認 config（14 エントリ）
+- `resolveDiscoveryAdapterExecutionPlan()` — canRun / mode / rate limit 判定
+- `runDiscoveryReferenceWithPlan()` — dry-run / blocked / stub のみ（ネットワークなし）
+- `GET /api/daily30-external-reference/approval-status`
+- `Daily30ExternalReferenceApprovalPanel` — 候補収集タブ DevDetails 内
+- `verifyPhase413ExternalReferenceAdapterFoundation`
+
+### デフォルト方針
+
+- 手動 URL: `approved_for_manual_url`
+- 業界団体 / 地域ポータル: `approved_for_dry_run` のみ
+- Wantedly / 求人ボックス等: `not_requested`
+- Indeed / doda / マイナビ / リクナビ: `blocked`
+- 人間承認なしに `approved_for_low_frequency` へ上げない
+
+### verify
+
+- Phase 41.3 ✅ / 全体 2112 passed, 40 failed（既存）
+
+### 次
+
+- Phase 41.4: Daily 30 補完ルートへの接続
+
+---
+
+## 2026-07-02 — Phase 41.2.1 手動URL投入 UI 実動作確認
+
+**進行:** 外部参照 Daily 30 本運用α **8 / 11 フェーズ**  
+**現在地:** Phase 41.2.1 完了 → 次: Phase 41.3
+
+### 確認結果（実運用 UI）
+
+- UI サーバー再起動後、候補収集タブ上部の `Not found` 解消
+- `GET /api/daily30-collection-schedule` — 200
+- `POST /api/daily30-external-reference/manual` — 200
+- 手動 URL 投入フォームから候補登録成功（成功バナー・候補一覧更新を確認）
+- `discoverySourceUrl` と `emailSourceUrl` の分離維持
+- `shouldEnrichOfficialSiteEmail=false` で保存成功
+- 外部掲載 URL への自動アクセスなし / Gmail send・`users.drafts.create` 未使用
+- 既存 Lead / 送信履歴 / GCS 候補の削除なし
+
+### 修正（41.2 実装後の UI 不具合）
+
+- **原因:** 古い UI サーバー（Phase 41.2 前）が 3847 で稼働 → collection-schedule / manual API が 404。加えて `readApiError` が endpoint path を捨て `Not found` のみ表示。
+- `apiError.ts` — 404 時に API path をエラー文に含める
+- `displayLabels.ts` — `toUserFacingApiError` 追加
+- `Daily30CollectionSchedulePanel` — ローカル warning（全体エラー汚染を防止）
+- `Daily30ManualExternalReferencePanel` — インライン成功/エラー表示
+- `selectDaily30LeadCandidates.ts` — 不足 export 追加
+
+### verify
+
+- Phase 41.2.1 チェック ✅ / 全体 2082 passed, 39 failed（既存）
+
+### 次
+
+- Phase 41.3: 許可済み外部参照 adapter の低頻度実装（サイト別人間承認後。interface / whitelist / rate limit / dry-run / stub 拡張から）
+
+---
+
+## 2026-07-02 — Phase 41.2 手動URL投入型の外部参照候補化
+
+**進行:** 外部参照 Daily 30 本運用α **8 / 11 フェーズ**
+
+### 実装
+
+- `createManualExternalReferenceCandidate.ts` — 手動候補作成（掲載元URLへ fetch なし）
+- `POST /api/daily30-external-reference/manual`
+- `Daily30ManualExternalReferencePanel.tsx` — 候補収集タブ UI
+- Lead化承認: 手動外部参照候補を一覧表示 + ブロック理由
+- `verifyPhase412ManualExternalReference`
+
+### verify
+
+- Phase 41.2 ✅ / 全体 2073 passed, 39 failed（既存）
+
+### 次
+
+- Phase 41.3: 許可済みサイトの低頻度 adapter（人間承認後）
+
+---
+
+## 2026-07-02 — Phase 41.1 外部参照収集 承認準備
+
+**進行:** 外部参照 Daily 30 本運用α **7 / 11 フェーズ**  
+**現在地:** Phase 41.1 完了 → 次: Phase 41.2 手動 URL 投入
+
+### 成果（調査・設計のみ）
+
+- 新規: `docs/GROWLY_SALES_EXTERNAL_REFERENCE_APPROVAL.md`
+- 14 サイト候補のリスク・優先順位
+- 自動化可/不可の境界
+- Phase 41.2 仕様案 / 41.3〜41.5 ロードマップ
+- **実アクセス・スクレイピング:** 未実施
+
+### 人間承認待ち
+
+- 方針承認 → Phase 41.2 着手
+
+---
+
+## 2026-07-02 — Phase 40.6 外部掲載サイト参考ルート（安全基盤）
+
+**現在地:** Growly Sales 全体 **Phase 40.6 完了** → 次: 実巡回（人間承認後）
+
+### 実装
+
+- `adapters/discovery/` — reference-only スタブ（5 discoverySource）
+- `sourceCompliance.ts` — コンプライアンス判定 / sanitize / Lead化ブロック理由
+- `getDaily30LeadApprovalBlockReason` — blocked_by_policy / 公式サイト未確認
+- `enrichCandidateEmailFromWebsite` — 公式サイトドメイン内メールのみ
+- `verifyPhase406ExternalReferenceSafety`
+
+### verify
+
+- Phase 40.6 ✅
+- 全体: 2036 passed / 39 failed（既存失敗）
+
+### 次
+
+- Phase 40.7（案）: 求人サイト reference adapter 実装（人間承認後）
+- 運用: Gmail 手動送信7件 → 送信記録
+
+---
+
+## 2026-07-01 — 本日締め（Phase 40.5.1 Cloud Run 本番反映）
+
+**現在地:** Growly Sales 全体 **Phase 40.5.1 / 40.6**
+
+### 本日完了
+
+| Phase | 内容 |
+|-------|------|
+| 40.4 | Lead一覧・候補一覧 収集プロファイル表示 / フィルター |
+| 40.5 | `daily30-collection-schedule.json` → Daily 30 実行反映（scheduleSource / areasUsed / JST batchId / areaStrategy） |
+| 40.5.1 | Cloud Run 本番再デプロイ |
+
+### Phase 40.5.1 デプロイ結果
+
+- **commit:** `837475a` — `Apply Daily 30 collection schedule to cloud runs`
+- **Cloud Build:** SUCCESS — `sha256:db91777ca5e1da90d8c87d07440ae33482b1006cb2727f9cf034ba3f6f6dc73c`
+- **Cloud Run revision:** `growly-sales-daily30-00004-8sq`
+- **URL:** `https://growly-sales-daily30-b6rlfzmvja-an.a.run.app`
+- **dry-run:** ok / `dry_run` / `batchId=2026-07-02` / `scheduleSource=active_profile` / `plannedAreaStrategy=priority_miyagi_fukushima_yamagata` / schedule 未消費
+- **Scheduler:** `growly-daily30-auto-fetch-9am` ENABLED・`0 9 * * *` Asia/Tokyo（変更なし）
+- **本番 fetch:** 未実行（明日 9:00 Scheduler で初回確認）
+
+### 明日（2026-07-02）9:00 以降
+
+```powershell
+npm run growly-sales:phase-c-cloud-status
+```
+
+UI: http://localhost:3847 — `batchId`（JST）/ `scheduleSource` / `areasUsed` / `collectionProfileId` / 東京除外 / override 消費 / Gmail 未使用
+
+### 次セッション
+
+- 明日 9:00 本番 Scheduler 結果確認
+- **Phase 40.6:** 外部掲載サイト参考ルート（job_site_reference 等）
+- 運用: Gmail 手動送信7件 → 送信記録（`NEXT_TASKS.md` 参照）
+
+---
+
 ## 2026-07-01 — Phase 40.5 Cloud Run が schedule を読んで Daily 30 実行に反映
 
 **種別:** fetch / Cloud Run 実行ロジック。求人巡回・再デプロイは別途。
@@ -20,9 +228,9 @@
 - UI — `Daily30RunCollectionProfileSummary`
 - `verifyPhase405CollectionScheduleExecution`
 
-### 次
+### 次（→ 40.5.1 で完了）
 
-- **人間:** Cloud Run 再デプロイ
+- ~~Cloud Run 再デプロイ~~ ✅
 - Phase 40.6: 外部掲載サイト参考ルート
 
 ---
