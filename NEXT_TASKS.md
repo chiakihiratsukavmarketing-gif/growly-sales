@@ -10,7 +10,7 @@
 
 本番 Cloud Run 再デプロイ後、外部参照補完 state が記録されることを確認し、本運用α 完了判定を行う。
 
-1. Cloud Run 再デプロイ（人間確認後）
+1. Cloud Run 再デプロイ（Phase 41.4.1 で実施済み）
 2. 次回 9:00 自動実行 or 手動 FETCH で supplement フィールド確認
 3. 手動 URL 候補 → 公式サイトメール確認 → Lead 化 → 下書き → 人間送信の 1 サイクル監査
 4. Phase 41.5 完了チェックリスト（`GROWLY_SALES_EXTERNAL_REFERENCE_APPROVAL.md` §9）
@@ -27,6 +27,16 @@
 - `verifyPhase414Daily30ExternalReferenceSupplement`
 
 **Cloud Run:** 再デプロイ必要（未実施）。Scheduler / Secret 変更不要。
+
+---
+
+## ~~Phase 41.4.1 Cloud Run 本番反映~~ ✅ 完了（2026-07-02）
+
+- commit/push: `9136f08`
+- Cloud Build: `fa257460-fd85-494f-aa80-c15256fbfaf0`
+- Cloud Run revision: `growly-sales-daily30-00005-2nq`（traffic 100%）
+- 本番 dry-run: ok / mode=dry_run / supplementMode=not_applicable / networkAccessPerformed=false
+- Scheduler/Secret 変更なし
 
 ---
 

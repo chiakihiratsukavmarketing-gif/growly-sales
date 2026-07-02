@@ -39,6 +39,7 @@
 - **手動外部参照 UI 確認:** Phase 41.2.1 — 実運用 UI で登録・成功表示・一覧更新を確認済み
 - **外部参照 adapter 基盤:** Phase 41.3 — 承認 config / dry-run 計画 / rate limit（実巡回なし）
 - **外部参照 Daily 30 補完:** Phase 41.4 — execution plan 参照・手動URL候補参照・state/UI 記録（**実サイトアクセスなし**）
+- **Cloud Run 反映:** Phase 41.4.1 — Cloud Build / Cloud Run 再デプロイ（Scheduler / Secret 変更なし）
 - **API:** `GET/POST /api/daily30-collection-schedule` / `GET /api/daily30-external-reference/approval-status` / `POST /api/daily30-external-reference/manual`
 - **注意:** 本番 Cloud Run へ反映するには再デプロイが必要（40.5.1 済み）。**ローカル UI は `npm run growly-sales:ui` 再起動で最新 route を反映**（起動ログに `Phase41 APIs:` を確認）
 - スキーマ: `docs/GROWLY_SALES_COLLECTION_PROFILE_SCHEMA.md`

@@ -8,6 +8,51 @@
 
 ---
 
+## 2026-07-02 — Phase 41.4.1 Cloud Run 本番反映（外部参照補完の state/UI を反映）
+
+**進行:** 外部参照 Daily 30 本運用α **10 / 11 フェーズ**  
+**現在地:** Phase 41.4.1 完了 → 次: Phase 41.5 本運用α 完了判定
+
+### build / verify
+
+- `npm run growly-sales:ui:build` ✅
+- `npm run growly-sales:verify` ✅（Phase 41.4 supplement checks passed）
+
+### git
+
+- commit: `9136f08`（push 済み）
+- **注意:** `data/growly-sales/*`（運用データ）は commit 対象外
+
+### Cloud Build
+
+- build ID: `fa257460-fd85-494f-aa80-c15256fbfaf0`
+- image: `asia-northeast1-docker.pkg.dev/growly-scheduler/growly-sales/growly-sales-daily30:latest`
+- digest: `sha256:16cf9fbcf0c2bdef942a1d8db98f004f9eda38289a3b032bba1caf57ea9ae23b`
+- secret 値のログ出力なし（確認）
+
+### Cloud Run（growly-sales-daily30）
+
+- revision: `growly-sales-daily30-00005-2nq`（traffic 100%）
+- service account / env / secret 参照 / timeout / concurrency は維持（変更なし）
+- Scheduler / Secret 変更なし
+
+### 本番 dry-run（force=false）
+
+- ok: true / mode: `dry_run`
+- `externalReferenceSupplementMode: not_applicable`
+- `externalReferenceNetworkAccessPerformed: false`
+- 手動URL候補: available 4 / eligible 4
+- **外部サイト実アクセスなし**（dry-run）
+- **state 書き込みなし / schedule 消費なし / GCS 保存なし / Gmail API なし**
+
+### 次回 9:00 JST 確認（Phase 41.5）
+
+- `externalReferenceSupplementMode` / `externalReferenceWarnings` / `externalReferenceDisplayMessage`
+- `externalReferenceManualCandidatesAvailable` / `Eligible`
+- `networkAccessPerformed=false`
+- 東京が plannedAreas に含まれない
+- Gmail 送信・下書き作成なし
+
 ## 2026-07-02 — Phase 41.4 Daily 30 補完ルート接続（execution plan 参照・実アクセスなし）
 
 **進行:** 外部参照 Daily 30 本運用α **10 / 11 フェーズ**  
