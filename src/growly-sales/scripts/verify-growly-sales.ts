@@ -6807,6 +6807,293 @@ async function verifyPhase422RoutineOperationsUiScreen(): Promise<void> {
   ok('Phase 42.2 routine operations UI screen readiness checks passed');
 }
 
+async function verifyPhase424SendRecordSourceUrls(): Promise<void> {
+  const profileDisplay = await readFile(join(SRC_ROOT, 'ui/CollectionProfileDisplay.tsx'), 'utf-8');
+  const sendRecords = await readFile(join(SRC_ROOT, 'ui/SendRecordsView.tsx'), 'utf-8');
+  const manualDialog = await readFile(join(SRC_ROOT, 'ui/ManualSendRecordDialog.tsx'), 'utf-8');
+  const recordModule = await readFile(join(SRC_ROOT, 'workflow/recordManualGmailSent.ts'), 'utf-8');
+  const styles = await readFile(join(SRC_ROOT, 'ui/styles.css'), 'utf-8');
+
+  assert(profileDisplay.includes('収集方法'), 'send record separates collection method label');
+  assert(profileDisplay.includes('企業の発見元URL'), 'send record shows discovery source URL row');
+  assert(profileDisplay.includes('公式サイト'), 'send record shows official site row');
+  assert(profileDisplay.includes('メール取得元'), 'send record shows email source row');
+  assert(profileDisplay.includes('URL未記録'), 'missing URL shows URL未記録');
+  assert(profileDisplay.includes('target="_blank"'), 'URL links open in new tab');
+  assert(profileDisplay.includes('rel="noopener noreferrer"'), 'URL links use noopener noreferrer');
+  assert(
+    !(profileDisplay.split("variant === 'send-record'")[1]?.split("if (variant === 'compact')")[0] ?? '').includes(
+      "job_site_reference"
+    ),
+    'send-record variant does not gate discovery URL on job_site_reference'
+  );
+  assert(
+    !profileDisplay.includes('place_id') && !profileDisplay.includes('googlePlaceId'),
+    'send record UI does not synthesize Google Maps URLs'
+  );
+  assert(profileDisplay.includes('企業の発見元URL'), 'user-facing discovery URL label');
+  assert(!profileDisplay.includes('>discoverySourceUrl<'), 'no raw discoverySourceUrl label in UI');
+  assert(!profileDisplay.includes('>emailSourceUrl<'), 'no raw emailSourceUrl label in UI');
+  assert(styles.includes('.send-record-source-url-row'), 'send record URL row CSS');
+  assert(sendRecords.includes('variant="send-record"'), 'send records view uses send-record variant');
+  assert(manualDialog.includes('variant="send-record"'), 'manual send dialog uses send-record variant');
+  assert(recordModule.includes('discoverySourceUrl'), 'preview still reads stored discoverySourceUrl');
+  assert(!recordModule.includes('users.messages.send'), 'send record workflow has no Gmail send');
+  assert(!recordModule.includes('users.drafts.create'), 'send record workflow has no draft create');
+
+  const {
+    buildCollectionProfileDisplayFromLead,
+    buildCollectionProfileDisplayFromCandidate,
+  } = await import('../candidates/resolveCollectionProfileDisplay.js');
+  const { resolveEmailSourceFromLead } = await import('../candidates/resolveEmailSourceDisplay.js');
+
+  const withDiscovery = createEmptyLead({
+    id: 'phase424-discovery',
+    companyName: 'Phase424 Discovery',
+    area: '宮城県',
+    industry: '工務店',
+    discoverySource: 'google_places',
+    discoverySourceLabel: 'Google Places / 公式サイト検索',
+    discoverySourceUrl: 'https://www.google.com/maps/place/?q=place_id:ChIJ_test',
+    websiteUrl: 'https://phase424.example/',
+    emailSourceUrl: 'https://phase424.example/contact',
+    emailCandidates: ['info@phase424.example'],
+    emailCandidateSourceUrls: ['https://phase424.example/contact'],
+  });
+  const discoveryDisplay = buildCollectionProfileDisplayFromLead(withDiscovery);
+  assert(
+    discoveryDisplay.discoverySourceUrl?.includes('google.com/maps'),
+    'lead display keeps stored discoverySourceUrl'
+  );
+  const emailInfo = resolveEmailSourceFromLead(withDiscovery);
+  assert(emailInfo.officialSiteUrl?.includes('phase424.example'), 'official site resolved for display');
+  assert(emailInfo.emailSourceUrl?.includes('contact'), 'email source resolved for display');
+
+  const candidateDisplay = buildCollectionProfileDisplayFromCandidate({
+    externalCandidateId: 'phase424-cand',
+    sourceType: 'google_places' as const,
+    companyName: 'Phase424',
+    area: '仙台',
+    industry: '工務店',
+    websiteUrl: 'https://cand424.example/',
+    officialSiteUrl: 'https://cand424.example/',
+    phoneNumber: null,
+    address: null,
+    googlePlaceId: 'ChIJ_test',
+    sourceUrl: 'https://maps.google.com/?cid=424',
+    sourceQuery: 'q',
+    category: '工務店',
+    contactFormUrl: null,
+    emailCandidates: [],
+    confidenceScore: 0.8,
+    importStatus: 'preview' as const,
+    riskLevel: 'low' as const,
+    duplicateReason: '',
+    duplicateKey: 'k',
+    pipelineStatus: 'email_found' as const,
+    prefecture: '宮城県',
+    regionGroup: '宮城' as const,
+    collectionPriority: 1,
+    collectionAreaSource: '宮城県',
+    collectionBatchId: '2026-07-03',
+    emailCandidateSourceUrls: [],
+    emailVerifiedAt: null,
+    generatedEmailSubject: null,
+    generatedEmailBody: null,
+    generatedCustomHook: null,
+    generatedCustomHookReason: null,
+    targetEmail: null,
+    emailCandidateSourceUrl: null,
+    failureReason: null,
+    copyGeneratedAt: null,
+    qualityCheckedAt: null,
+    humanReviewStatus: null,
+    gmailDraftStatus: null,
+    sendStatus: null,
+    notes: '',
+    collectedAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    collectionProfileId: null,
+    collectionProfileName: null,
+    collectionMode: null,
+    areaStrategy: null,
+    discoverySource: 'google_places' as const,
+    discoverySourceUrl: null,
+    discoverySourceSite: null,
+    sourceComplianceStatus: null,
+  });
+  assert(
+    candidateDisplay.discoverySourceUrl === 'https://maps.google.com/?cid=424',
+    'candidate display falls back to stored sourceUrl when discoverySourceUrl absent'
+  );
+
+  ok('Phase 42.4 send record source URL display checks passed');
+}
+
+async function verifyPhase425RoutineOperationsUiFinalScreen(): Promise<void> {
+  const styles = await readFile(join(SRC_ROOT, 'ui/styles.css'), 'utf-8');
+  const dashboard = await readFile(join(SRC_ROOT, 'ui/GrowlySalesDashboard.tsx'), 'utf-8');
+  const profileDisplay = await readFile(join(SRC_ROOT, 'ui/CollectionProfileDisplay.tsx'), 'utf-8');
+  const sendRecords = await readFile(join(SRC_ROOT, 'ui/SendRecordsView.tsx'), 'utf-8');
+  const followUp = await readFile(join(SRC_ROOT, 'ui/FollowUpDashboardView.tsx'), 'utf-8');
+  const replyMgmt = await readFile(join(SRC_ROOT, 'ui/ReplyManagementView.tsx'), 'utf-8');
+  const searchBar = await readFile(join(SRC_ROOT, 'ui/common/SearchAndFilterBar.tsx'), 'utf-8');
+  const recordModule = await readFile(join(SRC_ROOT, 'workflow/recordManualGmailSent.ts'), 'utf-8');
+
+  assert(styles.includes('.search-filter-bar-sticky'), 'sticky search bar CSS retained');
+  assert(styles.includes('.tab-scroll-candidate-collection'), 'candidate collection nested scroll CSS');
+  assert(styles.includes('.candidate-collection-work'), 'candidate work area scroll container');
+  assert(
+    styles.includes('.candidate-collection-work .daily30-candidate-tools-sticky'),
+    'candidate search sticky scoped to work area'
+  );
+  assert(!styles.match(/\.candidate-collection-header-sticky\s*\{[^}]*position:\s*sticky/s), 'header no longer outer sticky');
+  assert(profileDisplay.includes('収集方法'), 'send record method label separated');
+  assert(profileDisplay.includes('企業の発見元URL'), 'send record discovery URL row');
+  assert(profileDisplay.includes('URL未記録'), 'honest missing URL label');
+  assert(dashboard.includes('tab-scroll-candidate-collection'), 'dashboard uses nested scroll tab');
+  assert(followUp.includes('follow-up-lead-button'), 'follow-up lead navigation button');
+  assert(followUp.includes("onNavigateToTab?.('reply-management'"), 'follow-up navigates to reply management');
+  assert(replyMgmt.includes('highlightLeadId'), 'reply management highlight selection');
+  assert(dashboard.includes('highlightLeadId={highlightLeadId}'), 'dashboard passes highlight to reply');
+  assert(searchBar.includes('search-filter-bar-sticky'), 'search bar sticky class default');
+  assert(sendRecords.includes('variant="send-record"'), 'send records final URL layout');
+  assert(!recordModule.includes('users.messages.send'), 'no auto Gmail send in record workflow');
+  assert(!recordModule.includes('users.drafts.create'), 'no auto draft create in record workflow');
+  assert(!profileDisplay.includes('place_id'), 'UI does not synthesize Maps URLs');
+
+  ok('Phase 42.5 routine operations UI final screen checks passed');
+}
+
+async function verifyPhase426CandidateSourceColumn(): Promise<void> {
+  const styles = await readFile(join(SRC_ROOT, 'ui/styles.css'), 'utf-8');
+  const cards = await readFile(join(SRC_ROOT, 'ui/Daily30CandidateCards.tsx'), 'utf-8');
+
+  assert(styles.includes('.daily30-source-label'), 'source label 2-line wrap class');
+  assert(styles.includes('minmax(12rem'), 'source column min width widened');
+  assert(styles.includes('-webkit-line-clamp: 2'), 'source label allows 2-line display');
+  assert(cards.includes('daily30-source-label'), 'queue row uses source label class');
+  assert(
+    !cards.includes('daily30-queue-col-source daily30-field-ellipsis'),
+    'source column no longer single-line ellipsis only'
+  );
+
+  ok('Phase 42.6 candidate source column display checks passed');
+}
+
+async function verifyPhase427CandidateListViewport(): Promise<void> {
+  const styles = await readFile(join(SRC_ROOT, 'ui/styles.css'), 'utf-8');
+  const cloudPanel = await readFile(join(SRC_ROOT, 'ui/Daily30CloudResultsPanel.tsx'), 'utf-8');
+  const leadPanel = await readFile(join(SRC_ROOT, 'ui/Daily30LeadCandidatesPanel.tsx'), 'utf-8');
+
+  assert(styles.includes('.daily30-candidate-queue-body'), 'scrollable queue body container');
+  assert(
+    styles.includes('min-height: calc(2rem + 5 * 3.6rem)') ||
+      styles.includes('min-height: calc(5 * 3.6rem)') ||
+      styles.includes('min-height: calc(9rem + 2rem + 5 * 3.6rem)'),
+    'queue list min height for 5 rows'
+  );
+  assert(styles.includes('.daily30-candidate-tools-compact'), 'compact tools styling');
+  assert(styles.includes('.daily30-pager-compact'), 'inline compact pager');
+  assert(cloudPanel.includes('daily30-candidate-queue-body'), 'results panel wraps list in queue body');
+  assert(leadPanel.includes('daily30-candidate-queue-body'), 'lead panel wraps list in queue body');
+  assert(cloudPanel.includes('daily30-candidate-tools-row-list'), 'results list mode compact tools row');
+  assert(!cloudPanel.includes('daily30-candidate-tools-row-secondary'), 'results panel removes secondary tools row');
+  assert(
+    styles.includes('.candidate-collection-work .daily30-candidate-tools') ||
+      styles.includes('.candidate-collection-work .daily30-candidate-tools-bar'),
+    'candidate collection scoped tools'
+  );
+
+  ok('Phase 42.7 candidate list viewport checks passed');
+}
+
+async function verifyPhase428CandidateListLayoutFix(): Promise<void> {
+  const styles = await readFile(join(SRC_ROOT, 'ui/styles.css'), 'utf-8');
+  const cloudPanel = await readFile(join(SRC_ROOT, 'ui/Daily30CloudResultsPanel.tsx'), 'utf-8');
+  const leadPanel = await readFile(join(SRC_ROOT, 'ui/Daily30LeadCandidatesPanel.tsx'), 'utf-8');
+
+  assert(styles.includes('.daily30-candidate-work-primary'), 'primary work block');
+  assert(styles.includes('.daily30-candidate-work-aux'), 'auxiliary info block');
+  assert(styles.includes('.daily30-candidate-queue-list'), 'queue list wrapper');
+  assert(styles.includes('.daily30-candidate-tools-bar'), 'non-sticky tools bar');
+  assert(
+    styles.includes('.candidate-collection-work {\n  flex: 1;\n  min-height: 0;\n  overflow-y: auto;') ||
+      styles.includes('.candidate-collection-work {\n  flex: 1;\n  min-height: 0;\n  overflow: hidden;'),
+    'work area scroll policy'
+  );
+  assert(
+    !cloudPanel.includes('daily30-candidate-tools-sticky'),
+    'results panel removes sticky tools overlap'
+  );
+  assert(
+    !leadPanel.includes('daily30-candidate-tools-sticky'),
+    'lead panel removes sticky tools overlap'
+  );
+  assert(cloudPanel.includes('daily30-candidate-work-aux'), 'results aux block separated');
+  assert(leadPanel.includes('daily30-candidate-work-aux'), 'lead aux block separated');
+  assert(
+    cloudPanel.includes('</div>\n\n      <aside className="daily30-candidate-work-aux"') ||
+      cloudPanel.includes('</div>\r\n\r\n      <aside className="daily30-candidate-work-aux"'),
+    'results aux is sibling after panel'
+  );
+  assert(
+    cloudPanel.includes('daily30-candidate-queue-list') &&
+      cloudPanel.indexOf('Daily30CandidateQueueHeader') < cloudPanel.indexOf('daily30-candidate-queue-body'),
+    'queue header outside scroll body (results)'
+  );
+  assert(
+    leadPanel.includes('daily30-candidate-queue-list') &&
+      leadPanel.indexOf('Daily30CandidateQueueHeader') < leadPanel.indexOf('daily30-candidate-queue-body'),
+    'queue header outside scroll body (lead)'
+  );
+  assert(
+    !styles.includes('.daily30-candidate-queue-body .daily30-queue-header') ||
+      !styles.match(/\.daily30-candidate-queue-body[\s\S]*?position:\s*sticky/),
+    'no sticky queue header inside scroll body'
+  );
+  assert(
+    styles.includes('.daily30-candidate-queue-list') &&
+      styles.match(/\.daily30-candidate-queue-body[\s\S]*?min-height:\s*0/),
+    'queue body shrinks inside list container'
+  );
+
+  ok('Phase 42.8 candidate list layout fix checks passed');
+}
+
+async function verifyPhase429CandidateListFinalScreen(): Promise<void> {
+  const styles = await readFile(join(SRC_ROOT, 'ui/styles.css'), 'utf-8');
+  const cloudPanel = await readFile(join(SRC_ROOT, 'ui/Daily30CloudResultsPanel.tsx'), 'utf-8');
+  const leadPanel = await readFile(join(SRC_ROOT, 'ui/Daily30LeadCandidatesPanel.tsx'), 'utf-8');
+  const cards = await readFile(join(SRC_ROOT, 'ui/Daily30CandidateCards.tsx'), 'utf-8');
+  const sendRecords = await readFile(join(SRC_ROOT, 'ui/SendRecordsView.tsx'), 'utf-8');
+  const followUp = await readFile(join(SRC_ROOT, 'ui/FollowUpDashboardView.tsx'), 'utf-8');
+  const searchBar = await readFile(join(SRC_ROOT, 'ui/common/SearchAndFilterBar.tsx'), 'utf-8');
+
+  assert(styles.includes('min-height: calc(9rem + 2rem + 5 * 3.6rem)'), 'panel min height preserves 5 visible rows');
+  assert(styles.includes('.daily30-candidate-queue-list'), 'queue list container for header/body split');
+  assert(styles.includes('scrollbar-gutter: stable'), 'scrollbar gutter for header alignment');
+  assert(styles.includes('minmax(8rem, 0.95fr)'), 'actions column wide enough for buttons');
+  assert(cloudPanel.includes('daily30-candidate-tools-bar'), 'results uses non-sticky tools bar');
+  assert(leadPanel.includes('daily30-candidate-tools-bar'), 'lead uses non-sticky tools bar');
+  assert(cloudPanel.trim().startsWith('return (\n    <>') || cloudPanel.includes('return (\n    <>'), 'results panel fragment wraps panel+aux');
+  assert(cards.includes('daily30-source-label'), 'source full-text label retained');
+  assert(sendRecords.includes('variant="send-record"'), 'send record URL layout retained');
+  assert(followUp.includes("onNavigateToTab?.('reply-management'"), 'follow-up reply navigation retained');
+  assert(searchBar.includes('search-filter-bar-sticky'), 'other tabs sticky search retained');
+  assert(
+    cloudPanel.includes('setPage(1)') || cloudPanel.includes('setPage(1);'),
+    'results filter change resets page'
+  );
+  assert(
+    leadPanel.includes('setPage(1)') || leadPanel.includes('setPage(1);'),
+    'lead filter change resets page'
+  );
+
+  ok('Phase 42.9 candidate list final screen checks passed');
+}
+
 function verifyPhase20LiteEmailImprovement(): void {
   assert(MAX_ADDITIONAL_CONTACT_PAGES === 4, 'additional page limit is 4');
 
@@ -7204,6 +7491,12 @@ async function main(): Promise<void> {
   await verifyPhase415JExternalReferenceAlphaComplete();
   await verifyPhase421RoutineOperationsUi();
   await verifyPhase422RoutineOperationsUiScreen();
+  await verifyPhase424SendRecordSourceUrls();
+  await verifyPhase425RoutineOperationsUiFinalScreen();
+  await verifyPhase426CandidateSourceColumn();
+  await verifyPhase427CandidateListViewport();
+  await verifyPhase428CandidateListLayoutFix();
+  await verifyPhase429CandidateListFinalScreen();
   verifyPhase20LiteEmailImprovement();
   await verifyPhase20LiteEmailImprovementAsync();
   await verifyPhaseBLeadInventory();

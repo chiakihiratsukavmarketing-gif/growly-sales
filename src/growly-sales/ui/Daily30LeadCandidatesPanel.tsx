@@ -267,27 +267,33 @@ export function Daily30LeadCandidatesPanel({
   const queueTitle = workQueueTitleForLeadView(view);
 
   return (
-    <div className="daily30-lead-candidates-card daily30-work-queue-panel">
-      <section className="daily30-work-queue" aria-label="Lead化作業キュー">
-        <header className="daily30-work-queue-header">
-          <div className="daily30-work-queue-header-row">
-            <h3 className="daily30-work-queue-title">
-              {queueTitle}
-              <span className="daily30-section-count">{activeList.length}件</span>
-            </h3>
-            <CandidateDisplayModeToggle
-              mode={displayMode}
-              onChange={setDisplayModePersisted}
-              disabled={operationBusy}
-            />
-          </div>
-          <p className="hint daily30-work-queue-hint">
-            Lead化承認済み {workflowCounts.approved}件 · 営業文生成待ち {workflowCounts.copyPending}件
-          </p>
-        </header>
+    <>
+      <div className="daily30-lead-candidates-card daily30-work-queue-panel">
+        <div className="daily30-candidate-work-primary">
+          <section className="daily30-work-queue" aria-label="Lead化作業キュー">
+          <header className="daily30-work-queue-header">
+            <div className="daily30-work-queue-header-row">
+              <h3 className="daily30-work-queue-title">
+                {queueTitle}
+                <span className="daily30-section-count">{activeList.length}件</span>
+              </h3>
+              <CandidateDisplayModeToggle
+                mode={displayMode}
+                onChange={setDisplayModePersisted}
+                disabled={operationBusy}
+              />
+            </div>
+            <p className="hint daily30-work-queue-hint">
+              Lead化承認済み {workflowCounts.approved}件 · 営業文生成待ち {workflowCounts.copyPending}件
+            </p>
+          </header>
 
-        <div className="daily30-candidate-tools daily30-candidate-tools-sticky">
-          <div className="daily30-candidate-tools-row">
+          <div
+            className={`daily30-candidate-tools daily30-candidate-tools-bar${displayMode === 'list' ? ' daily30-candidate-tools-compact' : ''}`}
+          >
+          <div
+            className={`daily30-candidate-tools-row${displayMode === 'list' ? ' daily30-candidate-tools-row-list' : ''}`}
+          >
             <input
               className="input"
               value={query}
@@ -302,8 +308,11 @@ export function Daily30LeadCandidatesPanel({
               <option value="generated">営業文生成済み</option>
             </select>
             {displayMode === 'list' ? (
-              <>
-                <label className="hint">
+              <div className="daily30-pager daily30-pager-compact">
+                <span className="hint daily30-pager-count">
+                  {activeList.length === 0 ? '0件' : `${start + 1}–${end}`} / {activeList.length}
+                </span>
+                <label className="hint daily30-pager-size">
                   表示件数{' '}
                   <select className="input input-xs" value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
                     <option value={10}>10</option>
@@ -311,15 +320,14 @@ export function Daily30LeadCandidatesPanel({
                     <option value={50}>50</option>
                   </select>
                 </label>
-                <div className="hint">{activeList.length === 0 ? '0件' : `${start + 1}–${end}`} / {activeList.length}件</div>
                 <button type="button" className="btn btn-secondary btn-sm" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
                   前へ
                 </button>
-                <span className="hint">{safePage} / {pageCount}</span>
+                <span className="hint daily30-pager-page">{safePage} / {pageCount}</span>
                 <button type="button" className="btn btn-secondary btn-sm" disabled={safePage >= pageCount} onClick={() => setPage((p) => Math.min(pageCount, p + 1))}>
                   次へ
                 </button>
-              </>
+              </div>
             ) : null}
           </div>
         </div>
@@ -359,24 +367,29 @@ export function Daily30LeadCandidatesPanel({
             emptyMessage="表示できる候補がありません。"
           />
         ) : (
-          <>
+          <div className="daily30-candidate-queue-list">
             <Daily30CandidateQueueHeader showActions={view !== 'approved' && view !== 'generated'} />
-            <Daily30CandidateList
-              candidates={pageItems}
-              layout="queue"
-              showApprove={view !== 'approved' && view !== 'generated'}
-              approvingId={approvingId}
-              excludingId={excludingId}
-              onApprove={(c) => void handleApprove(c)}
-              onExclude={(c) => void handleExclude(c)}
-              approvalBlockHints={approvalBlockHints}
-              emptyMessage="表示できる候補がありません。"
-            />
-          </>
+            <div className="daily30-candidate-queue-body">
+              <Daily30CandidateList
+                candidates={pageItems}
+                layout="queue"
+                showApprove={view !== 'approved' && view !== 'generated'}
+                approvingId={approvingId}
+                excludingId={excludingId}
+                onApprove={(c) => void handleApprove(c)}
+                onExclude={(c) => void handleExclude(c)}
+                approvalBlockHints={approvalBlockHints}
+                emptyMessage="表示できる候補がありません。"
+              />
+            </div>
+          </div>
         )}
-      </section>
+          </section>
+        </div>
+      </div>
 
-      <div className="daily30-generate-gate human-gate-action-block">
+      <aside className="daily30-candidate-work-aux" aria-label="Lead化・営業文の補助操作">
+        <div className="daily30-generate-gate human-gate-action-block">
         <h3 className="subsection-title">営業文生成</h3>
         <p className="hint human-gate-action-hint">
           Lead化承認済み候補に営業文を作成します。Gmail下書き・送信は行いません。
@@ -403,7 +416,8 @@ export function Daily30LeadCandidatesPanel({
             onGenerate={() => void handleGenerateCopyDev()}
           />
         </DevDetails>
-      </div>
+        </div>
+      </aside>
 
       {showGenerateModal && (
         <HumanGateConfirmModal
@@ -421,6 +435,6 @@ export function Daily30LeadCandidatesPanel({
           onCancel={() => !generating && setShowGenerateModal(false)}
         />
       )}
-    </div>
+    </>
   );
 }

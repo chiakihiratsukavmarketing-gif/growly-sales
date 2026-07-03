@@ -426,7 +426,7 @@ export function GrowlySalesDashboard() {
           )}
 
           {activeTab === 'candidate-collection' && (
-            <div className="tab-scroll">
+            <div className="tab-scroll tab-scroll-candidate-collection">
               <TabErrorBoundary
                 title="候補収集"
                 hint="API未取得や一部パネルの失敗があっても、画面全体は落とさないようにしています。"

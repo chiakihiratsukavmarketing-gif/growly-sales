@@ -175,8 +175,7 @@ body {
 
 /* ── Phase 41.5A / 41.5D: Candidate collection UI ── */
 .candidate-collection-header-sticky {
-  position: sticky;
-  top: 0;
+  flex-shrink: 0;
   z-index: 5;
   background: var(--bg-page);
   padding-bottom: 0.5rem;
@@ -2135,6 +2134,205 @@ body {
 .candidate-collection-work {
   flex: 1;
   min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Phase 42.7/42.8: panel (list) + aux siblings; list-only inner scroll */
+.candidate-collection-work > .daily30-work-queue-panel {
+  flex: 1 1 0;
+  min-height: calc(9rem + 2rem + 5 * 3.6rem);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.candidate-collection-work > .daily30-candidate-work-aux {
+  flex: 0 0 auto;
+  margin-top: 0.45rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.candidate-collection-work .daily30-candidate-work-primary {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.candidate-collection-work .daily30-candidate-work-aux .daily30-collection-info-collapse {
+  margin-top: 0.35rem;
+}
+
+.candidate-collection-work .daily30-work-queue {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.candidate-collection-work .daily30-work-queue-panel {
+  padding: 0.55rem 0.65rem;
+}
+
+.candidate-collection-work .daily30-work-queue-header {
+  margin-bottom: 0.28rem;
+  flex-shrink: 0;
+}
+
+.candidate-collection-work .daily30-work-queue-hint {
+  margin-top: 0.1rem;
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.candidate-collection-work .daily30-candidate-tools {
+  margin: 0 0 0.28rem;
+  padding: 0.38rem 0.48rem;
+  flex-shrink: 0;
+}
+
+.candidate-collection-work .daily30-candidate-tools-bar {
+  position: relative;
+  z-index: 1;
+  background: var(--bg-soft);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.candidate-collection-work .daily30-candidate-tools-compact {
+  padding: 0.32rem 0.42rem;
+}
+
+.candidate-collection-work .daily30-candidate-tools-row {
+  gap: 0.28rem;
+}
+
+.candidate-collection-work .daily30-candidate-tools-row-list {
+  grid-template-columns:
+    minmax(6.25rem, 1fr)
+    minmax(6rem, 0.82fr)
+    minmax(5.75rem, 0.72fr)
+    minmax(5.75rem, 0.72fr)
+    minmax(11rem, auto);
+  align-items: center;
+}
+
+.candidate-collection-work .daily30-lead-candidates-card .daily30-candidate-tools-row-list {
+  grid-template-columns:
+    minmax(7rem, 1.15fr)
+    minmax(7.5rem, 0.85fr)
+    minmax(11rem, auto);
+}
+
+.candidate-collection-work .daily30-candidate-tools .input {
+  padding: 0.28rem 0.4rem;
+  font-size: 0.8rem;
+  min-height: 1.7rem;
+}
+
+.candidate-collection-work .daily30-pager-compact {
+  display: flex;
+  align-items: center;
+  gap: 0.28rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.candidate-collection-work .daily30-pager-compact .hint {
+  font-size: 0.72rem;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.candidate-collection-work .daily30-pager-compact .btn-sm {
+  padding: 0.16rem 0.38rem;
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.candidate-collection-work .daily30-candidate-queue-list {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-page);
+  overflow: hidden;
+}
+
+.candidate-collection-work .daily30-candidate-queue-list .daily30-queue-header {
+  flex-shrink: 0;
+  margin-bottom: 0;
+  padding-right: calc(0.5rem + 0.6rem);
+}
+
+.candidate-collection-work .daily30-queue-header,
+.candidate-collection-work .daily30-queue-row {
+  grid-template-columns:
+    minmax(8.5rem, 1.15fr)
+    minmax(3.25rem, 0.48fr)
+    minmax(6rem, 0.82fr)
+    minmax(3.75rem, 0.52fr)
+    minmax(12rem, 2.1fr)
+    minmax(8rem, 0.95fr);
+}
+
+.candidate-collection-work .daily30-candidate-queue-body {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+}
+
+.candidate-collection-work .daily30-candidate-card-queue {
+  padding: 0.18rem 0.38rem;
+  overflow: visible;
+}
+
+.candidate-collection-work .daily30-queue-row {
+  gap: 0.28rem 0.42rem;
+}
+
+.candidate-collection-work .daily30-queue-col-actions {
+  overflow: visible;
+}
+
+.candidate-collection-work .daily30-queue-col-actions .btn-sm {
+  padding: 0.14rem 0.36rem;
+  font-size: 0.71rem;
+  white-space: nowrap;
+}
+
+.candidate-collection-work .daily30-queue-col-status .status-badge {
+  font-size: 0.63rem;
+  padding: 0.07rem 0.26rem;
+}
+
+.candidate-collection-work .daily30-source-label {
+  font-size: 0.76rem;
+  line-height: 1.28;
+}
+
+@media (max-width: 1100px) {
+  .candidate-collection-work .daily30-candidate-tools-row-list {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .candidate-collection-work .daily30-pager-compact {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
 }
 
 .daily30-work-queue-panel {
@@ -2168,9 +2366,15 @@ body {
 .daily30-queue-header,
 .daily30-queue-row {
   display: grid;
-  grid-template-columns: minmax(10rem, 1.4fr) minmax(4rem, 0.7fr) minmax(7rem, 1fr) minmax(5rem, 0.8fr) minmax(6rem, 0.9fr) minmax(9rem, 1.1fr);
-  gap: 0.5rem;
-  align-items: center;
+  grid-template-columns:
+    minmax(8.5rem, 1.15fr)
+    minmax(3.25rem, 0.48fr)
+    minmax(6rem, 0.82fr)
+    minmax(3.75rem, 0.52fr)
+    minmax(12rem, 2.1fr)
+    minmax(7.25rem, 0.92fr);
+  gap: 0.45rem 0.5rem;
+  align-items: start;
 }
 
 .daily30-queue-header {
@@ -2180,6 +2384,7 @@ body {
   color: var(--color-subtext);
   border-bottom: 1px solid var(--color-border);
   margin-bottom: 0.25rem;
+  align-items: end;
 }
 
 .daily30-candidate-card-queue {
@@ -2213,10 +2418,47 @@ body {
   flex-wrap: wrap;
   gap: 0.25rem;
   justify-content: flex-end;
+  align-self: center;
+}
+
+.daily30-queue-col-source {
+  min-width: 0;
+}
+
+.daily30-source-label {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+  font-size: 0.8rem;
+  color: var(--color-text);
+}
+
+.daily30-queue-col-status {
+  min-width: 0;
+  align-self: center;
 }
 
 .daily30-queue-col-status .daily30-candidate-badges {
   flex-wrap: wrap;
+  gap: 0.15rem;
+}
+
+.daily30-queue-col-status .status-badge {
+  font-size: 0.68rem;
+  padding: 0.12rem 0.32rem;
+  white-space: nowrap;
+}
+
+.daily30-candidate-field-source {
+  grid-column: 1 / -1;
+}
+
+.daily30-candidate-field-source .daily30-source-label {
+  font-size: 0.85rem;
 }
 
 @media (max-width: 1100px) {
@@ -2228,6 +2470,10 @@ body {
     grid-template-columns: 1fr;
     gap: 0.25rem;
     padding: 0.5rem 0;
+  }
+
+  .daily30-queue-col-source.daily30-source-label {
+    -webkit-line-clamp: 3;
   }
 
   .daily30-queue-col-actions {
@@ -3330,6 +3576,18 @@ body {
   padding-right: 2px;
 }
 
+/* Phase 42.3: nested scroll — header fixed above, search sticks inside work area */
+.tab-scroll.tab-scroll-candidate-collection {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tab-scroll.tab-scroll-candidate-collection > .candidate-collection-view {
+  flex: 1;
+  min-height: 0;
+}
+
 .leads-workspace {
   flex: 1;
   min-height: 0;
@@ -3663,11 +3921,16 @@ body {
   box-shadow: 0 2px 0 var(--color-border);
 }
 
-.daily30-candidate-tools-sticky {
-  position: sticky;
-  top: 0;
-  z-index: 7;
-  box-shadow: 0 2px 0 var(--color-border);
+.candidate-collection-work .daily30-candidate-tools-bar {
+  background: var(--bg-soft);
+}
+
+/* Legacy sticky tools — not used in candidate collection list mode (Phase 42.8) */
+.candidate-collection-work .daily30-candidate-tools-sticky {
+  position: relative;
+  z-index: 1;
+  background: var(--bg-soft);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .search-filter-controls {
@@ -4388,6 +4651,11 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .candidate-collection-view .section-card {
@@ -5096,6 +5364,50 @@ body {
   gap: 0.35rem 0.65rem;
   font-size: 0.78rem;
   color: var(--color-subtext);
+  margin-bottom: 0.35rem;
+}
+
+.send-record-source-url-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.send-record-source-method-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.send-record-source-url-row {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, 9.5rem) minmax(0, 1fr);
+  gap: 0.45rem 0.65rem;
+  align-items: start;
+}
+
+.send-record-source-url-row .collection-profile-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-subtext);
+  line-height: 1.4;
+}
+
+.send-record-source-url-row .url-link {
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+.send-record-url-missing {
+  font-size: 0.82rem;
+  color: var(--color-subtext);
+}
+
+.send-record-email-warnings {
+  margin-top: 0.45rem;
+  padding-top: 0.35rem;
+  border-top: 1px dashed var(--color-border);
 }
 
 .send-record-source-site {

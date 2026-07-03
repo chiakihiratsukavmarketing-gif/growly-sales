@@ -182,7 +182,7 @@ export function Daily30CandidateCard({
           <div className="daily30-queue-col-status">
             <CandidateStatusBadges candidate={c} />
           </div>
-          <span className="daily30-queue-col-source daily30-field-ellipsis" title={discoveryLabel}>
+          <span className="daily30-queue-col-source daily30-source-label">
             {discoveryLabel}
           </span>
           <div className="daily30-queue-col-actions daily30-card-actions">
@@ -309,9 +309,9 @@ export function Daily30CandidateCard({
             {siteUrl ? <ExternalLink href={siteUrl} /> : '—'}
           </span>
         </div>
-        <div className="daily30-candidate-field">
+        <div className="daily30-candidate-field daily30-candidate-field-source">
           <span className="daily30-field-label">収集元</span>
-          <span className="daily30-field-value daily30-field-ellipsis" title={discoveryLabel}>
+          <span className="daily30-field-value daily30-source-label">
             {discoveryLabel}
           </span>
         </div>

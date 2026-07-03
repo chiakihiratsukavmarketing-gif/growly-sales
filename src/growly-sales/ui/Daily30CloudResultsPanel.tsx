@@ -298,27 +298,33 @@ export function Daily30CloudResultsPanel({
   const queueTitle = workQueueTitleForFilter(filter);
 
   return (
-    <div className="daily30-cloud-results-card daily30-work-queue-panel">
-      <section className="daily30-work-queue" aria-label="候補作業キュー">
-        <header className="daily30-work-queue-header">
-          <div className="daily30-work-queue-header-row">
-            <h3 className="daily30-work-queue-title">
-              {queueTitle}
-              <span className="daily30-section-count">{filteredCandidates.length}件</span>
-            </h3>
-            <CandidateDisplayModeToggle
-              mode={displayMode}
-              onChange={setDisplayModePersisted}
-              disabled={operationBusy}
-            />
-          </div>
-          <p className="hint daily30-work-queue-hint">
-            承認可能な候補を先頭に表示しています。Lead化承認後は「Lead化・営業文」タブへ。
-          </p>
-        </header>
+    <>
+      <div className="daily30-cloud-results-card daily30-work-queue-panel">
+        <div className="daily30-candidate-work-primary">
+          <section className="daily30-work-queue" aria-label="候補作業キュー">
+          <header className="daily30-work-queue-header">
+            <div className="daily30-work-queue-header-row">
+              <h3 className="daily30-work-queue-title">
+                {queueTitle}
+                <span className="daily30-section-count">{filteredCandidates.length}件</span>
+              </h3>
+              <CandidateDisplayModeToggle
+                mode={displayMode}
+                onChange={setDisplayModePersisted}
+                disabled={operationBusy}
+              />
+            </div>
+            <p className="hint daily30-work-queue-hint">
+              承認可能な候補を先頭に表示しています。Lead化承認後は「Lead化・営業文」タブへ。
+            </p>
+          </header>
 
-        <div className="daily30-candidate-tools daily30-candidate-tools-sticky">
-          <div className="daily30-candidate-tools-row">
+          <div
+            className={`daily30-candidate-tools daily30-candidate-tools-bar${displayMode === 'list' ? ' daily30-candidate-tools-compact' : ''}`}
+          >
+          <div
+            className={`daily30-candidate-tools-row${displayMode === 'list' ? ' daily30-candidate-tools-row-list' : ''}`}
+          >
             <input
               className="input"
               value={query}
@@ -350,31 +356,27 @@ export function Daily30CloudResultsPanel({
                 </option>
               ))}
             </select>
-          </div>
-          <div className="daily30-candidate-tools-row daily30-candidate-tools-row-secondary">
             {displayMode === 'list' ? (
-              <>
-                <div className="hint">
-                  {filteredCandidates.length === 0 ? '0件' : `${start + 1}–${end}`} / {filteredCandidates.length}件
-                </div>
-                <div className="daily30-pager">
-                  <label className="hint">
-                    表示件数{' '}
-                    <select className="input input-xs" value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
-                      <option value={10}>10</option>
-                      <option value={25}>25</option>
-                      <option value={50}>50</option>
-                    </select>
-                  </label>
-                  <button type="button" className="btn btn-secondary btn-sm" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-                    前へ
-                  </button>
-                  <span className="hint">{safePage} / {pageCount}</span>
-                  <button type="button" className="btn btn-secondary btn-sm" disabled={safePage >= pageCount} onClick={() => setPage((p) => Math.min(pageCount, p + 1))}>
-                    次へ
-                  </button>
-                </div>
-              </>
+              <div className="daily30-pager daily30-pager-compact">
+                <span className="hint daily30-pager-count">
+                  {filteredCandidates.length === 0 ? '0件' : `${start + 1}–${end}`} / {filteredCandidates.length}
+                </span>
+                <label className="hint daily30-pager-size">
+                  表示件数{' '}
+                  <select className="input input-xs" value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                  </select>
+                </label>
+                <button type="button" className="btn btn-secondary btn-sm" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                  前へ
+                </button>
+                <span className="hint daily30-pager-page">{safePage} / {pageCount}</span>
+                <button type="button" className="btn btn-secondary btn-sm" disabled={safePage >= pageCount} onClick={() => setPage((p) => Math.min(pageCount, p + 1))}>
+                  次へ
+                </button>
+              </div>
             ) : null}
           </div>
         </div>
@@ -415,40 +417,45 @@ export function Daily30CloudResultsPanel({
             emptyMessage="作業可能な候補はありません。"
           />
         ) : (
-          <>
+          <div className="daily30-candidate-queue-list">
             <Daily30CandidateQueueHeader showActions />
-            <Daily30CandidateList
-              candidates={pageItems}
-              showApprove
-              layout="queue"
-              approvingId={approvingId}
-              excludingId={excludingId}
-              onApprove={(c) => void handleApprove(c)}
-              onExclude={(c) => void handleExclude(c)}
-              approvalBlockHints={approvalBlockHints}
-              emptyMessage="表示できる候補がありません。フィルターを変更してください。"
-            />
-          </>
+            <div className="daily30-candidate-queue-body">
+              <Daily30CandidateList
+                candidates={pageItems}
+                showApprove
+                layout="queue"
+                approvingId={approvingId}
+                excludingId={excludingId}
+                onApprove={(c) => void handleApprove(c)}
+                onExclude={(c) => void handleExclude(c)}
+                approvalBlockHints={approvalBlockHints}
+                emptyMessage="表示できる候補がありません。フィルターを変更してください。"
+              />
+            </div>
+          </div>
         )}
-      </section>
+          </section>
+        </div>
+      </div>
 
-      {humanExcludedCount > 0 ? (
-        <p className="hint daily30-excluded-hint">除外済み {humanExcludedCount}件</p>
-      ) : null}
+      <aside className="daily30-candidate-work-aux" aria-label="候補収集の補助情報">
+        {humanExcludedCount > 0 ? (
+          <p className="hint daily30-excluded-hint">除外済み {humanExcludedCount}件</p>
+        ) : null}
 
-      {(data.humanExcludedCandidates?.length ?? 0) > 0 ? (
-        <DevDetails title={`除外済み候補（${data.humanExcludedCandidates!.length}件）`}>
-          <ul className="hint-list daily30-excluded-dev-list">
-            {data.humanExcludedCandidates!.map((c) => (
-              <li key={c.externalCandidateId}>
-                {c.companyName} — {c.excludedReason ?? '理由未記録'}（{c.excludedAt ?? '—'}）
-              </li>
-            ))}
-          </ul>
-        </DevDetails>
-      ) : null}
+        {(data.humanExcludedCandidates?.length ?? 0) > 0 ? (
+          <DevDetails title={`除外済み候補（${data.humanExcludedCandidates!.length}件）`}>
+            <ul className="hint-list daily30-excluded-dev-list">
+              {data.humanExcludedCandidates!.map((c) => (
+                <li key={c.externalCandidateId}>
+                  {c.companyName} — {c.excludedReason ?? '理由未記録'}（{c.excludedAt ?? '—'}）
+                </li>
+              ))}
+            </ul>
+          </DevDetails>
+        ) : null}
 
-      <DevDetails title="今日の収集情報" className="daily30-collection-info-collapse">
+        <DevDetails title="今日の収集情報" className="daily30-collection-info-collapse">
         <InfoBanner variant={bannerVariant(data.status)}>
           <span className="daily30-run-banner">
             <strong>{cloudRunStatusLabel(data.status)}</strong>
@@ -567,7 +574,8 @@ export function Daily30CloudResultsPanel({
             </div>
           ) : null}
         </dl>
-      </DevDetails>
-    </div>
+        </DevDetails>
+      </aside>
+    </>
   );
 }
