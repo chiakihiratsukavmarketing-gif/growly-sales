@@ -8,6 +8,258 @@
 
 ---
 
+## 2026-07-03 — Phase 41.5J 外部参照 Daily 30 本運用α **完了** ✅
+
+**進行:** 外部参照 Daily 30 本運用α **18 / 18 フェーズ完了**
+
+### Cloud 自然実行（2026-07-03 09:07 JST）
+
+- batchId: **2026-07-03** / revision: `growly-sales-daily30-00005-2nq`
+- status: `partial_success` / stoppedReason: `max_candidates_reached`
+- supplement state: `runs['2026-07-03']` に 8キー保存済み
+- networkAccessPerformed: **false** / manual: **4/4** / 東京除外: **NO**
+- 候補総数 **276**（本日 +120）/ 本日 Lead化レビュー **28**
+
+### compliance・UI・build
+
+- UI/API矛盾 **0** / updateEligible **0**
+- ui:build **成功** / verify **2301 passed, 46 failed**（既存・Phase 41.5 全通過）
+- UI実画面: 本日batch反映・28件・判定矛盾なし・外部参照ドロワー動作
+
+### 41.5J 修正
+
+- `normalizeExternalLeadCandidate.ts` — `normalizeWebsiteUrl` import 修正（verify fatal 解消）
+- `verifyPhase415JExternalReferenceAlphaComplete` 追加
+
+**次ゴール: 人間確認待ち**（勝手に次フェーズを開始しない）
+
+## 2026-07-02 セッション締め
+
+**本日の到達点:** 外部参照 Daily 30 本運用α **17 / 18**（本運用αは **未完了**）
+
+| 完了 | 内容 |
+|------|------|
+| ✅ | Phase 41.5G — Lead化承認判定の矛盾修正・監査 |
+| ✅ | Phase 41.5H — compliance dry-run |
+| ✅ | Phase 41.5H-2 — GCS compliance 23件永続化（バックアップ・再監査済み） |
+| ✅ | Phase 41.5I — 診断完了（Cloud supplement state 未達で本運用α保留） |
+| ✅ | ui:build 修復（browser-safe モジュール分離） |
+
+**明日の最初の作業（人間）:** 2026-07-03 09:00 JST 自然実行後 → Phase **41.5J**
+
+```powershell
+cd "C:\Users\chiak\AI_\Growly Sales"
+npm run growly-sales:phase-c-cloud-status
+```
+
+合格目安: `batchId=2026-07-03`、supplement 8キーが raw GCS に存在、manual 候補数が数値、東京除外、networkAccessPerformed=false
+
+**今日やらないこと:** 再デプロイ / Scheduler / Secret 変更 / Gmail送信・下書き本番 / force=true / 自動Lead化
+
+**GCS バックアップ（compliance apply）:** `gs://growly-sales-daily30/prod/growly-sales/external-candidates.json.2026-07-02T14-41-36-919Z.bak`
+
+**未コミット:** 本日のコード・docs・dist/ui 変更はワークツリーに残存（コミットは未実施）
+
+---
+
+## 2026-07-02 — Phase 41.5I Cloud state 確認・本運用α最終判定（未完了）
+
+**進行:** 外部参照 Daily 30 本運用α **17 / 18 フェーズ**（本運用αは未完了）  
+**次:** Phase 41.5J — 2026-07-03 09:00 JST 自然実行後の supplement state 再確認
+
+### Cloud state（読み取り）
+
+- 最新 batchId: **2026-07-02**（finishedAt 2026-07-02T00:04:53Z = 09:04 JST）
+- status: partial_success / revision 対象: **growly-sales-daily30-00005-2nq**（14:54 JST デプロイ）
+- raw GCS supplement 8キー: **すべて inRaw: false**（41.5F 未達継続）
+- networkAccessPerformed: false（型上） / 東京除外: NO
+
+### compliance 再監査 ✅
+
+- audit-lead-approval-judgment: 矛盾 **0**
+- phase415h dry-run: updateEligible **0** / 156件維持 / 意図的スキップ4件のみ
+
+### ui:build 修復 ✅
+
+- 原因: UI bundle が `outreachPolicy` → `offerProfile` → `paths.ts` および `dedupe` → `normalizeExternalLeadCandidate` → `targetProfile` を引き込み
+- 修正: `offerProfileRules.ts` / `targetProfileRules.ts` / `externalCandidateUrlUtils.ts` に分離
+- **Phase 41.5H-2 とは無因果**（既存の shared import 問題）
+- `npm run growly-sales:ui:build` → **成功**
+
+### UI 実画面（localhost:3847）
+
+- 白画面なし / 1件ずつ・前へ次へ・Lead化承認ボタン表示
+- 福井建設: 公式サイト代表メール確認済み + Lead化可能（矛盾なし）
+
+### verify
+
+- `verifyPhase415IFinalAlphaJudgment` 追加
+- Phase 41.5G/H/H-2/I 専用チェック通過（全体 failed は既存46件前後）
+
+## 2026-07-02 — Phase 41.5H-2 GCS compliance 永続化 apply ✅
+
+**進行:** 外部参照 Daily 30 本運用α **16 / 17 フェーズ**  
+**次:** Phase 41.5I — Cloud state 確認・本運用α最終判定
+
+### apply 結果
+
+- コマンド: `npm run growly-sales:phase415h-compliance-apply -- --apply --confirm=APPLY_COMPLIANCE_REFRESH`
+- 更新前 generation: `1782965285076398` → 書き込み後: `1783003297651494`
+- バックアップ: `gs://growly-sales-daily30/prod/growly-sales/external-candidates.json.2026-07-02T14-41-36-919Z.bak`（検証 OK）
+- 更新: **23件** / `sourceComplianceStatus` + `sourceComplianceNote` + `sourceComplianceCheckedAt`
+- 候補総数 **156** 維持 / compliance 以外差分 **0** / GCS書き込み **1回**
+- 再監査: `audit-lead-approval-judgment` 矛盾 **0** / dry-run `updateEligible` **0**
+- verify: Phase 41.5H-2 ✅（2275 passed, 46 failed は既存）
+
+### 23件 vs 26件・厳しくなる1件
+
+- **26→23:** 3件は `imported_or_excluded`（ウツミ工務店・住まいのリフォーム・AKCIA・㈱徳田工務店）
+- **厳しくなる1件:** Banana works LABO（`66309f56-…`）— `imported` のため **23件外**（stored `official_site_verified` → fresh `blocked_by_policy` / プレースホルダメール）
+
+### 実装
+
+- `phase415hCompliancePersistenceApply.ts` / `run-growly-sales-phase415h-compliance-apply.ts`
+- `gcsWriteJsonIfGenerationMatch` / バックアップ検証
+- `sourceComplianceCheckedAt` optional フィールド
+- `verifyPhase415H2CompliancePersistence`
+
+## 2026-07-02 — Phase 41.5H GCS compliance 永続化 dry-run（人間承認待ち）
+
+**進行:** 外部参照 Daily 30 本運用α **15 / 17 フェーズ**  
+**GCS書き込み: 0件**
+
+### dry-run
+
+- コマンド: `npm run growly-sales:phase415h-compliance-dry-run`
+- GCS生JSON 156件 / 更新対象 **23件** / status相違 26件（多くは `email_not_found` → `official_site_verified`）
+- generation: `1782965285076398`（apply時競合検知用）
+- レポート: `data/growly-sales/phase415h-compliance-dry-run-report.json`
+- 41.5G前提（UI/API矛盾）: **0件** ✅
+
+## 2026-07-02 — Phase 41.5G Lead化承認判定の根本監査・不整合修正
+
+**進行:** 外部参照 Daily 30 本運用α **15 / 16 フェーズ**  
+**現在地:** Phase 41.5G 完了 → 次: **41.5H** 既存候補の安全な再評価（GCS永続化）・**41.5I** Cloud state 最終確認
+
+### 根本原因
+
+1. **`getLeadApprovalComplianceBlockReason`** が保存済み `sourceComplianceStatus` を優先し、鮮度のない `email_not_found` 等でブロックしていた
+2. **`enrichExternalLeadCandidate`** が既存 `sourceComplianceStatus` を温存し、読み込み時に再評価していなかった
+3. **フォーカスUI** が `emailSourceConfirmed`（URL記録の有無）を「公式サイト代表メール確認済み」と誤表示
+4. **`approveExternalCandidateForLead` API** が compliance ブロックを再判定していなかった
+
+### 修正
+
+- `evaluateSourceCompliance` を常に最新判定源に統一
+- `enrichExternalLeadCandidate` → `applySourceComplianceFields` で読み込み時再計算
+- `resolveDaily30LeadApprovalJudgment.ts` — UI/API 共通判定
+- フォーカスカード判定行を `representativeEmailLabel` に統一
+- 承認 API に `getDaily30LeadApprovalBlockReason` ゲート追加
+- `isUrlOnOfficialSiteDomain` — サブドメイン一致対応
+- `verifyPhase415GLeadApprovalJudgmentAudit` / `growly-sales:audit-lead-approval-judgment`
+
+## 2026-07-02 — Phase 41.5F supplement state 最終確認（未合格）
+
+**進行:** 外部参照 Daily 30 本運用α **14 / 15 フェーズ（Cloud state 未達で保留）**  
+**現在地:** Phase 41.5F 診断完了 → 次: **2026-07-03 09:00 JST 自然実行後** に再確認
+
+### 診断結果（`npm run growly-sales:phase-c-cloud-status`）
+
+- 最新 batchId: `2026-07-02`（**当日 JST だが supplement 版 revision 実行前のエントリ**）
+- status: `partial_success` / 東京なし ✅ / `networkAccessPerformed=false`（未記録→デフォルト）✅
+- **supplement 系フィールドは GCS state JSON 全体に 1件も未保存**（`externalReference` キーなし）
+
+### 時系列（読み取り専用調査）
+
+| イベント | 時刻（UTC → JST） |
+|----------|-------------------|
+| 2026-07-02 自然実行完了 | `00:04:53 UTC` → **09:04 JST** |
+| revision `00005-2nq` 作成（Phase 41.4.1） | `05:54:21 UTC` → **14:54 JST** |
+| GCS state `updatedAt` | `00:04:53 UTC`（以降更新なし） |
+
+- 自然実行は **revision 00004 以前**（supplement state 書き込みなし）で実行された
+- traffic 100% は `00005-2nq` だが、**次回 9:00 JST 自然実行（2026-07-03）は未実施**
+- コード: `attachSupplementToEntry` → `supplementResultToStateFields` → `recordCloudRunEntry` は実装済み。serializer でフィールド脱落なし
+- 同日再実行は `DUPLICATE_GUARD_ALREADY_RAN`（force=false）でスキップ
+
+### 判定
+
+- **未合格** — 15/15 本運用α完了には進めない
+- **人間作業:** 2026-07-03 09:00 JST 自然実行後に `phase-c-cloud-status` 再実行。`force=true` / 再デプロイは不要（00005 は既に traffic 100%）
+
+## 2026-07-02 — Phase 41.5E 1件ずつフォーカスモード
+
+**進行:** 外部参照 Daily 30 本運用α **13 / 14 フェーズ（UI完了・Cloud state未達）**  
+**現在地:** Phase 41.5E UI完了 → 次: **Phase 41.5F** 次回9:00自然実行後の supplement state 確認
+
+### 変更点（UI）
+
+- 収集結果 / Lead化・営業文タブに **[1件ずつ] [一覧]** 切替（初期値 focus、localStorage にモードのみ保存）
+- `Daily30CandidateFocusView` — 1候補カード、判定表示、前へ/次へ、残件数・処理済み件数
+- 「あとで確認」— セッション内でキュー末尾へ移動（全件defer時はリセット導線）
+- Lead化承認・除外成功後に次候補へ（`recordProcessed` + キュー更新）
+- 一覧モードは Phase 41.5D のキューUIを維持
+- `verifyPhase415EFocusMode` 追加
+
+### Cloud state（2026-07-02 診断時点）
+
+- 最新 batchId `2026-07-02` / partial_success / 東京なし ✅
+- `externalReferenceSupplement*` 系フィールド **未記録**（attempted=false, mode=—）
+- 原因推定: 当日自然実行が supplement state 書き込み前の revision で実行された可能性
+- **本運用α完了は次回9:00 JST自然実行後の state 確認まで保留**
+
+### 実画面確認（2026-07-02）
+
+- 候補収集タブ白画面なし / React error #310 なし
+- [1件ずつ] [一覧] 切替（収集結果・Lead化タブ）動作
+- フォーカス1件表示・前へ/次へ・残件数（23 / 26）表示
+- 一覧モードは Phase 41.5D キュー（23件・ページング）維持
+- Lead化承認・除外の本番操作は未実施（人間確認待ち）
+
+### build / verify
+
+- `npm run growly-sales:ui:build` ✅
+- Phase 41.5A / 41.5C / 41.5D / **41.5E** ✅
+
+## 2026-07-02 — Phase 41.5D 候補収集UIの作業キュー化
+
+**進行:** 外部参照 Daily 30 本運用α **13 / 14 フェーズ**  
+**現在地:** Phase 41.5D 完了 → 次: Phase 41.5E（1件ずつフォーカスモード・本運用α最終判定）
+
+### 変更点（UI）
+
+- 上部サマリーを **1行（今日/明日）** に圧縮し、作業キューを画面上部へ
+- 画面幅を **最大1400px** に拡大
+- 収集結果の **重複一覧（メール取得済 + フィルター結果）を単一作業キューに統合**
+- 実行メタ・収集設定・supplement を **「今日の収集情報」折りたたみ** へ移動
+- 候補一覧を **キュー行レイアウト**（会社名｜エリア｜メール｜状態｜収集元｜操作）に変更
+- 人間ゲート・TabErrorBoundary・Hook順序（41.5C）を維持
+
+### build / verify
+
+- `verifyPhase415DWorkQueueUi` 追加
+
+## 2026-07-02 — Phase 41.5C React error #310 Hook順序修正
+
+**進行:** 外部参照 Daily 30 本運用α **11 / 12 フェーズ**  
+**現在地:** Phase 41.5A 完了 → 次: Phase 41.5B 最終完了判定
+
+### 変更点（UI）
+
+- 候補収集タブを **作業タブ切替方式**へ（収集結果 / Lead化・営業文 / 下書き取り込み）
+- 上部を **sticky** にして「今日の状態」「明日の設定（1行要約）」「作業ナビ」を固定
+- 明日の収集設定は **要約 + 詳細（DevDetails）**へ
+- 外部参照候補追加フォームは **右ドロワー**へ移動（通常画面を圧迫しない）
+- 収集結果・Lead化・営業文は **検索/フィルター/10件ページング**を追加し、承認可能を優先表示
+- 下書き取り込みは **0件時の表示を簡潔化**（大きなカード群を出さない）
+- 技術名（discoverySourceUrl 等）は通常ラベルから除去し DevDetails へ
+- TabErrorBoundary 維持（白画面回避）
+
+### build / verify
+
+- `npm run growly-sales:ui:build` ✅
+- `verifyPhase415ACandidateCollectionUiOptimization` ✅（全体 verify は既存失敗あり）
+
 ## 2026-07-02 — Phase 41.4.1 Cloud Run 本番反映（外部参照補完の state/UI を反映）
 
 **進行:** 外部参照 Daily 30 本運用α **10 / 11 フェーズ**  

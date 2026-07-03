@@ -40,6 +40,8 @@
 - **外部参照 adapter 基盤:** Phase 41.3 — 承認 config / dry-run 計画 / rate limit（実巡回なし）
 - **外部参照 Daily 30 補完:** Phase 41.4 — execution plan 参照・手動URL候補参照・state/UI 記録（**実サイトアクセスなし**）
 - **Cloud Run 反映:** Phase 41.4.1 — Cloud Build / Cloud Run 再デプロイ（Scheduler / Secret 変更なし）
+- **候補収集UI最適化:** Phase 41.5A — 作業タブ切替 / ドロワー化 / ページング（運用詰まりを減らす）
+- **Lead化判定:** Phase 41.5G — 共通判定・UI/API整合 / Phase 41.5H — GCS compliance dry-run（**書き込み未実施・人間承認待ち**）
 - **API:** `GET/POST /api/daily30-collection-schedule` / `GET /api/daily30-external-reference/approval-status` / `POST /api/daily30-external-reference/manual`
 - **注意:** 本番 Cloud Run へ反映するには再デプロイが必要（40.5.1 済み）。**ローカル UI は `npm run growly-sales:ui` 再起動で最新 route を反映**（起動ログに `Phase41 APIs:` を確認）
 - スキーマ: `docs/GROWLY_SALES_COLLECTION_PROFILE_SCHEMA.md`
@@ -285,3 +287,19 @@ npm run growly-sales:ui
 - 署名 Email: `c_hiratsuka@wantreach.jp`
 - 返信本文全文は保存せず `replySummary` のみ
 - APIキー / refresh token / secret は画面・ログに出さない
+
+## Phase 41.5I / 41.5J — 本運用α最終ゲート（外部参照 supplement state）
+
+**41.5I（2026-07-02）:** 診断完了。supplement キーは 7/2 09:04 実行（デプロイ前）のため未保存。
+
+**41.5J（2026-07-03）:** ✅ **本運用α完了**
+
+- batchId `2026-07-03` / revision `growly-sales-daily30-00005-2nq`
+- `runs['2026-07-03']` に supplement 8キー保存
+- `externalReferenceNetworkAccessPerformed=false` / manual 4/4 / 東京除外
+
+```powershell
+npm run growly-sales:phase-c-cloud-status
+```
+
+

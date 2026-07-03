@@ -1,61 +1,54 @@
 # Growly Sales — NEXT_TASKS
 
-**更新日:** 2026-07-02  
-**進行:** 外部参照 Daily 30 本運用α 完了まで **10 / 11 フェーズ**  
-**現在フォーカス:** **Phase 41.5** — 外部参照 Daily 30 本運用α 完了判定
+**更新日:** 2026-07-03  
+**進行:** 外部参照 Daily 30 本運用α **18 / 18 フェーズ完了** ✅
 
 ---
 
-## 最優先 — Phase 41.5
+## 本運用α完了
 
-本番 Cloud Run 再デプロイ後、外部参照補完 state が記録されることを確認し、本運用α 完了判定を行う。
+**Growly Sales 外部参照 Daily 30 本運用α** — 2026-07-03 Phase 41.5J で正式完了。
 
-1. Cloud Run 再デプロイ（Phase 41.4.1 で実施済み）
-2. 次回 9:00 自動実行 or 手動 FETCH で supplement フィールド確認
-3. 手動 URL 候補 → 公式サイトメール確認 → Lead 化 → 下書き → 人間送信の 1 サイクル監査
-4. Phase 41.5 完了チェックリスト（`GROWLY_SALES_EXTERNAL_REFERENCE_APPROVAL.md` §9）
-
-**まだやらない:** 未承認サイトの実巡回 / Wantedly・Indeed 等の本格 crawl
+**次ゴールは人間確認待ち。** 勝手に次フェーズを開始しない。
 
 ---
 
-## ~~Phase 41.4 Daily 30 補完ルート接続~~ ✅ 完了（2026-07-02）
+## 今日の通常運用（人間作業）
 
-- `daily30ExternalReferenceSupplement.ts` — execution plan 参照
-- `fetchDaily30Candidates` / Cloud Run — supplement 接続
-- state / dashboard / UI バナー
-- `verifyPhase414Daily30ExternalReferenceSupplement`
+1. UI: `http://localhost:3847` → 候補収集
+2. 本日 batch（2026-07-03）Lead化レビュー **28件** を確認
+3. Lead化承認 → 営業文生成 → 下書き取り込み（各ゲートは人間承認）
+4. Gmail送信は Gmail 画面で手動のみ
 
-**Cloud Run:** 再デプロイ必要（未実施）。Scheduler / Secret 変更不要。
-
----
-
-## ~~Phase 41.4.1 Cloud Run 本番反映~~ ✅ 完了（2026-07-02）
-
-- commit/push: `9136f08`
-- Cloud Build: `fa257460-fd85-494f-aa80-c15256fbfaf0`
-- Cloud Run revision: `growly-sales-daily30-00005-2nq`（traffic 100%）
-- 本番 dry-run: ok / mode=dry_run / supplementMode=not_applicable / networkAccessPerformed=false
-- Scheduler/Secret 変更なし
+**禁止:** 自動送信 / force=true / 再デプロイ / Scheduler・Secret変更
 
 ---
 
-## ~~Phase 41.3 許可済み外部参照 adapter 基盤~~ ✅ 完了（2026-07-02）
-
----
-
-## ~~Phase 41.2.1 手動URL投入 UI 実動作確認~~ ✅ 完了（2026-07-02）
-
----
-
-## 並行運用 — Gmail 手動送信7件
-
-Growly Sales **からは送信しない**。Gmail 下書き7件を人間が確認して送信後、送信記録タブで記録。
-
----
-
-## ロードマップ（残り）
+## 直近完了（参照）
 
 | Phase | 内容 |
 |-------|------|
-| **41.5** | 本運用α 完了判定 |
+| 41.5H-2 | compliance 23件 GCS永続化 |
+| 41.5I | Cloud診断・ui:build修復 |
+| 41.5J | 7/3自然実行supplement state・本運用α完了判定 |
+
+---
+
+## 未コミット
+
+コード・docs・dist/ui に変更あり。**git commit は人間確認後。**
+
+コミット候補のまとまり:
+1. Phase 41.5G〜41.5J（判定・compliance・UI・verify）
+2. docs / WORK_LOG / NEXT_TASKS
+3. dist/ui（production build）
+4. data/ verify 成果物・schedule backup（別コミットまたは除外を検討）
+
+**.env / credentials はコミットしない。**
+
+---
+
+## 参照
+
+- `docs/GROWLY_SALES_DAILY30_RUNBOOK.md`
+- compliance バックアップ: `gs://growly-sales-daily30/prod/growly-sales/external-candidates.json.2026-07-02T14-41-36-919Z.bak`
