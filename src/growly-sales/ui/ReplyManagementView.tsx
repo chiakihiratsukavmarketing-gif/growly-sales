@@ -36,6 +36,7 @@ interface ReplyManagementViewProps {
   onError: (message: string) => void;
   onUpdated?: (lead: Lead) => void;
   refreshKey?: number;
+  highlightLeadId?: string | null;
 }
 
 function startOfToday(): Date {
@@ -81,6 +82,7 @@ export function ReplyManagementView({
   onError,
   onUpdated,
   refreshKey = 0,
+  highlightLeadId = null,
 }: ReplyManagementViewProps) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -146,14 +148,25 @@ export function ReplyManagementView({
   }, [selectedLead?.id]);
 
   useEffect(() => {
+    if (!highlightLeadId || loading) return;
+    if (!contactedLeads.some((l) => l.id === highlightLeadId)) return;
+    setSearch('');
+    setStatusFilter('all');
+  }, [highlightLeadId, loading, contactedLeads]);
+
+  useEffect(() => {
     if (filteredLeads.length === 0) {
       setSelectedId(null);
+      return;
+    }
+    if (highlightLeadId && filteredLeads.some((l) => l.id === highlightLeadId)) {
+      setSelectedId(highlightLeadId);
       return;
     }
     if (!selectedId || !filteredLeads.some((l) => l.id === selectedId)) {
       setSelectedId(filteredLeads[0].id);
     }
-  }, [filteredLeads, selectedId]);
+  }, [filteredLeads, selectedId, highlightLeadId]);
 
   useEffect(() => {
     if (!selectedId) return;

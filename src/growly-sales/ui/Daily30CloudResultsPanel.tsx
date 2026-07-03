@@ -317,7 +317,7 @@ export function Daily30CloudResultsPanel({
           </p>
         </header>
 
-        <div className="daily30-candidate-tools">
+        <div className="daily30-candidate-tools daily30-candidate-tools-sticky">
           <div className="daily30-candidate-tools-row">
             <input
               className="input"

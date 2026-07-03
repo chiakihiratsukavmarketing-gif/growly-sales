@@ -18,6 +18,8 @@ interface SearchAndFilterBarProps {
   onAreaFilterChange?: (value: string) => void;
   areaFilterOptions?: AreaFilterOption[];
   searchPlaceholder?: string;
+  /** Scroll containers: keep company search visible (default true). */
+  sticky?: boolean;
 }
 
 export function SearchAndFilterBar({
@@ -33,6 +35,7 @@ export function SearchAndFilterBar({
   onAreaFilterChange,
   areaFilterOptions,
   searchPlaceholder = '企業名で検索',
+  sticky = true,
 }: SearchAndFilterBarProps) {
   const hasActiveFilters =
     searchValue.trim().length > 0 ||
@@ -40,7 +43,7 @@ export function SearchAndFilterBar({
     (areaFilterValue !== undefined && areaFilterValue !== 'all' && areaFilterValue !== '');
 
   return (
-    <div className="search-filter-bar">
+    <div className={`search-filter-bar${sticky ? ' search-filter-bar-sticky' : ''}`}>
       <div className="search-filter-controls">
         <input
           type="search"

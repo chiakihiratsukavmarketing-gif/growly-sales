@@ -6769,6 +6769,44 @@ async function verifyPhase415JExternalReferenceAlphaComplete(): Promise<void> {
   ok('Phase 41.5J external reference alpha complete checks passed');
 }
 
+async function verifyPhase421RoutineOperationsUi(): Promise<void> {
+  const searchBar = await readFile(join(SRC_ROOT, 'ui/common/SearchAndFilterBar.tsx'), 'utf-8');
+  const styles = await readFile(join(SRC_ROOT, 'ui/styles.css'), 'utf-8');
+  const sendRecords = await readFile(join(SRC_ROOT, 'ui/SendRecordsView.tsx'), 'utf-8');
+  const followUp = await readFile(join(SRC_ROOT, 'ui/FollowUpDashboardView.tsx'), 'utf-8');
+  const replyMgmt = await readFile(join(SRC_ROOT, 'ui/ReplyManagementView.tsx'), 'utf-8');
+  const dashboard = await readFile(join(SRC_ROOT, 'ui/GrowlySalesDashboard.tsx'), 'utf-8');
+  const profileDisplay = await readFile(join(SRC_ROOT, 'ui/CollectionProfileDisplay.tsx'), 'utf-8');
+  const cloudResults = await readFile(join(SRC_ROOT, 'ui/Daily30CloudResultsPanel.tsx'), 'utf-8');
+
+  assert(searchBar.includes('search-filter-bar-sticky'), 'search bar sticky class');
+  assert(searchBar.includes('sticky = true'), 'search bar sticky default on');
+  assert(styles.includes('.search-filter-bar-sticky'), 'sticky search CSS');
+  assert(styles.includes('.daily30-candidate-tools-sticky'), 'candidate tools sticky CSS');
+  assert(styles.includes('.send-record-source-block'), 'send record source block CSS');
+  assert(profileDisplay.includes("variant === 'send-record'"), 'send-record collection variant');
+  assert(sendRecords.includes("variant=\"send-record\""), 'send records use send-record variant');
+  assert(followUp.includes("onNavigateToTab?.('reply-management'"), 'follow-up opens reply management');
+  assert(followUp.includes('follow-up-lead-button'), 'follow-up lead click target');
+  assert(replyMgmt.includes('highlightLeadId'), 'reply management accepts highlight lead');
+  assert(dashboard.includes('highlightLeadId={highlightLeadId}'), 'dashboard passes highlight to reply');
+  assert(cloudResults.includes('daily30-candidate-tools-sticky'), 'candidate collection search sticky');
+
+  ok('Phase 42.1 routine operations UI improvements checks passed');
+}
+
+async function verifyPhase422RoutineOperationsUiScreen(): Promise<void> {
+  const followUp = await readFile(join(SRC_ROOT, 'ui/FollowUpDashboardView.tsx'), 'utf-8');
+  const replyMgmt = await readFile(join(SRC_ROOT, 'ui/ReplyManagementView.tsx'), 'utf-8');
+  const sendRecords = await readFile(join(SRC_ROOT, 'ui/SendRecordsView.tsx'), 'utf-8');
+
+  assert(followUp.includes('返信管理で開く'), 'follow-up action hint for reply navigation');
+  assert(replyMgmt.includes('highlightLeadId'), 'reply highlight wiring for follow-up deep link');
+  assert(sendRecords.includes('variant="send-record"'), 'send records use send-record source variant');
+
+  ok('Phase 42.2 routine operations UI screen readiness checks passed');
+}
+
 function verifyPhase20LiteEmailImprovement(): void {
   assert(MAX_ADDITIONAL_CONTACT_PAGES === 4, 'additional page limit is 4');
 
@@ -7164,6 +7202,8 @@ async function main(): Promise<void> {
   await verifyPhase415H2CompliancePersistence();
   await verifyPhase415IFinalAlphaJudgment();
   await verifyPhase415JExternalReferenceAlphaComplete();
+  await verifyPhase421RoutineOperationsUi();
+  await verifyPhase422RoutineOperationsUiScreen();
   verifyPhase20LiteEmailImprovement();
   await verifyPhase20LiteEmailImprovementAsync();
   await verifyPhaseBLeadInventory();

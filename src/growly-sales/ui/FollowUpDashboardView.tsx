@@ -18,7 +18,7 @@ import type { SalesFlowTab } from './GrowlySalesDashboard.js';
 interface FollowUpDashboardViewProps {
   onError: (message: string) => void;
   refreshKey?: number;
-  onNavigateToTab?: (tab: SalesFlowTab) => void;
+  onNavigateToTab?: (tab: SalesFlowTab, leadId?: string) => void;
 }
 
 function formatDue(lead: Lead): string {
@@ -147,6 +147,7 @@ export function FollowUpDashboardView({
                 items={items}
                 emptyLabel={`${BUCKET_LABELS[bucket]}はありません`}
                 highlight={bucket === 'overdue'}
+                onOpenLead={(leadId) => onNavigateToTab?.('reply-management', leadId)}
               />
             );
           })}
@@ -156,11 +157,11 @@ export function FollowUpDashboardView({
           <ul className="follow-up-filtered-list">
             {filteredLeads.map((l) => (
               <li key={l.id}>
-                <strong>{l.companyName}</strong>
-                <span className="follow-up-meta">
-                  {' '}
-                  · 予定 {formatDue(l)} · {l.nextAction || '—'}
-                </span>
+                <FollowUpLeadButton
+                  lead={l}
+                  formatDue={formatDue}
+                  onOpen={() => onNavigateToTab?.('reply-management', l.id)}
+                />
               </li>
             ))}
           </ul>
@@ -169,10 +170,30 @@ export function FollowUpDashboardView({
 
       {followTargets.length > 0 && statusFilter === 'all' && search === '' && (
         <p className="hint">
-          フォロー対象 {followTargets.length} 件（日付未設定は返信管理タブから予定日を設定できます）
+          フォロー対象 {followTargets.length} 件 — 企業名をクリックすると返信管理で開きます（日付未設定は返信管理タブから予定日を設定）
         </p>
       )}
     </div>
+  );
+}
+
+function FollowUpLeadButton({
+  lead,
+  formatDue,
+  onOpen,
+}: {
+  lead: Lead;
+  formatDue: (lead: Lead) => string;
+  onOpen: () => void;
+}) {
+  return (
+    <button type="button" className="follow-up-lead-button" onClick={onOpen}>
+      <span className="follow-up-lead-name">{lead.companyName}</span>
+      <span className="follow-up-meta">
+        予定 {formatDue(lead)} · {lead.nextAction || '—'}
+      </span>
+      <span className="follow-up-lead-action-hint">返信管理で開く</span>
+    </button>
   );
 }
 
@@ -181,11 +202,13 @@ function FollowBucket({
   items,
   emptyLabel,
   highlight,
+  onOpenLead,
 }: {
   title: string;
   items: Lead[];
   emptyLabel: string;
   highlight?: boolean;
+  onOpenLead: (leadId: string) => void;
 }) {
   return (
     <SectionCard title={`${title}（${items.length}件）`} className={highlight ? 'follow-bucket-attn' : ''}>
@@ -195,8 +218,11 @@ function FollowBucket({
         <ul className="follow-up-simple-list">
           {items.map((l) => (
             <li key={l.id}>
-              <strong>{l.companyName}</strong>
-              <span className="follow-up-meta"> · 予定 {formatDue(l)} · {l.nextAction || '—'}</span>
+              <FollowUpLeadButton
+                lead={l}
+                formatDue={formatDue}
+                onOpen={() => onOpenLead(l.id)}
+              />
             </li>
           ))}
         </ul>

@@ -213,7 +213,7 @@ export function SendRecordsView({
                           />
                           <CollectionProfileDisplay
                             info={item.collectionProfile}
-                            variant="compact"
+                            variant="send-record"
                             emailSourceInfo={{
                               email: item.to,
                               emailSourceUrl: item.emailSourceUrl,
@@ -278,7 +278,7 @@ export function SendRecordsView({
                             ) : null}
                             <CollectionProfileDisplay
                               info={buildCollectionProfileDisplayFromLead(lead)}
-                              variant="compact"
+                              variant="send-record"
                               emailSourceInfo={resolveEmailSourceFromLead(lead)}
                               showEmailSource={
                                 lead.emailCandidates.some((e) => e.trim()) &&

@@ -3656,6 +3656,20 @@ body {
   background: var(--bg-card);
 }
 
+.search-filter-bar-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  box-shadow: 0 2px 0 var(--color-border);
+}
+
+.daily30-candidate-tools-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 7;
+  box-shadow: 0 2px 0 var(--color-border);
+}
+
 .search-filter-controls {
   display: flex;
   flex-wrap: wrap;
@@ -5038,6 +5052,120 @@ body {
 
 .collection-profile-email-source {
   margin-top: 0.2rem;
+}
+
+/* Phase 42.1: send record collection source readability */
+.send-record-source-block {
+  margin: 0.5rem 0 0.65rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-primary, #2563eb);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  font-size: 0.85rem;
+}
+
+.send-record-source-primary {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.35rem;
+}
+
+.send-record-source-label {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-subtext);
+}
+
+.send-record-source-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.send-record-source-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  color: var(--color-subtext);
+}
+
+.send-record-source-site {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.send-record-source-area::before,
+.send-record-source-profile::before {
+  content: '·';
+  margin-right: 0.35rem;
+  color: var(--color-border);
+}
+
+.send-record-source-area:first-child::before,
+.send-record-source-profile:first-child::before {
+  content: none;
+  margin: 0;
+}
+
+.pending-record-card .send-record-source-block {
+  width: 100%;
+  flex-basis: 100%;
+}
+
+/* Phase 42.1: follow-up → reply management navigation */
+.follow-up-lead-button {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+  width: 100%;
+  margin: 0;
+  padding: var(--space-sm) 0;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background 0.12s ease;
+}
+
+.follow-up-simple-list li:last-child .follow-up-lead-button,
+.follow-up-filtered-list li:last-child .follow-up-lead-button {
+  border-bottom: none;
+}
+
+.follow-up-lead-button:hover,
+.follow-up-lead-button:focus-visible {
+  background: var(--bg-soft);
+  outline: none;
+}
+
+.follow-up-lead-name {
+  font-weight: 700;
+  color: var(--color-primary, #2563eb);
+}
+
+.follow-up-lead-action-hint {
+  flex: 1 0 100%;
+  font-size: 0.74rem;
+  color: var(--color-subtext);
+}
+
+.follow-up-filtered-list li {
+  padding: 0;
+  border-bottom: none;
 }
 
 .daily30-run-profile-summary {

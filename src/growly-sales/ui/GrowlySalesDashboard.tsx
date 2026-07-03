@@ -405,6 +405,7 @@ export function GrowlySalesDashboard() {
               onError={handleViewError}
               onUpdated={handleRecordSuccess}
               refreshKey={dataVersion}
+              highlightLeadId={highlightLeadId}
             />
           )}
 

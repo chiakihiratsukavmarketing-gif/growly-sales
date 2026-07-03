@@ -6,7 +6,7 @@ import { DevDetails } from './common/DevDetails.js';
 
 interface CollectionProfileDisplayProps {
   info: CollectionProfileDisplayInfo;
-  variant?: 'compact' | 'detail';
+  variant?: 'compact' | 'detail' | 'send-record';
   emailSourceInfo?: EmailSourceDisplayInfo | null;
   showEmailSource?: boolean;
 }
@@ -36,6 +36,38 @@ export function CollectionProfileDisplay({
   emailSourceInfo = null,
   showEmailSource = false,
 }: CollectionProfileDisplayProps) {
+  if (variant === 'send-record') {
+    const sourceLabel = info.discoverySourceLabel?.trim() || '—';
+    const siteLabel = info.discoverySourceSiteLabel?.trim();
+    const showSite = Boolean(siteLabel && siteLabel !== '—' && siteLabel !== sourceLabel);
+    return (
+      <div className="send-record-source-block" aria-label="収集元情報">
+        <div className="send-record-source-primary">
+          <span className="send-record-source-label">収集元</span>
+          <strong className="send-record-source-value" title={sourceLabel}>
+            {sourceLabel}
+          </strong>
+        </div>
+        <div className="send-record-source-meta">
+          {[showSite ? siteLabel : null, info.prefecture || null, info.collectionProfileName || null]
+            .filter(Boolean)
+            .join(' · ')}
+        </div>
+        {info.discoverySource === 'job_site_reference' && info.discoverySourceUrl ? (
+          <UrlRow label="発見元" url={info.discoverySourceUrl} />
+        ) : null}
+        {showEmailSource && emailSourceInfo ? (
+          <EmailSourceDisplay
+            info={emailSourceInfo}
+            variant="under-email"
+            showWarnings
+            className="collection-profile-email-source"
+          />
+        ) : null}
+      </div>
+    );
+  }
+
   if (variant === 'compact') {
     return (
       <div className="collection-profile-compact">
