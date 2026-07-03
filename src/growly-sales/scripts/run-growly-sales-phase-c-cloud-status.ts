@@ -21,6 +21,9 @@ import { summarizeDaily30ContactPaths } from '../candidates/summarizeDaily30Cont
 import { todayBatchIdJst } from '../candidates/daily30AreaConfig.js';
 import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTypes.js';
 import { sanitizeErrorMessageSafe } from '../candidates/daily30CloudRunErrors.js';
+import { loadExternalCandidatesFromJson } from '../storage/externalCandidatesRepository.js';
+import { getLatestCloudRunEntry } from '../storage/daily30CloudRunState.js';
+import { listEligibleManualExternalReferenceCandidates } from '../candidates/daily30ExternalReferenceSupplement.js';
 
 function countCandidates(raw: string | null): number {
   if (!raw?.trim()) return 0;
@@ -30,6 +33,12 @@ function countCandidates(raw: string | null): number {
   } catch {
     return -1;
   }
+}
+
+function safeString(v: unknown): string {
+  if (v == null) return '—';
+  if (typeof v === 'string' && v.trim()) return v;
+  return String(v);
 }
 
 async function main(): Promise<void> {
@@ -84,6 +93,7 @@ async function main(): Promise<void> {
   let stateParseOk = false;
   let contactSummary: ReturnType<typeof summarizeDaily30ContactPaths> | null = null;
   let gcsError: string | null = null;
+  let candidates: ExternalLeadCandidate[] = [];
 
   for (const doc of [EXTERNAL_CANDIDATES_JSON, DAILY30_CLOUD_RUN_STATE_JSON] as const) {
     try {
@@ -91,17 +101,11 @@ async function main(): Promise<void> {
       const raw = await readJsonDocument(doc);
       if (doc === EXTERNAL_CANDIDATES_JSON) {
         externalExists = exists;
-        externalCount = countCandidates(raw);
-        if (raw) {
-          try {
-            const parsed = JSON.parse(raw) as ExternalLeadCandidate[];
-            if (Array.isArray(parsed)) {
-              contactSummary = summarizeDaily30ContactPaths(parsed, todayBatchIdJst());
-            }
-          } catch {
-            /* parse error handled below */
-          }
-        }
+        // NOTE: Cloud/local で確実に同じ読み取り経路にするため、Repository 経由で件数を確定する。
+        // readJsonDocument は JSON として読めても型が合わない場合があるため、診断は repository を優先する。
+        candidates = await loadExternalCandidatesFromJson();
+        externalCount = candidates.length;
+        contactSummary = summarizeDaily30ContactPaths(candidates, todayBatchIdJst());
         console.log(
           `${doc}: ${exists ? '存在' : '未検出'} / 件数: ${externalCount >= 0 ? externalCount : 'JSON解析失敗'}`
         );
@@ -132,6 +136,45 @@ async function main(): Promise<void> {
     console.log('本日 batch: —（GCS 未接続）');
   } else {
     console.log('本日 batch: 0 またはデータなし');
+  }
+
+  console.log('');
+  console.log('## 手動外部参照候補（manual-external-reference）監査サマリー');
+  const manualStats = listEligibleManualExternalReferenceCandidates(candidates, {
+    includeImported: true,
+  });
+  console.log(`手動候補 total: ${manualStats.available}`);
+  console.log(`  eligible（blocked_by_policy/duplicate/excluded 除外）: ${manualStats.eligible.length}`);
+  console.log(`  blocked_by_policy: ${manualStats.blocked}`);
+
+  console.log('');
+  console.log('## Cloud Run state（最新エントリ）');
+  try {
+    const latest = await getLatestCloudRunEntry();
+    if (!latest) {
+      console.log('最新 state: なし');
+    } else {
+      const tokyoInAreasUsed = (latest.areasUsed ?? []).some((a) => /東京/.test(a));
+      console.log(`batchId: ${safeString(latest.batchId)}`);
+      console.log(`status: ${safeString(latest.status)}`);
+      console.log(`emailFound: ${safeString(latest.emailFound)}`);
+      console.log(`totalCollected: ${safeString(latest.totalCollected)}`);
+      console.log(`stoppedReason: ${safeString(latest.stoppedReason)}`);
+      console.log(`scheduleSource: ${safeString(latest.scheduleSource)}`);
+      console.log(`collectionProfileId: ${safeString(latest.collectionProfileId)}`);
+      console.log(`areaStrategy: ${safeString(latest.areaStrategy)}`);
+      console.log(`areasUsed: ${(latest.areasUsed ?? []).join(', ') || '—'}`);
+      console.log(`containsTokyoInAreasUsed: ${tokyoInAreasUsed ? 'YES' : 'NO'}`);
+      console.log(`externalReferenceSupplementAttempted: ${String(latest.externalReferenceSupplementAttempted ?? false)}`);
+      console.log(`externalReferenceSupplementMode: ${safeString(latest.externalReferenceSupplementMode)}`);
+      console.log(`externalReferencePlanReason: ${safeString(latest.externalReferencePlanReason)}`);
+      console.log(`externalReferenceNetworkAccessPerformed: ${String(latest.externalReferenceNetworkAccessPerformed ?? false)}`);
+      console.log(`externalReferenceManualCandidatesAvailable: ${safeString(latest.externalReferenceManualCandidatesAvailable)}`);
+      console.log(`externalReferenceManualCandidatesEligible: ${safeString(latest.externalReferenceManualCandidatesEligible)}`);
+      console.log(`externalReferenceDisplayMessage: ${safeString(latest.externalReferenceDisplayMessage)}`);
+    }
+  } catch (err) {
+    console.log(`最新 state 読み取り失敗: ${sanitizeErrorMessageSafe(err instanceof Error ? err.message : String(err))}`);
   }
 
   console.log('');

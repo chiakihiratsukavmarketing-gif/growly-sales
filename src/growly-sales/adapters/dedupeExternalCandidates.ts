@@ -1,7 +1,7 @@
 import type { Lead } from '../types/lead.js';
 import type { ExternalLeadCandidate } from './externalLeadCandidateTypes.js';
 import { leadDedupeKey } from '../workflow/dedupeLeads.js';
-import { normalizeWebsiteUrl } from './normalizeExternalLeadCandidate.js';
+import { normalizeWebsiteUrl } from './externalCandidateUrlUtils.js';
 
 function normalizeCompanyKey(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, '');

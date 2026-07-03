@@ -11,3 +11,15 @@ node_modules/
 dist/
 build/
 
+# Runtime backups
+data/growly-sales/**/*.bak
+
+# Verify sandboxes and stdout captures
+data/growly-sales/_verify_phase384/
+verify-*.txt
+
+# Local operational state
+data/growly-sales/daily30-collection-schedule.json
+
+# Generated audit reports
+data/growly-sales/phase415h-compliance-dry-run-report.json

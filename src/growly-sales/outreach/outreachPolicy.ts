@@ -8,7 +8,7 @@ import {
   buildCollectionProfileDisplayFromLead,
   type CollectionProfileDisplayInfo,
 } from '../candidates/resolveCollectionProfileDisplay.js';
-import { containsProhibitedClaim } from '../config/offerProfile.js';
+import { containsProhibitedClaim } from '../config/offerProfileRules.js';
 import { containsProhibitedPhrase } from '../generation/generationUtils.js';
 import { hasEmailCandidates, hasContactForm, isFormCopyOnlyLead } from '../analytics/contactPathTypes.js';
 import { isFollowUpOnlyLead } from './outreachEligibility.js';

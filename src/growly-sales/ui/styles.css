@@ -173,6 +173,343 @@ body {
   max-width: 900px;
 }
 
+/* ── Phase 41.5A / 41.5D: Candidate collection UI ── */
+.candidate-collection-header-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bg-page);
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 0.5rem;
+}
+
+.candidate-work-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin: 0.35rem 0 0;
+}
+
+.daily30-work-queue-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.candidate-display-mode-toggle {
+  display: inline-flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.daily30-focus-panel {
+  max-width: 1050px;
+  margin: 0 auto;
+}
+
+.daily30-focus-meta {
+  margin-bottom: 0.5rem;
+}
+
+.daily30-focus-queue-title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.daily30-focus-counts {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+}
+
+.daily30-focus-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  background: var(--bg-card);
+}
+
+.daily30-focus-company {
+  margin: 0 0 0.35rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.daily30-focus-subline {
+  margin: 0 0 var(--space-md);
+  font-size: 0.88rem;
+  color: var(--color-subtext);
+}
+
+.daily30-focus-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem 1rem;
+  margin-bottom: var(--space-md);
+}
+
+.daily30-focus-field-wide {
+  grid-column: 1 / -1;
+}
+
+.daily30-focus-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-subtext);
+  margin-bottom: 0.15rem;
+}
+
+.daily30-focus-value {
+  font-size: 0.9rem;
+  word-break: break-word;
+}
+
+.daily30-focus-link {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.daily30-focus-judgment {
+  margin-bottom: var(--space-md);
+  padding: 0.5rem 0.65rem;
+  background: var(--bg-soft);
+  border-radius: var(--radius-sm);
+}
+
+.daily30-focus-judgment-list {
+  margin: 0.25rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.88rem;
+}
+
+.daily30-focus-status-approvable {
+  color: var(--color-success, #0a7);
+}
+
+.daily30-focus-status-needs_review {
+  color: var(--color-warning, #b8860b);
+}
+
+.daily30-focus-status-blocked,
+.daily30-focus-status-not_approvable {
+  color: var(--color-danger, #c33);
+}
+
+.daily30-focus-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-bottom: 0.5rem;
+}
+
+.daily30-focus-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: var(--space-md);
+}
+
+.daily30-focus-position {
+  min-width: 4rem;
+  text-align: center;
+}
+
+.daily30-focus-empty {
+  padding: var(--space-md);
+  text-align: center;
+}
+
+.daily30-focus-empty-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.daily30-focus-dev-dl {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+}
+
+.daily30-focus-dev-dl dt {
+  font-weight: 600;
+  color: var(--color-subtext);
+}
+
+.daily30-focus-dev-dl dd {
+  margin: 0;
+  word-break: break-all;
+}
+
+@media (max-width: 768px) {
+  .daily30-focus-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .daily30-focus-actions {
+    justify-content: stretch;
+  }
+
+  .daily30-focus-actions .btn {
+    flex: 1 1 auto;
+  }
+}
+
+.candidate-work-tabs {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.work-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid var(--color-border);
+  background: var(--bg-card);
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius-pill);
+}
+
+.work-tab-btn.active {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary-muted);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.work-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.6rem;
+  height: 1.2rem;
+  padding: 0 0.4rem;
+  border-radius: var(--radius-pill);
+  background: var(--bg-soft);
+  color: var(--color-subtext);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.work-tab-btn.active .work-tab-badge {
+  background: var(--bg-card);
+  color: var(--color-primary);
+}
+
+.candidate-schedule-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.candidate-schedule-summary-text {
+  min-width: 0;
+  font-size: 0.95rem;
+}
+
+.candidate-schedule-summary-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.daily30-candidate-tools {
+  margin: var(--space-md) 0;
+  padding: var(--space-md);
+  background: var(--bg-soft);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.daily30-candidate-tools-row {
+  display: grid;
+  grid-template-columns: 1fr 180px 160px 160px;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.daily30-candidate-tools-row-secondary {
+  margin-top: 0.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.daily30-pager {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.input-xs {
+  padding: 0.25rem 0.4rem;
+  font-size: 0.85rem;
+}
+
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  z-index: 20;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.drawer {
+  height: 100%;
+  width: min(520px, 92vw);
+  background: var(--bg-card);
+  border-left: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-lg);
+  overflow-y: auto;
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-sm);
+}
+
+.drawer-title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.manual-external-reference-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+@media (max-width: 900px) {
+  .daily30-candidate-tools-row {
+    grid-template-columns: 1fr 1fr;
+  }
+  .candidate-schedule-summary-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .manual-external-reference-grid-2col {
+    grid-template-columns: 1fr;
+  }
+}
+
 .dashboard-two-col {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1749,24 +2086,153 @@ body {
 }
 
 .candidate-collection-view {
-  max-width: 960px;
+  max-width: min(1400px, 100%);
+  width: 100%;
 }
 
-.candidate-collection-view .candidate-today-status {
-  margin-bottom: var(--space-md);
+/* ── Phase 41.5D: work-queue centered candidate collection ── */
+.candidate-collection-title {
+  margin: 0 0 0.35rem;
+  font-size: 1.35rem;
+  font-weight: 700;
 }
 
-.candidate-collection-view .candidate-today-status .stats-grid {
-  gap: var(--space-sm);
+.candidate-header-line {
+  margin: 0.2rem 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--color-text);
 }
 
-.candidate-collection-view .candidate-path-summary {
-  margin: var(--space-sm) 0 0;
-  font-size: 0.85rem;
+.candidate-path-summary-compact {
+  margin: 0.1rem 0 0.2rem;
+  font-size: 0.75rem;
+  color: var(--color-subtext);
 }
 
-.candidate-collection-view .candidate-collection-schedule {
-  margin-bottom: var(--space-md);
+.candidate-header-today span {
+  font-weight: 500;
+}
+
+.candidate-header-tomorrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.candidate-header-tomorrow-text {
+  margin: 0;
+  min-width: 0;
+  flex: 1;
+}
+
+.candidate-schedule-dev-details {
+  margin-top: 0.35rem;
+}
+
+.candidate-collection-work {
+  flex: 1;
+  min-height: 0;
+}
+
+.daily30-work-queue-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+}
+
+.daily30-work-queue-header {
+  margin-bottom: 0.5rem;
+}
+
+.daily30-work-queue-title {
+  margin: 0;
+  font-size: 1.05rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.daily30-work-queue-hint {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+}
+
+.daily30-collection-info-collapse {
+  margin-top: var(--space-md);
+}
+
+.daily30-queue-header,
+.daily30-queue-row {
+  display: grid;
+  grid-template-columns: minmax(10rem, 1.4fr) minmax(4rem, 0.7fr) minmax(7rem, 1fr) minmax(5rem, 0.8fr) minmax(6rem, 0.9fr) minmax(9rem, 1.1fr);
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.daily30-queue-header {
+  padding: 0.35rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-subtext);
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 0.25rem;
+}
+
+.daily30-candidate-card-queue {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+}
+
+.daily30-candidate-card-queue:last-child {
+  border-bottom: none;
+}
+
+.daily30-candidate-list-queue {
+  gap: 0;
+}
+
+.daily30-queue-col-name {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.daily30-queue-block-hint {
+  font-size: 0.72rem;
+  margin: 0;
+}
+
+.daily30-queue-col-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  justify-content: flex-end;
+}
+
+.daily30-queue-col-status .daily30-candidate-badges {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 1100px) {
+  .daily30-queue-header {
+    display: none;
+  }
+
+  .daily30-queue-row {
+    grid-template-columns: 1fr;
+    gap: 0.25rem;
+    padding: 0.5rem 0;
+  }
+
+  .daily30-queue-col-actions {
+    justify-content: flex-start;
+  }
 }
 
 .collection-schedule-dl {

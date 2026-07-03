@@ -121,6 +121,26 @@ export function Daily30DraftImportPanel({
 
   if (loading) return <p className="loading">Daily 30 下書き候補取り込みを読み込み中…</p>;
 
+  if (items.length === 0) {
+    return (
+      <SectionCard title="下書き候補取り込み" className="daily30-draft-import-card">
+        <p className="hint">
+          <strong>下書き候補取り込み 0件</strong>
+        </p>
+        <p className="hint">現在、取り込み可能な候補はありません。</p>
+        <DevDetails title="詳細操作（開発者向け）">
+          <Daily30ImportDraftGateDev
+            gateInput={bulkGateInput}
+            bulkImporting={bulkImporting}
+            importableCount={importable.length}
+            onGateInputChange={setBulkGateInput}
+            onBulkImport={() => void handleBulkImportDev()}
+          />
+        </DevDetails>
+      </SectionCard>
+    );
+  }
+
   return (
     <SectionCard title="下書き候補取り込み" className="daily30-draft-import-card">
       <InfoBanner variant="info">
@@ -148,17 +168,15 @@ export function Daily30DraftImportPanel({
         </InfoBanner>
       )}
 
-      {pipeline && (
+      {pipeline ? (
         <div className="stats-grid">
-          <SummaryStatCard value={pipeline.readyForDraftCount} label="下書き待ち" highlight />
+          <SummaryStatCard value={pipeline.readyForDraftCount} label="ready_for_draft" highlight />
           <SummaryStatCard value={pipeline.leadsImportPendingCount} label="取り込み待ち" highlight />
-          <SummaryStatCard value={pipeline.gmailDraftTabVisibleCount} label="下書き候補タブ表示" />
-          <SummaryStatCard value={pipeline.humanReviewPendingCount} label="承認待ち" />
           <SummaryStatCard value={pipeline.gmailDraftCreatedCount} label="Gmail下書き作成済" />
           <SummaryStatCard value={pipeline.sendRecordPendingCount} label="送信記録待ち" />
         </div>
-      )}
-      {pipeline && <p className="hint">{pipeline.todayProgressLabel}</p>}
+      ) : null}
+      {pipeline?.todayProgressLabel ? <p className="hint">{pipeline.todayProgressLabel}</p> : null}
 
       <h3 className="subsection-title">取り込み候補（{items.length}件）</h3>
       {items.length === 0 ? (

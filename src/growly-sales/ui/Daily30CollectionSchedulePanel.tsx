@@ -21,7 +21,6 @@ const SCHEDULE_SAFETY_NOTES = [
   '求人サイト・楽天市場・ポータルは企業候補の発見元です。メール取得元は公式サイトのみです。',
   '外部掲載サイト上のメールは使用しません。',
   'Gmail下書き作成・送信には関係ありません。',
-  '外部掲載サイト探索（求人サイト巡回等）は Phase 40.6 で実装予定です。実行は Google Places / 公式サイト検索です。',
 ] as const;
 
 interface Daily30CollectionSchedulePanelProps {

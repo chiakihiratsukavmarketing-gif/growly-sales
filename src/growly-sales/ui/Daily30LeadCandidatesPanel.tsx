@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTypes.js';
-import { SectionCard } from './SectionCard.js';
-import { InfoBanner } from './InfoBanner.js';
-import { SummaryStatCard } from './SummaryStatCard.js';
 import {
   GENERATE_DAILY_30_COPY_GATE_LABEL,
   approveExternalCandidateForLead,
@@ -12,12 +9,25 @@ import {
 } from './daily30CopyApi.js';
 import { confirmDaily30LeadApproval } from './confirmDaily30LeadApproval.js';
 import { confirmDaily30CandidateExclude } from './confirmDaily30CandidateExclude.js';
-import { Daily30CandidateList } from './Daily30CandidateCards.js';
-import { countDaily30LeadCopyWorkflow } from '../candidates/resolveDaily30WorkflowStatus.js';
+import {
+  Daily30CandidateList,
+  Daily30CandidateQueueHeader,
+  workQueueTitleForLeadView,
+} from './Daily30CandidateCards.js';
 import { filterDaily30UiListCandidates } from './daily30ExcludeUi.js';
 import { HumanGateConfirmModal } from './HumanGateConfirmModal.js';
 import { DevDetails } from './common/DevDetails.js';
 import { Daily30GenerateCopyGateDev } from './Daily30GenerateCopyGateDev.js';
+import { filterByCompanyName } from './leadFilterUtils.js';
+import { CandidateDisplayModeToggle } from './CandidateDisplayModeToggle.js';
+import { Daily30CandidateFocusView } from './Daily30CandidateFocusView.js';
+import {
+  DISPLAY_MODE_STORAGE_KEY_LEAD,
+  loadStoredDisplayMode,
+  saveStoredDisplayMode,
+  type CandidateDisplayMode,
+} from './daily30CandidateFocusMode.js';
+import { useCandidateFocusQueue } from './useCandidateFocusQueue.js';
 
 interface Daily30LeadCandidatesPanelProps {
   onError: (message: string) => void;
@@ -61,10 +71,29 @@ export function Daily30LeadCandidatesPanel({
   const [generating, setGenerating] = useState(false);
   const [generateMessage, setGenerateMessage] = useState<string | null>(null);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [view, setView] = useState<
+    'actionable' | 'pending' | 'approved' | 'generated'
+  >('actionable');
+  const [query, setQuery] = useState('');
+  const [pageSize, setPageSize] = useState(10);
+  const [page, setPage] = useState(1);
+  const [displayMode, setDisplayMode] = useState<CandidateDisplayMode>(() =>
+    loadStoredDisplayMode(DISPLAY_MODE_STORAGE_KEY_LEAD, 'focus')
+  );
+
+  const setDisplayModePersisted = useCallback((mode: CandidateDisplayMode) => {
+    setDisplayMode(mode);
+    saveStoredDisplayMode(DISPLAY_MODE_STORAGE_KEY_LEAD, mode);
+  }, []);
 
   const workflowCounts = useMemo(
-    () => countDaily30LeadCopyWorkflow([...approvalPending, ...approvedForLead]),
-    [approvalPending, approvedForLead]
+    () => ({
+      approved: approvedForLead.length,
+      copyPending: approvedForLead.filter(
+        (c) => c.pipelineStatus === 'ready_for_copy' || c.pipelineStatus === 'needs_review'
+      ).length,
+    }),
+    [approvedForLead]
   );
 
   const copyTargets = useMemo(
@@ -99,6 +128,58 @@ export function Daily30LeadCandidatesPanel({
     void load();
   }, [load, refreshKey]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [view, query, pageSize]);
+
+  const pendingFiltered = useMemo(() => {
+    return filterByCompanyName(approvalPending, query, (c) => c.companyName ?? '');
+  }, [approvalPending, query]);
+
+  const approvedFiltered = useMemo(() => {
+    return filterByCompanyName(approvedForLead, query, (c) => c.companyName ?? '');
+  }, [approvedForLead, query]);
+
+  const actionable = useMemo(() => {
+    const list = pendingFiltered;
+    const score = (c: ExternalLeadCandidate) => (approvalBlockHints[c.externalCandidateId] ? 1 : 0);
+    return [...list].sort((a, b) => score(a) - score(b));
+  }, [pendingFiltered, approvalBlockHints]);
+
+  const generated = useMemo(() => {
+    return approvedFiltered.filter(
+      (c) => c.pipelineStatus === 'copy_generated' || c.pipelineStatus === 'ready_for_draft'
+    );
+  }, [approvedFiltered]);
+
+  const activeList =
+    view === 'pending'
+      ? pendingFiltered
+      : view === 'approved'
+        ? approvedFiltered
+        : view === 'generated'
+          ? generated
+          : actionable;
+
+  const pageCount = Math.max(1, Math.ceil(activeList.length / pageSize));
+  const safePage = Math.min(page, pageCount);
+  const start = (safePage - 1) * pageSize;
+  const end = Math.min(activeList.length, start + pageSize);
+  const pageItems = activeList.slice(start, end);
+
+  const focusFilterKey = `${query}|${view}`;
+  const focusQueueState = useCandidateFocusQueue(activeList, approvalBlockHints, focusFilterKey);
+
+  const operationBusy =
+    approvingId !== null || excludingId !== null || generating;
+
+  const focusPrimaryAction =
+    view === 'generated'
+      ? 'view_copy'
+      : view === 'approved'
+        ? 'generate_copy'
+        : 'approve';
+
   async function handleApprove(candidate: ExternalLeadCandidate): Promise<void> {
     if (!confirmDaily30LeadApproval(candidate)) return;
     setApprovingId(candidate.externalCandidateId);
@@ -114,6 +195,7 @@ export function Daily30LeadCandidatesPanel({
       onSuccess?.(
         `${updated.companyName} を Lead 化候補として承認しました（leads.json には未取り込み）`
       );
+      focusQueueState.recordProcessed();
       onChanged?.();
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Lead化承認に失敗しました');
@@ -161,6 +243,7 @@ export function Daily30LeadCandidatesPanel({
         throw new Error('候補の除外状態を保存できませんでした');
       }
       onMarkExcluded?.(result.candidateId);
+      focusQueueState.recordProcessed();
       onSuccess?.(`${candidate.companyName} を候補から除外しました`);
       await load();
       const refreshed = await fetchDaily30LeadCandidates();
@@ -181,44 +264,117 @@ export function Daily30LeadCandidatesPanel({
 
   if (loading) return <p className="loading">Lead化候補を読み込み中…</p>;
 
+  const queueTitle = workQueueTitleForLeadView(view);
+
   return (
-    <SectionCard title="Lead化承認・営業文" className="daily30-lead-candidates-card">
-      <InfoBanner variant="info">
-        メール取得済候補を確認してLead化承認します。承認のみでは leads.json に書き込みません。営業文生成は確認ボタン実行時のみ（送信・下書き作成なし）。
-      </InfoBanner>
+    <div className="daily30-lead-candidates-card daily30-work-queue-panel">
+      <section className="daily30-work-queue" aria-label="Lead化作業キュー">
+        <header className="daily30-work-queue-header">
+          <div className="daily30-work-queue-header-row">
+            <h3 className="daily30-work-queue-title">
+              {queueTitle}
+              <span className="daily30-section-count">{activeList.length}件</span>
+            </h3>
+            <CandidateDisplayModeToggle
+              mode={displayMode}
+              onChange={setDisplayModePersisted}
+              disabled={operationBusy}
+            />
+          </div>
+          <p className="hint daily30-work-queue-hint">
+            Lead化承認済み {workflowCounts.approved}件 · 営業文生成待ち {workflowCounts.copyPending}件
+          </p>
+        </header>
 
-      <div className="stats-grid daily30-workflow-stats">
-        <SummaryStatCard value={workflowCounts.approvedLead} label="Lead化承認済み" highlight />
-        <SummaryStatCard
-          value={workflowCounts.copyPending}
-          label="営業文生成待ち"
-          highlight={workflowCounts.copyPending > 0}
-        />
-        <SummaryStatCard value={workflowCounts.copyGenerated} label="営業文生成済み" />
-        <SummaryStatCard
-          value={workflowCounts.qualityPassed}
-          label="品質チェック済み"
-          highlight={workflowCounts.qualityPassed > 0}
-        />
-      </div>
+        <div className="daily30-candidate-tools">
+          <div className="daily30-candidate-tools-row">
+            <input
+              className="input"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="会社名で検索"
+              aria-label="会社名で検索"
+            />
+            <select className="input" value={view} onChange={(e) => setView(e.target.value as typeof view)}>
+              <option value="actionable">作業可能（推奨）</option>
+              <option value="pending">承認待ち</option>
+              <option value="approved">承認済み</option>
+              <option value="generated">営業文生成済み</option>
+            </select>
+            {displayMode === 'list' ? (
+              <>
+                <label className="hint">
+                  表示件数{' '}
+                  <select className="input input-xs" value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                  </select>
+                </label>
+                <div className="hint">{activeList.length === 0 ? '0件' : `${start + 1}–${end}`} / {activeList.length}件</div>
+                <button type="button" className="btn btn-secondary btn-sm" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                  前へ
+                </button>
+                <span className="hint">{safePage} / {pageCount}</span>
+                <button type="button" className="btn btn-secondary btn-sm" disabled={safePage >= pageCount} onClick={() => setPage((p) => Math.min(pageCount, p + 1))}>
+                  次へ
+                </button>
+              </>
+            ) : null}
+          </div>
+        </div>
 
-      <h3 className="subsection-title">Lead化承認待ち（{approvalPending.length}件）</h3>
-      <Daily30CandidateList
-        candidates={approvalPending}
-        showApprove
-        approvingId={approvingId}
-        excludingId={excludingId}
-        onApprove={(c) => void handleApprove(c)}
-        onExclude={(c) => void handleExclude(c)}
-        approvalBlockHints={approvalBlockHints}
-        emptyMessage="承認待ち候補はありません。セクション1で収集結果を確認してください。"
-      />
-
-      <h3 className="subsection-title">承認済み・営業文対象（{approvedForLead.length}件）</h3>
-      <Daily30CandidateList
-        candidates={approvedForLead}
-        emptyMessage="承認済み候補はありません。"
-      />
+        {displayMode === 'focus' ? (
+          <Daily30CandidateFocusView
+            variant="lead"
+            title={queueTitle}
+            candidate={focusQueueState.currentCandidate}
+            approvalBlockHints={approvalBlockHints}
+            remainingCount={focusQueueState.remainingCount}
+            processedCount={focusQueueState.processedCount}
+            focusIndex={focusQueueState.safeIndex}
+            canGoPrev={focusQueueState.canGoPrev}
+            canGoNext={focusQueueState.canGoNext}
+            allDeferred={focusQueueState.allDeferred}
+            busy={operationBusy}
+            approving={approvingId === focusQueueState.currentCandidate?.externalCandidateId}
+            excluding={excludingId === focusQueueState.currentCandidate?.externalCandidateId}
+            showApprove={view !== 'approved' && view !== 'generated'}
+            showExclude={view !== 'approved' && view !== 'generated'}
+            showDefer={view !== 'approved' && view !== 'generated'}
+            primaryAction={focusPrimaryAction}
+            onApprove={() => {
+              const c = focusQueueState.currentCandidate;
+              if (c) void handleApprove(c);
+            }}
+            onExclude={() => {
+              const c = focusQueueState.currentCandidate;
+              if (c) void handleExclude(c);
+            }}
+            onDefer={focusQueueState.deferCurrent}
+            onClearDeferred={focusQueueState.clearDeferred}
+            onPrev={focusQueueState.goPrev}
+            onNext={focusQueueState.goNext}
+            onGenerateCopy={() => setShowGenerateModal(true)}
+            emptyMessage="表示できる候補がありません。"
+          />
+        ) : (
+          <>
+            <Daily30CandidateQueueHeader showActions={view !== 'approved' && view !== 'generated'} />
+            <Daily30CandidateList
+              candidates={pageItems}
+              layout="queue"
+              showApprove={view !== 'approved' && view !== 'generated'}
+              approvingId={approvingId}
+              excludingId={excludingId}
+              onApprove={(c) => void handleApprove(c)}
+              onExclude={(c) => void handleExclude(c)}
+              approvalBlockHints={approvalBlockHints}
+              emptyMessage="表示できる候補がありません。"
+            />
+          </>
+        )}
+      </section>
 
       <div className="daily30-generate-gate human-gate-action-block">
         <h3 className="subsection-title">営業文生成</h3>
@@ -265,6 +421,6 @@ export function Daily30LeadCandidatesPanel({
           onCancel={() => !generating && setShowGenerateModal(false)}
         />
       )}
-    </SectionCard>
+    </div>
   );
 }

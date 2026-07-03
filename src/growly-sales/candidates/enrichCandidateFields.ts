@@ -1,13 +1,13 @@
 import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTypes.js';
 import { externalCandidateDedupeKey } from '../adapters/dedupeExternalCandidates.js';
-import { evaluateSourceCompliance } from './sourceCompliance.js';
+import { applySourceComplianceFields } from './sourceCompliance.js';
 
 /** 保存用フィールドを補完（既存JSONとの後方互換） */
 export function enrichExternalLeadCandidate(
   candidate: ExternalLeadCandidate
 ): ExternalLeadCandidate {
   const duplicateKey = candidate.duplicateKey?.trim() || externalCandidateDedupeKey(candidate);
-  return {
+  const enriched: ExternalLeadCandidate = {
     ...candidate,
     duplicateKey,
     officialSiteUrl: candidate.officialSiteUrl ?? candidate.websiteUrl,
@@ -51,9 +51,8 @@ export function enrichExternalLeadCandidate(
     discoverySourceUrl: candidate.discoverySourceUrl ?? null,
     sourceComplianceNote: candidate.sourceComplianceNote ?? null,
     collectionRunId: candidate.collectionRunId ?? null,
-    sourceComplianceStatus:
-      candidate.sourceComplianceStatus ?? evaluateSourceCompliance(candidate).status,
   };
+  return applySourceComplianceFields(enriched);
 }
 
 export function enrichExternalLeadCandidates(

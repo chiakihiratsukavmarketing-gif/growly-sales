@@ -68,6 +68,4 @@ export function pickSalesAngleForIndustry(industry: string, offer: OfferProfile,
   return offer.salesAngles.find((a) => a.includes('無料診断')) ?? offer.salesAngles[offer.salesAngles.length - 1];
 }
 
-export function containsProhibitedClaim(text: string, offer: OfferProfile): boolean {
-  return offer.prohibitedClaims.some((claim) => text.includes(claim));
-}
+export { containsProhibitedClaim } from './offerProfileRules.js';

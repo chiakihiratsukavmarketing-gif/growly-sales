@@ -32,6 +32,7 @@ import { SettingsView } from './SettingsView.js';
 import { CandidateCollectionView } from './CandidateCollectionView.js';
 import { PilotModeBanner } from './PilotModeBanner.js';
 import { DevDetails } from './common/DevDetails.js';
+import { TabErrorBoundary } from './common/TabErrorBoundary.js';
 import { isDevApiErrorMessage, toUserFacingApiError } from './displayLabels.js';
 import type { RecommendedActionTargetTab } from '../analytics/buildSalesDashboard.js';
 
@@ -425,17 +426,22 @@ export function GrowlySalesDashboard() {
 
           {activeTab === 'candidate-collection' && (
             <div className="tab-scroll">
-              <CandidateCollectionView
-                daily30={daily30}
-                daily30Loading={daily30Loading}
-                onError={handleViewError}
-                onSuccess={handleViewSuccess}
-                refreshKey={dataVersion}
-                onDataChanged={() => {
-                  setDataVersion((v) => v + 1);
-                  void load();
-                }}
-              />
+              <TabErrorBoundary
+                title="候補収集"
+                hint="API未取得や一部パネルの失敗があっても、画面全体は落とさないようにしています。"
+              >
+                <CandidateCollectionView
+                  daily30={daily30}
+                  daily30Loading={daily30Loading}
+                  onError={handleViewError}
+                  onSuccess={handleViewSuccess}
+                  refreshKey={dataVersion}
+                  onDataChanged={() => {
+                    setDataVersion((v) => v + 1);
+                    void load();
+                  }}
+                />
+              </TabErrorBoundary>
             </div>
           )}
         </main>

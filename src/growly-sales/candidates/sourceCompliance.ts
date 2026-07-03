@@ -1,5 +1,6 @@
 import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTypes.js';
 import {
+  hostMatchesOrIsSubdomain,
   hostsMatchUrl,
   isKnownJobSiteHost,
   isKnownRakutenHost,
@@ -65,14 +66,21 @@ export function getPrimaryEmailSourceUrl(
   );
 }
 
-/** メール確認元 URL が公式サイト配下か */
+/** メール確認元 URL が公式サイト配下か（サブドメイン含む） */
 export function isUrlOnOfficialSiteDomain(
   url: string | null | undefined,
   candidate: Pick<ExternalLeadCandidate, 'officialSiteUrl' | 'websiteUrl'>
 ): boolean {
   const official = getOfficialSiteUrl(candidate);
   if (!url?.trim() || !official) return false;
-  return hostsMatchUrl(url, official);
+  if (hostsMatchUrl(url, official)) return true;
+  const urlHost = normalizeHostFromUrl(url);
+  const officialHost = normalizeHostFromUrl(official);
+  if (!urlHost || !officialHost) return false;
+  return (
+    hostMatchesOrIsSubdomain(urlHost, officialHost) ||
+    hostMatchesOrIsSubdomain(officialHost, urlHost)
+  );
 }
 
 /** URL が discoverySourceUrl と同一ホストか */
@@ -288,7 +296,7 @@ export function getLeadApprovalComplianceBlockReason(
   >
 ): string | null {
   const evaluation = evaluateSourceCompliance(candidate);
-  const status = candidate.sourceComplianceStatus ?? evaluation.status;
+  const status = evaluation.status;
 
   if (status === 'blocked_by_policy') {
     const detail = evaluation.note ?? candidate.sourceComplianceNote;

@@ -136,6 +136,8 @@ export interface ExternalLeadCandidate {
   discoverySourceUrl?: string | null;
   sourceComplianceStatus?: Daily30SourceComplianceStatus | null;
   sourceComplianceNote?: string | null;
+  /** Phase 41.5H: evaluateSourceCompliance 再評価日時（ISO 8601） */
+  sourceComplianceCheckedAt?: string | null;
   collectionRunId?: string | null;
 }
 

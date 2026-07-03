@@ -8,6 +8,7 @@ import {
 } from '../storage/externalCandidatesRepository.js';
 import { isGcsStorageBackend } from '../config/storageBackend.js';
 import { isDaily30LeadReviewCandidate } from '../candidates/selectDaily30LeadCandidates.js';
+import { getDaily30LeadApprovalBlockReason } from '../candidates/getDaily30LeadApprovalBlockReason.js';
 
 export async function approveExternalCandidateForLead(
   externalCandidateId: string
@@ -28,6 +29,11 @@ export async function approveExternalCandidateForLead(
   const dup = findDuplicateReason(candidate, existingLeads, candidates);
   if (dup) {
     throw new Error(dup);
+  }
+
+  const approvalBlock = getDaily30LeadApprovalBlockReason(candidate, existingLeads, candidates);
+  if (approvalBlock) {
+    throw new Error(approvalBlock.blockReason);
   }
 
   const updated: ExternalLeadCandidate = {

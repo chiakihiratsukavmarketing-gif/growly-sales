@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { getConfigRoot } from './paths.js';
+import { DEFAULT_TARGET_PROFILE_ID } from './targetProfileRules.js';
 
 export interface TargetProfile {
   targetId: string;
@@ -30,7 +31,7 @@ export const TARGET_PROFILE_REQUIRED_FIELDS: (keyof TargetProfile)[] = [
   'scoringNotes',
 ];
 
-export const DEFAULT_TARGET_PROFILE_ID = 'housing';
+export { DEFAULT_TARGET_PROFILE_ID } from './targetProfileRules.js';
 
 export async function loadTargetProfile(profileId = DEFAULT_TARGET_PROFILE_ID): Promise<TargetProfile> {
   const filePath = join(getConfigRoot(), 'targets', `${profileId}.json`);
@@ -52,14 +53,4 @@ export async function loadTargetProfile(profileId = DEFAULT_TARGET_PROFILE_ID): 
   return profile;
 }
 
-export function isTargetIndustry(industry: string, profile: TargetProfile): boolean {
-  const normalized = industry.trim();
-  if (!normalized) return false;
-  return profile.industries.some((kw) => normalized.includes(kw) || kw.includes(normalized));
-}
-
-export function matchesTargetArea(area: string, profile: TargetProfile): boolean {
-  const normalized = area.trim();
-  if (!normalized) return false;
-  return profile.defaultAreas.some((kw) => normalized.includes(kw) || kw.includes(normalized));
-}
+export { isTargetIndustry, matchesTargetArea } from './targetProfileRules.js';

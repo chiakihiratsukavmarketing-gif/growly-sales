@@ -5894,6 +5894,11 @@ async function verifyPhase414Daily30ExternalReferenceSupplement(): Promise<void>
   assert(dashboard.includes('externalReferenceFieldsFromEntry'), 'dashboard exposes supplement fields');
   assert(resultsPanel.includes('Daily30ExternalReferenceSupplementBanner'), 'results panel shows supplement');
   assert(collectionView.includes('Daily30ExternalReferenceSupplementBanner'), 'collection view shows supplement');
+  assert(
+    collectionView.includes("from './Daily30DashboardPanel") ||
+      collectionView.includes('from "./Daily30DashboardPanel'),
+    'candidate collection view imports Daily30DashboardPanel'
+  );
   assert(!cloudFetch.includes('messages.send'), 'phase41.4 no gmail send');
   assert(!cloudFetch.includes('users.drafts.create'), 'phase41.4 no drafts create');
 
@@ -6053,6 +6058,715 @@ async function verifyPhase414Daily30ExternalReferenceSupplement(): Promise<void>
   assert(typeof stateFields.externalReferenceDisplayMessage === 'string', 'state display message');
 
   ok('Phase 41.4 Daily 30 external reference supplement checks passed');
+}
+
+async function verifyPhase415ACandidateCollectionUiOptimization(): Promise<void> {
+  const collectionView = await readFile(join(SRC_ROOT, 'ui/CandidateCollectionView.tsx'), 'utf-8');
+  const resultsPanel = await readFile(join(SRC_ROOT, 'ui/Daily30CloudResultsPanel.tsx'), 'utf-8');
+  const leadPanel = await readFile(join(SRC_ROOT, 'ui/Daily30LeadCandidatesPanel.tsx'), 'utf-8');
+  const draftPanel = await readFile(join(SRC_ROOT, 'ui/Daily30DraftImportPanel.tsx'), 'utf-8');
+  const manualPanel = await readFile(join(SRC_ROOT, 'ui/Daily30ManualExternalReferencePanel.tsx'), 'utf-8');
+  const schedulePanel = await readFile(join(SRC_ROOT, 'ui/Daily30CollectionSchedulePanel.tsx'), 'utf-8');
+  const tabBoundary = await readFile(join(SRC_ROOT, 'ui/common/TabErrorBoundary.tsx'), 'utf-8');
+  const styles = await readFile(join(SRC_ROOT, 'ui/styles.css'), 'utf-8');
+
+  assert(collectionView.includes("type CandidateCollectionWorkView"), 'work view type exists');
+  assert(collectionView.includes("setWorkView('results") || collectionView.includes("setWorkView(\"results"), 'results tab exists');
+  assert(collectionView.includes("setWorkView('lead_approval") || collectionView.includes("setWorkView(\"lead_approval"), 'lead approval tab exists');
+  assert(collectionView.includes("setWorkView('draft_import") || collectionView.includes("setWorkView(\"draft_import"), 'draft import tab exists');
+  assert(collectionView.includes('showExternalReferenceDrawer'), 'external reference drawer state exists');
+  assert(collectionView.includes('drawer-overlay'), 'drawer overlay exists');
+  assert(!collectionView.includes('2. Lead化承認・営業文'), 'old always-on section headings removed from collection view');
+  assert(!collectionView.includes('3. 下書き候補取り込み'), 'old always-on section headings removed from collection view');
+
+  assert(resultsPanel.includes('pageSize') && resultsPanel.includes('setPageSize'), 'results paging exists');
+  assert(resultsPanel.includes('会社名で検索'), 'results search exists');
+  assert(resultsPanel.includes('収集元:'), 'results source filter exists');
+
+  assert(leadPanel.includes('会社名で検索'), 'lead panel search exists');
+  assert(leadPanel.includes('pageSize') && leadPanel.includes('setPageSize'), 'lead panel paging exists');
+  assert(leadPanel.includes('作業可能（推奨）'), 'lead panel default actionable view exists');
+
+  assert(draftPanel.includes('下書き候補取り込み 0件'), 'draft import zero state simplified');
+
+  assert(!manualPanel.includes('discoverySourceUrl'), 'manual panel hides internal field names in main label');
+  assert(manualPanel.includes('掲載元URL'), 'manual panel uses user label');
+
+  assert(!schedulePanel.includes('Phase 40.6'), 'schedule panel removes old phase text');
+
+  assert(tabBoundary.includes('候補収集画面の一部読み込みに失敗しました'), 'tab error boundary message');
+  assert(styles.includes('candidate-collection-header-sticky'), 'sticky header css exists');
+  assert(!resultsPanel.includes('messages.send'), 'no gmail send in results panel');
+  assert(!resultsPanel.includes('users.drafts.create'), 'no drafts create in results panel');
+
+  ok('Phase 41.5A candidate collection UI optimization checks passed');
+}
+
+/** React rules-of-hooks: no useState/useMemo/useEffect/useCallback after component-level early return. */
+function assertNoHooksAfterComponentEarlyReturn(source: string, label: string): void {
+  const loadingEarly = source.match(/\n  if \(loading\) return /);
+  if (!loadingEarly || loadingEarly.index === undefined) {
+    return;
+  }
+  const afterEarly = source.slice(loadingEarly.index);
+  const beforeMainReturn = afterEarly.split(/\n  return \(/)[0] ?? '';
+  const hookCalls = beforeMainReturn.match(/\buse(Memo|State|Effect|Callback)\s*\(/g);
+  assert(
+    !hookCalls || hookCalls.length === 0,
+    `${label}: hooks must not appear after loading early return (React #310): ${hookCalls?.join(', ') ?? ''}`
+  );
+}
+
+async function verifyPhase415CHookOrderSafety(): Promise<void> {
+  const collectionView = await readFile(join(SRC_ROOT, 'ui/CandidateCollectionView.tsx'), 'utf-8');
+  const resultsPanel = await readFile(join(SRC_ROOT, 'ui/Daily30CloudResultsPanel.tsx'), 'utf-8');
+  const leadPanel = await readFile(join(SRC_ROOT, 'ui/Daily30LeadCandidatesPanel.tsx'), 'utf-8');
+  const draftPanel = await readFile(join(SRC_ROOT, 'ui/Daily30DraftImportPanel.tsx'), 'utf-8');
+  const manualPanel = await readFile(join(SRC_ROOT, 'ui/Daily30ManualExternalReferencePanel.tsx'), 'utf-8');
+  const dashboard = await readFile(join(SRC_ROOT, 'ui/GrowlySalesDashboard.tsx'), 'utf-8');
+  const tabBoundary = await readFile(join(SRC_ROOT, 'ui/common/TabErrorBoundary.tsx'), 'utf-8');
+
+  assertNoHooksAfterComponentEarlyReturn(resultsPanel, 'Daily30CloudResultsPanel');
+  assertNoHooksAfterComponentEarlyReturn(leadPanel, 'Daily30LeadCandidatesPanel');
+  assertNoHooksAfterComponentEarlyReturn(draftPanel, 'Daily30DraftImportPanel');
+
+  const resultsLoadingIdx = resultsPanel.indexOf('if (loading) return');
+  const resultsPrefectureIdx = resultsPanel.indexOf('const prefectureOptions = useMemo');
+  assert(
+    resultsPrefectureIdx >= 0 && resultsLoadingIdx >= 0 && resultsPrefectureIdx < resultsLoadingIdx,
+    'Daily30CloudResultsPanel: filter useMemo hooks must precede loading early return'
+  );
+
+  const leadLoadingIdx = leadPanel.indexOf('if (loading) return');
+  const leadPendingIdx = leadPanel.indexOf('const pendingFiltered = useMemo');
+  assert(
+    leadPendingIdx >= 0 && leadLoadingIdx >= 0 && leadPendingIdx < leadLoadingIdx,
+    'Daily30LeadCandidatesPanel: list useMemo hooks must precede loading early return'
+  );
+
+  assert(
+    !collectionView.includes('if (workView') ||
+      !collectionView.match(/if \(workView[^)]*\)[^{]*\{[^}]*use(Memo|State|Effect|Callback)/),
+    'CandidateCollectionView: work tab switch must not conditionally call hooks'
+  );
+  assert(
+    !collectionView.includes('if (showExternalReferenceDrawer') ||
+      !collectionView.match(
+        /if \(showExternalReferenceDrawer[^)]*\)[^{]*\{[^}]*use(Memo|State|Effect|Callback)/
+      ),
+    'CandidateCollectionView: drawer open must not conditionally call hooks'
+  );
+  assert(
+    !manualPanel.includes('if (loading) return'),
+    'Daily30ManualExternalReferencePanel: drawer form keeps fixed hook count (no loading early return)'
+  );
+
+  assert(dashboard.includes('TabErrorBoundary'), 'TabErrorBoundary still wraps candidate collection');
+  assert(tabBoundary.includes('候補収集画面の一部読み込みに失敗しました'), 'TabErrorBoundary message retained');
+
+  const gmailSendPattern = /users\.messages\.send|messages\.send/;
+  for (const [name, src] of [
+    ['CandidateCollectionView', collectionView],
+    ['Daily30CloudResultsPanel', resultsPanel],
+    ['Daily30LeadCandidatesPanel', leadPanel],
+  ] as const) {
+    assert(!gmailSendPattern.test(src), `${name}: Gmail send API must not be used`);
+    assert(!src.includes('users.drafts.create'), `${name}: Gmail drafts.create must not be used`);
+  }
+
+  const secretPattern = /(Bearer\s+[A-Za-z0-9._-]{20,}|refresh_token['":\s]+[A-Za-z0-9._-]{20,})/;
+  for (const [name, src] of [
+    ['CandidateCollectionView', collectionView],
+    ['Daily30CloudResultsPanel', resultsPanel],
+    ['Daily30LeadCandidatesPanel', leadPanel],
+    ['TabErrorBoundary', tabBoundary],
+  ] as const) {
+    assert(!secretPattern.test(src), `${name}: secrets/tokens must not appear in UI source`);
+  }
+
+  ok('Phase 41.5C hook order safety checks passed');
+}
+
+async function verifyPhase415DWorkQueueUi(): Promise<void> {
+  const collectionView = await readFile(join(SRC_ROOT, 'ui/CandidateCollectionView.tsx'), 'utf-8');
+  const resultsPanel = await readFile(join(SRC_ROOT, 'ui/Daily30CloudResultsPanel.tsx'), 'utf-8');
+  const leadPanel = await readFile(join(SRC_ROOT, 'ui/Daily30LeadCandidatesPanel.tsx'), 'utf-8');
+  const candidateCards = await readFile(join(SRC_ROOT, 'ui/Daily30CandidateCards.tsx'), 'utf-8');
+  const styles = await readFile(join(SRC_ROOT, 'ui/styles.css'), 'utf-8');
+  const tabBoundary = await readFile(join(SRC_ROOT, 'ui/common/TabErrorBoundary.tsx'), 'utf-8');
+
+  assert(collectionView.includes('candidate-header-today'), 'compressed today summary line');
+  assert(collectionView.includes('candidate-header-tomorrow'), 'one-line tomorrow schedule');
+  assert(collectionView.includes('今日：'), 'today label in header');
+  assert(collectionView.includes('明日：'), 'tomorrow label in header');
+  assert(!collectionView.includes('SummaryStatCard'), 'four stat cards removed from collection header');
+
+  assert(resultsPanel.includes('daily30-work-queue'), 'results panel uses single work queue');
+  assert(resultsPanel.includes('workQueueTitleForFilter'), 'dynamic work queue title');
+  assert(resultsPanel.includes('今日の収集情報'), 'collection meta collapsed');
+  assert(!resultsPanel.includes('メール取得済候補'), 'duplicate email-found list removed');
+  assert(!resultsPanel.includes('全候補（フィルター結果）'), 'duplicate filtered list section removed');
+  assert(resultsPanel.includes("layout=\"queue\"") || resultsPanel.includes("layout='queue'"), 'queue row layout');
+
+  assert(leadPanel.includes('daily30-work-queue'), 'lead panel uses work queue');
+  assert(leadPanel.includes('HumanGateConfirmModal'), 'generate copy human gate retained');
+  assert(leadPanel.includes('GENERATE_DAILY_30_COPY_GATE_LABEL'), 'generate gate label retained');
+
+  assert(candidateCards.includes('Daily30CandidateQueueHeader'), 'queue table header exists');
+  assert(candidateCards.includes('daily30-candidate-card-queue'), 'queue row card layout');
+
+  assert(styles.includes('max-width: min(1400px'), 'collection view width expanded');
+  assert(styles.includes('daily30-queue-header'), 'queue header styles');
+
+  assert(tabBoundary.includes('候補収集画面の一部読み込みに失敗しました'), 'TabErrorBoundary retained');
+  assert(!resultsPanel.includes('messages.send'), 'no gmail send in results panel');
+  assert(!resultsPanel.includes('users.drafts.create'), 'no drafts create in results panel');
+
+  ok('Phase 41.5D work queue UI checks passed');
+}
+
+async function verifyPhase415EFocusMode(): Promise<void> {
+  const collectionView = await readFile(join(SRC_ROOT, 'ui/CandidateCollectionView.tsx'), 'utf-8');
+  const resultsPanel = await readFile(join(SRC_ROOT, 'ui/Daily30CloudResultsPanel.tsx'), 'utf-8');
+  const leadPanel = await readFile(join(SRC_ROOT, 'ui/Daily30LeadCandidatesPanel.tsx'), 'utf-8');
+  const focusView = await readFile(join(SRC_ROOT, 'ui/Daily30CandidateFocusView.tsx'), 'utf-8');
+  const focusMode = await readFile(join(SRC_ROOT, 'ui/daily30CandidateFocusMode.ts'), 'utf-8');
+  const focusHook = await readFile(join(SRC_ROOT, 'ui/useCandidateFocusQueue.ts'), 'utf-8');
+  const toggle = await readFile(join(SRC_ROOT, 'ui/CandidateDisplayModeToggle.tsx'), 'utf-8');
+  const dashboard = await readFile(join(SRC_ROOT, 'ui/GrowlySalesDashboard.tsx'), 'utf-8');
+  const tabBoundary = await readFile(join(SRC_ROOT, 'ui/common/TabErrorBoundary.tsx'), 'utf-8');
+  const styles = await readFile(join(SRC_ROOT, 'ui/styles.css'), 'utf-8');
+
+  assert(toggle.includes('1件ずつ') && toggle.includes('一覧'), 'focus/list toggle labels');
+  assert(focusMode.includes("CandidateDisplayMode = 'focus' | 'list'"), 'display mode type');
+  assert(focusMode.includes('loadStoredDisplayMode'), 'localStorage display mode');
+  assert(focusMode.includes('sortCandidatesForFocusMode'), 'focus sort order');
+  assert(focusMode.includes('applyDeferredOrder'), 'defer to queue end');
+
+  assert(resultsPanel.includes('CandidateDisplayModeToggle'), 'results panel has mode toggle');
+  assert(resultsPanel.includes('Daily30CandidateFocusView'), 'results panel has focus view');
+  assert(resultsPanel.includes("displayMode === 'focus'"), 'results focus branch');
+  assert(resultsPanel.includes("displayMode === 'list'"), 'results list branch preserved');
+  assert(resultsPanel.includes('useCandidateFocusQueue'), 'results uses focus queue hook');
+  assert(resultsPanel.includes('deferCurrent'), 'results defer support');
+  assert(resultsPanel.includes('recordProcessed'), 'results processed count');
+
+  assert(leadPanel.includes('CandidateDisplayModeToggle'), 'lead panel has mode toggle');
+  assert(leadPanel.includes('Daily30CandidateFocusView'), 'lead panel has focus view');
+  assert(leadPanel.includes('primaryAction'), 'lead focus primary action');
+
+  assert(focusView.includes('daily30-focus-card'), 'single focus card');
+  assert(focusView.includes('あとで確認'), 'defer button');
+  assert(focusView.includes('Lead化承認'), 'approve button');
+  assert(focusView.includes('候補から除外'), 'exclude button');
+  assert(focusView.includes('前へ'), 'prev navigation');
+  assert(focusView.includes('次へ'), 'next navigation');
+  assert(focusView.includes('残り'), 'remaining count');
+  assert(focusView.includes('今日処理済み'), 'processed count');
+  assert(focusView.includes('すべての候補を「あとで確認」'), 'all deferred empty state');
+  assert(focusView.includes('開発者向け詳細'), 'dev details collapsed');
+  assert(!focusView.includes('Bearer '), 'no bearer token in focus view');
+
+  assert(focusHook.includes('allCandidatesDeferred'), 'infinite loop guard');
+  assert(focusHook.includes('clearDeferred'), 'reset deferred');
+
+  assertNoHooksAfterComponentEarlyReturn(resultsPanel, 'Daily30CloudResultsPanel');
+  assertNoHooksAfterComponentEarlyReturn(leadPanel, 'Daily30LeadCandidatesPanel');
+
+  assert(dashboard.includes('TabErrorBoundary'), 'TabErrorBoundary maintained');
+  assert(tabBoundary.includes('候補収集画面の一部読み込みに失敗しました'), 'tab error boundary message');
+  assert(styles.includes('daily30-focus-panel'), 'focus panel styles');
+  assert(!resultsPanel.includes('messages.send'), 'no gmail send');
+  assert(!resultsPanel.includes('users.drafts.create'), 'no drafts create');
+
+  ok('Phase 41.5E focus mode checks passed');
+}
+
+async function verifyPhase415GLeadApprovalJudgmentAudit(): Promise<void> {
+  const complianceSrc = await readFile(join(SRC_ROOT, 'candidates/sourceCompliance.ts'), 'utf-8');
+  const enrichSrc = await readFile(join(SRC_ROOT, 'candidates/enrichCandidateFields.ts'), 'utf-8');
+  const approvalSrc = await readFile(
+    join(SRC_ROOT, 'candidates/getDaily30LeadApprovalBlockReason.ts'),
+    'utf-8'
+  );
+  const judgmentSrc = await readFile(
+    join(SRC_ROOT, 'candidates/resolveDaily30LeadApprovalJudgment.ts'),
+    'utf-8'
+  );
+  const approveWorkflow = await readFile(
+    join(SRC_ROOT, 'workflow/approveExternalCandidateForLead.ts'),
+    'utf-8'
+  );
+  const focusView = await readFile(join(SRC_ROOT, 'ui/Daily30CandidateFocusView.tsx'), 'utf-8');
+  const focusMode = await readFile(join(SRC_ROOT, 'ui/daily30CandidateFocusMode.ts'), 'utf-8');
+
+  assert(judgmentSrc.includes('resolveDaily30LeadApprovalJudgment'), 'unified judgment resolver');
+  assert(judgmentSrc.includes('representativeEmailJudgmentLabel'), 'judgment label helper');
+  assert(!complianceSrc.includes('candidate.sourceComplianceStatus ?? evaluation.status'), 'no stale compliance in block reason');
+  assert(enrichSrc.includes('applySourceComplianceFields'), 'enrich recomputes compliance on load');
+  assert(approveWorkflow.includes('getDaily30LeadApprovalBlockReason'), 'approve API uses block reason');
+  assert(focusView.includes('representativeEmailLabel'), 'focus view uses unified representative label');
+  assert(!focusView.includes('emailSource.emailSourceConfirmed ?'), 'focus view does not use emailSourceConfirmed alone');
+  assert(focusMode.includes('isRepresentativeEmailOfficialSiteVerified'), 'focus mode uses compliance verified');
+  assert(complianceSrc.includes('hostMatchesOrIsSubdomain'), 'official site domain allows subdomain');
+
+  const {
+    getLeadApprovalComplianceBlockReason,
+    evaluateSourceCompliance,
+    isUrlOnOfficialSiteDomain,
+  } = await import('../candidates/sourceCompliance.js');
+  const { getDaily30LeadApprovalBlockReason } = await import(
+    '../candidates/getDaily30LeadApprovalBlockReason.js'
+  );
+  const { resolveDaily30LeadApprovalJudgment } = await import(
+    '../candidates/resolveDaily30LeadApprovalJudgment.js'
+  );
+  const { enrichExternalLeadCandidate } = await import('../candidates/enrichCandidateFields.js');
+  const { representativeEmailJudgmentLabel } = await import(
+    '../candidates/resolveDaily30LeadApprovalJudgment.js'
+  );
+
+  const officialVerifiedBase = {
+    externalCandidateId: 'phase415g-verified',
+    sourceType: 'google_places' as const,
+    companyName: 'Verified Housing Co',
+    area: '宮城県',
+    industry: '工務店',
+    websiteUrl: 'https://www.example-housing.test/',
+    officialSiteUrl: 'https://www.example-housing.test/',
+    phoneNumber: null,
+    address: null,
+    googlePlaceId: 'p1',
+    sourceUrl: 'https://maps.google.com/x',
+    sourceQuery: 'q',
+    category: '工務店',
+    contactFormUrl: null,
+    emailCandidates: ['info@example-housing.test'],
+    confidenceScore: 0.9,
+    importStatus: 'preview' as const,
+    riskLevel: 'low' as const,
+    duplicateReason: '',
+    duplicateKey: 'k-415g',
+    pipelineStatus: 'email_found' as const,
+    prefecture: '宮城県',
+    regionGroup: '宮城' as const,
+    collectionPriority: 1,
+    collectionAreaSource: '宮城県',
+    collectionBatchId: '2026-07-02',
+    emailCandidateSourceUrls: ['https://www.example-housing.test/contact'],
+    emailCandidateSourceUrl: 'https://www.example-housing.test/contact',
+    emailVerifiedAt: '2026-07-02T00:00:00.000Z',
+    generatedEmailSubject: null,
+    generatedEmailBody: null,
+    generatedCustomHook: null,
+    generatedCustomHookReason: null,
+    targetEmail: 'info@example-housing.test',
+    failureReason: null,
+    copyGeneratedAt: null,
+    qualityCheckedAt: null,
+    humanReviewStatus: null,
+    gmailDraftStatus: null,
+    sendStatus: null,
+    excludedAt: null,
+    excludedReason: null,
+    excludedBy: null,
+    createdAt: '2026-07-02T00:00:00.000Z',
+    updatedAt: '2026-07-02T00:00:00.000Z',
+    notes: '',
+    collectedAt: '2026-07-02T00:00:00.000Z',
+    discoverySource: 'google_places' as const,
+    discoverySourceUrl: 'https://maps.google.com/x',
+    sourceComplianceStatus: 'email_not_found' as const,
+    sourceComplianceNote: null,
+  };
+
+  assert(
+    getLeadApprovalComplianceBlockReason(officialVerifiedBase) === null,
+    'stale stored compliance does not block approval'
+  );
+  assert(
+    getDaily30LeadApprovalBlockReason(officialVerifiedBase, [], [officialVerifiedBase]) === null,
+    'stale stored compliance does not produce block hint'
+  );
+
+  const judgment = resolveDaily30LeadApprovalJudgment(officialVerifiedBase, [], [
+    officialVerifiedBase,
+  ]);
+  assert(judgment.canApprove, 'unified judgment approvable with stale stored status');
+  assert(judgment.representativeEmailVerified, 'representative email verified');
+  assert(
+    judgment.representativeEmailLabel === '公式サイト代表メール確認済み',
+    'representative label matches compliance'
+  );
+  assert(judgment.blockHint === null, 'no contradictory block hint');
+
+  const enriched = enrichExternalLeadCandidate(officialVerifiedBase);
+  assert(
+    enriched.sourceComplianceStatus === 'official_site_verified',
+    'enrich refreshes stored compliance status'
+  );
+
+  const subdomainCandidate = {
+    ...officialVerifiedBase,
+    externalCandidateId: 'phase415g-subdomain',
+    websiteUrl: 'https://example-housing.test/',
+    officialSiteUrl: 'https://example-housing.test/',
+    emailCandidateSourceUrls: ['https://corp.example-housing.test/contact'],
+    emailCandidateSourceUrl: 'https://corp.example-housing.test/contact',
+    sourceComplianceStatus: null,
+  };
+  assert(
+    isUrlOnOfficialSiteDomain(
+      'https://corp.example-housing.test/contact',
+      subdomainCandidate
+    ),
+    'subdomain email source counts as official site'
+  );
+  assert(
+    evaluateSourceCompliance(subdomainCandidate).status === 'official_site_verified',
+    'subdomain email source yields official_site_verified'
+  );
+
+  const label = representativeEmailJudgmentLabel(officialVerifiedBase);
+  const block = getDaily30LeadApprovalBlockReason(officialVerifiedBase, [], [officialVerifiedBase]);
+  assert(
+    !(label === '公式サイト代表メール確認済み' && block?.blockReason?.includes('確認できていません')),
+    'no confirmed-label vs cannot-confirm block contradiction'
+  );
+
+  ok('Phase 41.5G lead approval judgment audit checks passed');
+}
+
+async function verifyPhase415HCompliancePersistenceDryRun(): Promise<void> {
+  const dryRunModule = await readFile(
+    join(SRC_ROOT, 'candidates/phase415hCompliancePersistenceDryRun.ts'),
+    'utf-8'
+  );
+  const dryRunScript = await readFile(
+    join(SRC_ROOT, 'scripts/run-growly-sales-phase415h-compliance-dry-run.ts'),
+    'utf-8'
+  );
+  const gcsStorage = await readFile(join(SRC_ROOT, 'storage/gcsJsonStorage.ts'), 'utf-8');
+  const repo = await readFile(join(SRC_ROOT, 'storage/externalCandidatesRepository.ts'), 'utf-8');
+  const pkg = await readFile(join(process.cwd(), 'package.json'), 'utf-8');
+
+  assert(dryRunModule.includes('gcsWritesPerformed: 0'), 'dry-run summary fixes writes to 0');
+  assert(dryRunModule.includes('backupObjectsCreated: 0'), 'dry-run no backup writes');
+  assert(dryRunModule.includes('PHASE415H_COMPLIANCE_FIELDS'), 'compliance fields limited');
+  assert(dryRunModule.includes('updateEligible'), 'update eligibility tracked');
+  assert(dryRunModule.includes('toMorePermissive'), 'permissive transition tracked');
+  assert(dryRunModule.includes('toMoreRestrictive'), 'restrictive transition tracked');
+  assert(dryRunModule.includes('maskEmailForReport'), 'email masking in reports');
+  assert(!dryRunScript.includes('writeJsonDocument'), 'dry-run script does not write JSON');
+  assert(!dryRunScript.includes('saveExternalCandidatesToJson'), 'dry-run script no candidate save');
+  assert(dryRunScript.includes('loadRawExternalCandidatesStoreFromJson'), 'reads raw GCS JSON');
+  assert(dryRunScript.includes('人間承認待ち'), 'human approval wait message');
+  assert(gcsStorage.includes('gcsGetObjectMetadata'), 'generation metadata read helper');
+  assert(repo.includes('loadRawExternalCandidatesStoreFromJson'), 'raw load without enrich');
+  assert(pkg.includes('phase415h-compliance-dry-run'), 'npm script registered');
+  assert(dryRunModule.includes('applySafetyDesign'), 'apply safety design documented');
+  assert(dryRunModule.includes('--apply'), 'apply requires explicit flag in design');
+  assert(!dryRunModule.includes('Bearer '), 'no bearer tokens in dry-run module');
+
+  const {
+    runPhase415HComplianceDryRun,
+    auditCandidateComplianceDryRun,
+    maskEmailForReport,
+  } = await import('../candidates/phase415hCompliancePersistenceDryRun.js');
+
+  const masked = maskEmailForReport('info@example-housing.test');
+  assert(masked.includes('***'), 'email mask hides local part');
+  assert(!masked.includes('info@example-housing.test'), 'full email not in mask');
+
+  const base = {
+    externalCandidateId: 'phase415h-1',
+    sourceType: 'google_places' as const,
+    companyName: 'Dry Run Co',
+    area: '宮城県',
+    industry: '工務店',
+    websiteUrl: 'https://www.example-housing.test/',
+    officialSiteUrl: 'https://www.example-housing.test/',
+    phoneNumber: null,
+    address: null,
+    googlePlaceId: null,
+    sourceUrl: 'https://maps.google.com/x',
+    sourceQuery: 'q',
+    category: '工務店',
+    contactFormUrl: null,
+    emailCandidates: ['info@example-housing.test'],
+    confidenceScore: 0.9,
+    importStatus: 'preview' as const,
+    riskLevel: 'low' as const,
+    duplicateReason: '',
+    duplicateKey: 'k-415h',
+    pipelineStatus: 'email_found' as const,
+    prefecture: '宮城県',
+    regionGroup: '宮城' as const,
+    collectionPriority: 1,
+    collectionAreaSource: '宮城県',
+    collectionBatchId: '2026-07-02',
+    emailCandidateSourceUrls: ['https://www.example-housing.test/contact'],
+    emailCandidateSourceUrl: 'https://www.example-housing.test/contact',
+    emailVerifiedAt: null,
+    generatedEmailSubject: null,
+    generatedEmailBody: null,
+    generatedCustomHook: null,
+    generatedCustomHookReason: null,
+    targetEmail: 'info@example-housing.test',
+    failureReason: null,
+    copyGeneratedAt: null,
+    qualityCheckedAt: null,
+    humanReviewStatus: null,
+    gmailDraftStatus: null,
+    sendStatus: null,
+    notes: '',
+    collectedAt: '2026-07-02T00:00:00.000Z',
+    createdAt: '2026-07-02T00:00:00.000Z',
+    updatedAt: '2026-07-02T00:00:00.000Z',
+    sourceComplianceStatus: 'email_not_found' as const,
+    sourceComplianceNote: 'stale',
+  };
+
+  const row = auditCandidateComplianceDryRun(base, [], [base]);
+  assert(row.updateEligible, 'stale compliance is update eligible');
+  assert(row.storedStatus === 'email_not_found', 'stored status preserved in audit');
+  assert(row.freshStatus === 'official_site_verified', 'fresh status from evaluate');
+
+  const result = runPhase415HComplianceDryRun({
+    rawCandidates: [base],
+    existingLeads: [],
+    storageBackend: 'gcs',
+    gcsMetadata: { generation: '1', size: 100, updated: null, md5Hash: null },
+    storeUpdatedAt: '2026-07-02T00:00:00.000Z',
+    preconditionContradictions: 0,
+  });
+  assert(result.summary.gcsWritesPerformed === 0, 'summary writes zero');
+  assert(result.summary.updateEligible >= 1, 'dry-run counts eligible');
+  assert(result.applySafetyDesign.length >= 5, 'apply safety design present');
+
+  ok('Phase 41.5H compliance persistence dry-run checks passed');
+}
+
+async function verifyPhase415H2CompliancePersistence(): Promise<void> {
+  const applyModule = await readFile(
+    join(SRC_ROOT, 'candidates/phase415hCompliancePersistenceApply.ts'),
+    'utf-8'
+  );
+  const applyScript = await readFile(
+    join(SRC_ROOT, 'scripts/run-growly-sales-phase415h-compliance-apply.ts'),
+    'utf-8'
+  );
+  const gcsStorage = await readFile(join(SRC_ROOT, 'storage/gcsJsonStorage.ts'), 'utf-8');
+  const types = await readFile(
+    join(SRC_ROOT, 'adapters/externalLeadCandidateTypes.ts'),
+    'utf-8'
+  );
+  const pkg = await readFile(join(process.cwd(), 'package.json'), 'utf-8');
+
+  assert(applyModule.includes('assertApplyArgsOrThrow'), 'apply double-confirm gate');
+  assert(applyModule.includes('APPLY_COMPLIANCE_REFRESH'), 'confirm phrase constant');
+  assert(applyModule.includes('validateGcsMetadataMatchesBaseline'), 'generation conflict detection');
+  assert(applyModule.includes('countNonComplianceDiffs'), 'non-compliance diff guard');
+  assert(applyModule.includes('assertArrayOrderPreserved'), 'array order preserved');
+  assert(applyModule.includes('sourceComplianceCheckedAt'), 'checkedAt field applied');
+  assert(applyScript.includes('gcsBackupBeforeWrite'), 'backup before write');
+  assert(applyScript.includes('verifyBackup'), 'backup verification');
+  assert(applyScript.includes('gcsWriteJsonIfGenerationMatch'), 'generation precondition write');
+  assert(!applyScript.includes('writeJsonDocument'), 'apply uses conditional GCS write only');
+  assert(!applyScript.includes('users.drafts.create'), 'no gmail draft create');
+  assert(!applyScript.includes('messages.send'), 'no gmail send');
+  assert(gcsStorage.includes('gcsWriteJsonIfGenerationMatch'), 'precondition write helper');
+  assert(gcsStorage.includes('gcsGetObjectMetadataAtPath'), 'backup metadata helper');
+  assert(types.includes('sourceComplianceCheckedAt'), 'schema optional checkedAt');
+  assert(pkg.includes('phase415h-compliance-apply'), 'apply npm script registered');
+  assert(applyScript.includes('audit-lead-approval-judgment'), 'post-audit command hint');
+  assert(applyScript.includes('phase415h-compliance-dry-run'), 'post dry-run hint');
+  assert(!applyModule.includes('Bearer '), 'no bearer tokens in apply module');
+
+  const {
+    parsePhase415HApplyArgs,
+    assertApplyArgsOrThrow,
+    countNonComplianceDiffs,
+    applyComplianceFieldsToCandidates,
+  } = await import('../candidates/phase415hCompliancePersistenceApply.js');
+
+  const noApply = parsePhase415HApplyArgs([]);
+  assert(!noApply.apply, 'default no apply flag');
+
+  let threw = false;
+  try {
+    assertApplyArgsOrThrow({ apply: true, confirm: 'WRONG' });
+  } catch {
+    threw = true;
+  }
+  assert(threw, 'wrong confirm phrase rejected');
+
+  const base = {
+    externalCandidateId: 'phase415h2-1',
+    sourceType: 'google_places' as const,
+    companyName: 'Apply Test Co',
+    area: '宮城県',
+    industry: '工務店',
+    websiteUrl: 'https://www.example-housing.test/',
+    officialSiteUrl: 'https://www.example-housing.test/',
+    phoneNumber: null,
+    address: null,
+    googlePlaceId: null,
+    sourceUrl: 'https://maps.google.com/x',
+    sourceQuery: 'q',
+    category: '工務店',
+    contactFormUrl: null,
+    emailCandidates: ['info@example-housing.test'],
+    confidenceScore: 0.9,
+    importStatus: 'preview' as const,
+    riskLevel: 'low' as const,
+    duplicateReason: '',
+    duplicateKey: 'k-415h2',
+    pipelineStatus: 'email_found' as const,
+    prefecture: '宮城県',
+    regionGroup: '宮城' as const,
+    collectionPriority: 1,
+    collectionAreaSource: '宮城県',
+    collectionBatchId: '2026-07-02',
+    emailCandidateSourceUrls: ['https://www.example-housing.test/contact'],
+    emailCandidateSourceUrl: 'https://www.example-housing.test/contact',
+    emailVerifiedAt: null,
+    generatedEmailSubject: null,
+    generatedEmailBody: null,
+    generatedCustomHook: null,
+    generatedCustomHookReason: null,
+    targetEmail: 'info@example-housing.test',
+    failureReason: null,
+    copyGeneratedAt: null,
+    qualityCheckedAt: null,
+    humanReviewStatus: null,
+    gmailDraftStatus: null,
+    sendStatus: null,
+    notes: '',
+    collectedAt: '2026-07-02T00:00:00.000Z',
+    createdAt: '2026-07-02T00:00:00.000Z',
+    updatedAt: '2026-07-02T00:00:00.000Z',
+    sourceComplianceStatus: 'email_not_found' as const,
+    sourceComplianceNote: 'stale',
+  };
+
+  const row = {
+    externalCandidateId: 'phase415h2-1',
+    companyName: 'Apply Test Co',
+    collectionBatchId: '2026-07-02',
+    storedStatus: 'email_not_found' as const,
+    freshStatus: 'official_site_verified' as const,
+    storedNote: 'stale',
+    freshNote: null,
+    storedRepresentativeVerified: false,
+    freshRepresentativeVerified: true,
+    storedLeadApprovalBlocked: true,
+    freshLeadApprovalBlocked: false,
+    freshBlockReason: null,
+    emailMasked: 'in***@***',
+    officialSiteUrl: 'https://www.example-housing.test/',
+    emailSourceUrl: 'https://www.example-housing.test/contact',
+    discoverySourceUrl: null,
+    importStatus: 'preview',
+    pipelineStatus: 'email_found',
+    skipReason: null,
+    updateEligible: true,
+    exactComplianceMatch: false,
+    statusOnlyDiff: true,
+    noteOnlyDiff: false,
+    toMorePermissive: true,
+    toMoreRestrictive: false,
+    toNeedsReview: false,
+    emailSourceUrlMissing: false,
+    officialSiteUrlMissing: false,
+    externalDomainEmail: false,
+    personalOrPlaceholder: false,
+    duplicateFlag: false,
+  };
+
+  const updated = applyComplianceFieldsToCandidates(
+    [base],
+    [row],
+    '2026-07-02T12:00:00.000Z'
+  );
+  assert(updated[0].sourceComplianceStatus === 'official_site_verified', 'status updated');
+  assert(updated[0].sourceComplianceCheckedAt === '2026-07-02T12:00:00.000Z', 'checkedAt set');
+  assert(countNonComplianceDiffs([base], updated) === 0, 'only compliance fields change');
+
+  ok('Phase 41.5H-2 compliance persistence apply checks passed');
+}
+
+async function verifyPhase415IFinalAlphaJudgment(): Promise<void> {
+  const phaseCScript = await readFile(
+    join(SRC_ROOT, 'scripts/run-growly-sales-phase-c-cloud-status.ts'),
+    'utf-8'
+  );
+  const cloudState = await readFile(join(SRC_ROOT, 'storage/daily30CloudRunState.ts'), 'utf-8');
+  const dryRun = await readFile(
+    join(SRC_ROOT, 'candidates/phase415hCompliancePersistenceDryRun.ts'),
+    'utf-8'
+  );
+  const applyScript = await readFile(
+    join(SRC_ROOT, 'scripts/run-growly-sales-phase415h-compliance-apply.ts'),
+    'utf-8'
+  );
+  const offerRules = await readFile(join(SRC_ROOT, 'config/offerProfileRules.ts'), 'utf-8');
+  const targetRules = await readFile(join(SRC_ROOT, 'config/targetProfileRules.ts'), 'utf-8');
+  const urlUtils = await readFile(join(SRC_ROOT, 'adapters/externalCandidateUrlUtils.ts'), 'utf-8');
+  const pkg = await readFile(join(process.cwd(), 'package.json'), 'utf-8');
+
+  assert(cloudState.includes('externalReferenceSupplementAttempted'), 'supplement state type');
+  assert(cloudState.includes('externalReferenceManualCandidatesAvailable'), 'manual count state');
+  assert(cloudState.includes('externalReferenceNetworkAccessPerformed'), 'network access flag');
+  assert(phaseCScript.includes('containsTokyoInAreasUsed'), 'tokyo exclusion check');
+  assert(phaseCScript.includes('externalReferenceSupplementAttempted'), 'phase-c prints supplement');
+  assert(dryRun.includes('updateEligible'), 'compliance dry-run eligibility');
+  assert(applyScript.includes('gcsWriteJsonIfGenerationMatch'), 'compliance apply guarded write');
+  assert(offerRules.includes('containsProhibitedClaim'), 'browser-safe offer rules');
+  assert(!offerRules.includes('node:fs'), 'offer rules no fs');
+  assert(targetRules.includes('isTargetIndustry'), 'browser-safe target rules');
+  assert(!targetRules.includes('node:fs'), 'target rules no fs');
+  assert(urlUtils.includes('normalizeWebsiteUrl'), 'browser-safe url utils');
+  assert(pkg.includes('phase415h-compliance-apply'), 'apply script registered');
+  assert(pkg.includes('phase-c-cloud-status'), 'cloud status script registered');
+
+  const { PHASE415H_APPROVED_BASELINE } = await import(
+    '../candidates/phase415hCompliancePersistenceDryRun.js'
+  );
+  assert(PHASE415H_APPROVED_BASELINE.expectedTotalCandidates === 156, 'baseline candidate count');
+
+  ok('Phase 41.5I final alpha judgment checks passed');
+}
+
+async function verifyPhase415JExternalReferenceAlphaComplete(): Promise<void> {
+  const phaseCScript = await readFile(
+    join(SRC_ROOT, 'scripts/run-growly-sales-phase-c-cloud-status.ts'),
+    'utf-8'
+  );
+  const cloudState = await readFile(join(SRC_ROOT, 'storage/daily30CloudRunState.ts'), 'utf-8');
+  const auditScript = await readFile(
+    join(SRC_ROOT, 'scripts/run-growly-sales-audit-lead-approval-judgment.ts'),
+    'utf-8'
+  );
+  const dryRunScript = await readFile(
+    join(SRC_ROOT, 'scripts/run-growly-sales-phase415h-compliance-dry-run.ts'),
+    'utf-8'
+  );
+  const urlUtils = await readFile(join(SRC_ROOT, 'adapters/externalCandidateUrlUtils.ts'), 'utf-8');
+
+  assert(cloudState.includes('getCloudRunEntryForBatch'), 'batch lookup for runs record');
+  assert(cloudState.includes('externalReferenceDisplayMessage'), 'display message field');
+  assert(phaseCScript.includes('externalReferenceManualCandidatesEligible'), 'manual eligible in phase-c');
+  assert(phaseCScript.includes('containsTokyoInAreasUsed'), 'tokyo exclusion in phase-c');
+  assert(auditScript.includes('resolveDaily30LeadApprovalJudgment'), 'unified judgment audit');
+  assert(dryRunScript.includes('updateEligible'), 'compliance dry-run tracks eligibility');
+  assert(urlUtils.includes('normalizeWebsiteUrl'), 'browser-safe url utils for ui build');
+  assert(!auditScript.includes('messages.send'), 'audit script no gmail send');
+
+  const { normalizeWebsiteUrl: normUrl } = await import('../adapters/externalCandidateUrlUtils.js');
+  assert(normUrl('https://example.test/') === 'https://example.test/', 'url utils work');
+
+  ok('Phase 41.5J external reference alpha complete checks passed');
 }
 
 function verifyPhase20LiteEmailImprovement(): void {
@@ -6285,8 +6999,14 @@ async function verifyPhaseCCloudDaily30Status(): Promise<void> {
   assert(cloudDash.includes('ok: false'), 'cloud dashboard degrades on gcs failure');
 
   const candidateView = await readFile(join(SRC_ROOT, 'ui/CandidateCollectionView.tsx'), 'utf-8');
-  assert(candidateView.includes('メール取得済み'), 'candidate view shows email-found KPI');
-  assert(candidateView.includes('総収集候補'), 'candidate view shows total collected helper');
+  assert(
+    candidateView.includes('収集時メール取得') || candidateView.includes('メール取得済'),
+    'candidate view shows email-found KPI'
+  );
+  assert(
+    candidateView.includes('総候補') || candidateView.includes('総収集候補'),
+    'candidate view shows total collected helper'
+  );
   assert(candidateView.includes('cloudOk'), 'candidate view handles cloud unavailable');
 
   const { diagnoseGcsAuth } = await import('../config/gcsAuthDiagnostics.js');
@@ -6435,6 +7155,15 @@ async function main(): Promise<void> {
   await verifyPhase412ManualExternalReference();
   await verifyPhase413ExternalReferenceAdapterFoundation();
   await verifyPhase414Daily30ExternalReferenceSupplement();
+  await verifyPhase415ACandidateCollectionUiOptimization();
+  await verifyPhase415CHookOrderSafety();
+  await verifyPhase415DWorkQueueUi();
+  await verifyPhase415EFocusMode();
+  await verifyPhase415GLeadApprovalJudgmentAudit();
+  await verifyPhase415HCompliancePersistenceDryRun();
+  await verifyPhase415H2CompliancePersistence();
+  await verifyPhase415IFinalAlphaJudgment();
+  await verifyPhase415JExternalReferenceAlphaComplete();
   verifyPhase20LiteEmailImprovement();
   await verifyPhase20LiteEmailImprovementAsync();
   await verifyPhaseBLeadInventory();

@@ -123,9 +123,7 @@ export function Daily30ManualExternalReferencePanel({
   return (
     <div className="manual-external-reference-panel">
       <p className="hint manual-external-reference-intro">
-        求人サイト・楽天市場・地域ポータル等は<strong>企業候補の発見元</strong>としてのみ使います。
-        メール取得元は<strong>公式サイト上の代表メール</strong>に限定します。
-        この画面では<strong>外部掲載サイトへ自動アクセスしません</strong>。
+        掲載元URLは企業発見の記録にのみ使用します。メールは公式サイトからのみ確認します。
       </p>
 
       {submitError ? <InfoBanner variant="danger">{submitError}</InfoBanner> : null}
@@ -138,7 +136,7 @@ export function Daily30ManualExternalReferencePanel({
 
       <div className="manual-external-reference-form">
         <label className="collection-schedule-select">
-          <span>掲載元URL（discoverySourceUrl）*</span>
+          <span>掲載元URL *</span>
           <input
             type="url"
             value={discoverySourceUrl}
@@ -152,7 +150,7 @@ export function Daily30ManualExternalReferencePanel({
         </p>
 
         <label className="collection-schedule-select">
-          <span>収集元（discoverySource）*</span>
+          <span>掲載元の種類 *</span>
           <select
             value={discoverySource}
             onChange={(e) => setDiscoverySource(e.target.value as Daily30DiscoverySource)}
@@ -204,30 +202,32 @@ export function Daily30ManualExternalReferencePanel({
           Lead化承認には実質必須。メール確認はこのURLのドメイン内のみ許可されます。
         </p>
 
-        <label className="collection-schedule-select">
-          <span>都道府県</span>
-          <select value={prefecture} onChange={(e) => setPrefecture(e.target.value)}>
-            {prefectureOptions.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="manual-external-reference-grid-2col">
+          <label className="collection-schedule-select">
+            <span>都道府県</span>
+            <select value={prefecture} onChange={(e) => setPrefecture(e.target.value)}>
+              {prefectureOptions.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <label className="collection-schedule-select">
-          <span>業種</span>
-          <select
-            value={industryCategory}
-            onChange={(e) => setIndustryCategory(e.target.value as Daily30IndustryCategory)}
-          >
-            {(Object.keys(INDUSTRY_CATEGORY_LABELS) as Daily30IndustryCategory[]).map((key) => (
-              <option key={key} value={key}>
-                {INDUSTRY_CATEGORY_LABELS[key]}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label className="collection-schedule-select">
+            <span>業種</span>
+            <select
+              value={industryCategory}
+              onChange={(e) => setIndustryCategory(e.target.value as Daily30IndustryCategory)}
+            >
+              {(Object.keys(INDUSTRY_CATEGORY_LABELS) as Daily30IndustryCategory[]).map((key) => (
+                <option key={key} value={key}>
+                  {INDUSTRY_CATEGORY_LABELS[key]}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
 
         <label className="collection-schedule-select">
           <span>メモ</span>
@@ -262,6 +262,15 @@ export function Daily30ManualExternalReferencePanel({
             <p className="hint collection-schedule-disabled-hint">{disabledReason}</p>
           ) : null}
         </div>
+
+        <DevDetails title="入力フィールド（開発者向け）">
+          <ul className="hint-list">
+            <li>掲載元URL: discoverySourceUrl</li>
+            <li>掲載元の種類: discoverySource / discoverySourceSite</li>
+            <li>公式サイト: officialSiteUrl</li>
+            <li>公式サイトメール確認: shouldEnrichOfficialSiteEmail</li>
+          </ul>
+        </DevDetails>
       </div>
 
       {lastResult ? (

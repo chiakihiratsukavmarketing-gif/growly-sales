@@ -2,23 +2,16 @@ import type { TargetProfile } from '../config/targetProfile.js';
 import type { ExternalLeadCandidate, ExternalCandidateSourceType } from './externalLeadCandidateTypes.js';
 import type { Daily30RegionGroup } from '../candidates/daily30CandidateStatus.js';
 import { createExternalCandidateId } from './externalLeadCandidateTypes.js';
-import { isTargetIndustry } from '../config/targetProfile.js';
+import { isTargetIndustry } from '../config/targetProfileRules.js';
 import { enrichExternalLeadCandidate } from '../candidates/enrichCandidateFields.js';
 
 function normalizeCompanyName(name: string): string {
   return name.trim().replace(/\s+/g, ' ');
 }
 
-export function normalizeWebsiteUrl(url: string | null | undefined): string | null {
-  if (!url?.trim()) return null;
-  try {
-    const parsed = new URL(url.trim());
-    if (!['http:', 'https:'].includes(parsed.protocol)) return null;
-    return parsed.toString();
-  } catch {
-    return null;
-  }
-}
+import { normalizeWebsiteUrl } from './externalCandidateUrlUtils.js';
+
+export { normalizeWebsiteUrl };
 
 function inferIndustryFromQuery(query: string, profile: TargetProfile): string {
   for (const industry of profile.industries) {

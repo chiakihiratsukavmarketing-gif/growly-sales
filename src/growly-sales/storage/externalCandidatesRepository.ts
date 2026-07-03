@@ -22,6 +22,14 @@ function escapeCsv(value: string): string {
 export async function loadExternalCandidatesFromJson(
   filePath?: string
 ): Promise<ExternalLeadCandidate[]> {
+  const { candidates } = await loadRawExternalCandidatesStoreFromJson(filePath);
+  return enrichExternalLeadCandidates(candidates);
+}
+
+/** GCS/ローカル JSON を enrich せずに読み込む（Phase 41.5H dry-run 用） */
+export async function loadRawExternalCandidatesStoreFromJson(
+  filePath?: string
+): Promise<{ candidates: ExternalLeadCandidate[]; updatedAt: string | null; note: string | null }> {
   const canonicalPath = getExternalCandidatesJsonPath();
   const resolvedPath = filePath ?? canonicalPath;
   try {
@@ -31,14 +39,19 @@ export async function loadExternalCandidatesFromJson(
     } else {
       raw = await readJsonDocument(EXTERNAL_CANDIDATES_JSON);
     }
-    if (!raw) return [];
+    if (!raw) return { candidates: [], updatedAt: null, note: null };
     const parsed = JSON.parse(raw) as ExternalCandidatesStore | ExternalLeadCandidate[];
-    if (Array.isArray(parsed)) return enrichExternalLeadCandidates(parsed);
-    if (parsed?.candidates) return enrichExternalLeadCandidates(parsed.candidates);
-    return [];
+    if (Array.isArray(parsed)) {
+      return { candidates: parsed, updatedAt: null, note: null };
+    }
+    return {
+      candidates: parsed?.candidates ?? [],
+      updatedAt: parsed?.updatedAt ?? null,
+      note: parsed?.note ?? null,
+    };
   } catch (err) {
     if (!isGcsStorageBackend() && (err as NodeJS.ErrnoException).code === 'ENOENT') {
-      return [];
+      return { candidates: [], updatedAt: null, note: null };
     }
     throw err;
   }
