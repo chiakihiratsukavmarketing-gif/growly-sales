@@ -1,27 +1,39 @@
 import type { CollectionProfileDisplayInfo } from '../candidates/resolveCollectionProfileDisplay.js';
 import { shortenDisplayUrl } from '../candidates/resolveCollectionProfileDisplay.js';
 import type { EmailSourceDisplayInfo } from '../candidates/resolveEmailSourceDisplay.js';
-import { EmailSourceDisplay } from './EmailSourceDisplay.js';
+import { EmailSourceDisplay, EmailSourceWarnings } from './EmailSourceDisplay.js';
 import { DevDetails } from './common/DevDetails.js';
 
 interface CollectionProfileDisplayProps {
   info: CollectionProfileDisplayInfo;
   variant?: 'compact' | 'detail' | 'send-record';
   emailSourceInfo?: EmailSourceDisplayInfo | null;
+  /** @deprecated send-record variant always shows URL rows when emailSourceInfo is provided */
   showEmailSource?: boolean;
+  showEmailWarnings?: boolean;
 }
 
-function UrlRow({ label, url }: { label: string; url: string | null }) {
+function UrlRow({
+  label,
+  url,
+  emptyLabel = 'なし',
+  className = 'collection-profile-url-row',
+}: {
+  label: string;
+  url: string | null;
+  emptyLabel?: string;
+  className?: string;
+}) {
   if (!url) {
     return (
-      <div className="collection-profile-url-row">
+      <div className={className}>
         <span className="collection-profile-label">{label}</span>
-        <span className="hint">なし</span>
+        <span className="hint send-record-url-missing">{emptyLabel}</span>
       </div>
     );
   }
   return (
-    <div className="collection-profile-url-row">
+    <div className={className}>
       <span className="collection-profile-label">{label}</span>
       <a href={url} target="_blank" rel="noopener noreferrer" className="url-link" title={url}>
         {shortenDisplayUrl(url)}
@@ -30,39 +42,59 @@ function UrlRow({ label, url }: { label: string; url: string | null }) {
   );
 }
 
+function EmailSourceWarningsBlock({ info }: { info: EmailSourceDisplayInfo }) {
+  return <EmailSourceWarnings info={info} />;
+}
+
 export function CollectionProfileDisplay({
   info,
   variant = 'compact',
   emailSourceInfo = null,
   showEmailSource = false,
+  showEmailWarnings = false,
 }: CollectionProfileDisplayProps) {
   if (variant === 'send-record') {
-    const sourceLabel = info.discoverySourceLabel?.trim() || '—';
-    const siteLabel = info.discoverySourceSiteLabel?.trim();
-    const showSite = Boolean(siteLabel && siteLabel !== '—' && siteLabel !== sourceLabel);
+    const methodLabel = info.discoverySourceLabel?.trim() || '—';
+    const discoveryUrl = info.discoverySourceUrl?.trim() || null;
+    const officialSiteUrl = emailSourceInfo?.officialSiteUrl?.trim() || null;
+    const emailSourceUrl = emailSourceInfo?.emailSourceUrl?.trim() || null;
+    const metaParts = [info.prefecture || null, info.collectionProfileName || null].filter(Boolean);
+
     return (
       <div className="send-record-source-block" aria-label="収集元情報">
-        <div className="send-record-source-primary">
-          <span className="send-record-source-label">収集元</span>
-          <strong className="send-record-source-value" title={sourceLabel}>
-            {sourceLabel}
-          </strong>
-        </div>
-        <div className="send-record-source-meta">
-          {[showSite ? siteLabel : null, info.prefecture || null, info.collectionProfileName || null]
-            .filter(Boolean)
-            .join(' · ')}
-        </div>
-        {info.discoverySource === 'job_site_reference' && info.discoverySourceUrl ? (
-          <UrlRow label="発見元" url={info.discoverySourceUrl} />
-        ) : null}
-        {showEmailSource && emailSourceInfo ? (
-          <EmailSourceDisplay
-            info={emailSourceInfo}
-            variant="under-email"
-            showWarnings
-            className="collection-profile-email-source"
+        <div className="send-record-source-url-list">
+          <div className="send-record-source-method-row">
+            <span className="send-record-source-label">収集方法</span>
+            <strong className="send-record-source-value" title={methodLabel}>
+              {methodLabel}
+            </strong>
+          </div>
+          {metaParts.length > 0 ? (
+            <div className="send-record-source-meta">{metaParts.join(' · ')}</div>
+          ) : null}
+          <UrlRow
+            label="企業の発見元URL"
+            url={discoveryUrl}
+            emptyLabel="URL未記録"
+            className="send-record-source-url-row"
           />
+          <UrlRow
+            label="公式サイト"
+            url={officialSiteUrl}
+            emptyLabel="URL未記録"
+            className="send-record-source-url-row"
+          />
+          <UrlRow
+            label="メール取得元"
+            url={emailSourceUrl}
+            emptyLabel="URL未記録"
+            className="send-record-source-url-row"
+          />
+        </div>
+        {showEmailWarnings && emailSourceInfo ? (
+          <div className="send-record-email-warnings">
+            <EmailSourceWarningsBlock info={emailSourceInfo} />
+          </div>
         ) : null}
       </div>
     );

@@ -25,7 +25,7 @@ function EmailSourceLink({ url }: { url: string }) {
   );
 }
 
-function EmailSourceWarnings({ info }: { info: EmailSourceDisplayInfo }) {
+export function EmailSourceWarnings({ info }: { info: EmailSourceDisplayInfo }) {
   const warnings: string[] = [];
   if (info.isPlaceholderEmail) {
     warnings.push('メール不正の可能性あり');

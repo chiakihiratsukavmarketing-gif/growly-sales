@@ -73,7 +73,7 @@ export function ManualSendRecordDialog({
         />
         <CollectionProfileDisplay
           info={preview.collectionProfile}
-          variant="compact"
+          variant="send-record"
           emailSourceInfo={{
             email: preview.to,
             emailSourceUrl: preview.emailSourceUrl,
@@ -87,7 +87,7 @@ export function ManualSendRecordDialog({
             batchId: preview.batchId,
             source: preview.source,
           }}
-          showEmailSource={Boolean(preview.to) && preview.discoverySource === 'job_site_reference'}
+          showEmailWarnings
         />
         <div className="modal-actions">
           <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={recording}>
