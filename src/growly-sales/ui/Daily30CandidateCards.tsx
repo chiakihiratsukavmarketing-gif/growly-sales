@@ -5,7 +5,11 @@ import { resolveEmailSourceFromCandidate } from '../candidates/resolveEmailSourc
 import { isDaily30HumanExcludedCandidate } from '../candidates/daily30CandidateVisibility.js';
 import { EmailSourceDisplay } from './EmailSourceDisplay.js';
 import { CollectionProfileDisplay } from './CollectionProfileDisplay.js';
-import { buildCollectionProfileDisplayFromCandidate } from '../candidates/resolveCollectionProfileDisplay.js';
+import {
+  buildCollectionProfileDisplayFromCandidate,
+  resolveCandidateCollectionDestinationUrl,
+  shortenDisplayUrl,
+} from '../candidates/resolveCollectionProfileDisplay.js';
 import {
   pipelineStatusLabel,
   pipelineStatusVariant,
@@ -71,15 +75,13 @@ function CandidateStatusBadges({ candidate: c }: { candidate: ExternalLeadCandid
 }
 
 export function workQueueTitleForLeadView(
-  view: 'actionable' | 'pending' | 'approved' | 'generated'
+  view: 'actionable' | 'approved' | 'generated'
 ): string {
   switch (view) {
     case 'actionable':
-      return '作業可能な候補';
-    case 'pending':
-      return 'Lead化承認待ち';
+      return '営業文作成待ち';
     case 'approved':
-      return 'Lead化承認済み';
+      return 'Lead登録済み';
     case 'generated':
       return '営業文生成済み';
     default:
@@ -108,7 +110,10 @@ export function workQueueTitleForFilter(
 
 export function Daily30CandidateQueueHeader({ showActions = false }: { showActions?: boolean }) {
   return (
-    <div className="daily30-queue-header" aria-hidden="true">
+    <div
+      className={`daily30-queue-header${showActions ? '' : ' daily30-queue-header-no-actions'}`}
+      aria-hidden="true"
+    >
       <span className="daily30-queue-col-name">会社名</span>
       <span className="daily30-queue-col-area">エリア</span>
       <span className="daily30-queue-col-email">メール</span>
@@ -130,6 +135,7 @@ interface Daily30CandidateCardProps {
   layout?: 'card' | 'queue';
   approvalBlockReason?: string | null;
   duplicateLeadName?: string | null;
+  showActionColumn?: boolean;
 }
 
 export function Daily30CandidateCard({
@@ -143,6 +149,7 @@ export function Daily30CandidateCard({
   layout = 'card',
   approvalBlockReason = null,
   duplicateLeadName = null,
+  showActionColumn = true,
 }: Daily30CandidateCardProps) {
   const siteUrl = c.officialSiteUrl ?? c.websiteUrl ?? '';
   const email = c.emailCandidates?.[0] ?? c.targetEmail ?? '';
@@ -156,13 +163,15 @@ export function Daily30CandidateCard({
     c.importStatus !== 'imported' &&
     !isDaily30HumanExcludedCandidate(c);
   const workflow = resolveDaily30WorkflowStatus(c);
-  const discoveryLabel = c.discoverySourceLabel ?? c.discoverySource ?? '—';
+  const profileInfo = buildCollectionProfileDisplayFromCandidate(c);
+  const discoveryLabel = profileInfo.discoverySourceLabel ?? '—';
+  const collectionDestinationUrl = resolveCandidateCollectionDestinationUrl(c);
   const isQueue = layout === 'queue';
 
   if (isQueue) {
     return (
       <article className="daily30-candidate-card daily30-candidate-card-queue">
-        <div className="daily30-queue-row">
+        <div className={`daily30-queue-row${showActionColumn ? '' : ' daily30-queue-row-no-actions'}`}>
           <div className="daily30-queue-col-name">
             <span className="daily30-candidate-name" title={c.companyName}>
               {c.companyName}
@@ -182,43 +191,60 @@ export function Daily30CandidateCard({
           <div className="daily30-queue-col-status">
             <CandidateStatusBadges candidate={c} />
           </div>
-          <span className="daily30-queue-col-source daily30-source-label">
-            {discoveryLabel}
-          </span>
-          <div className="daily30-queue-col-actions daily30-card-actions">
-            {canApprove ? (
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                disabled={approving || excluding}
-                onClick={onApprove}
+          <div className="daily30-queue-col-source daily30-source-stack">
+            <span className="daily30-source-label" title={discoveryLabel}>
+              {discoveryLabel}
+            </span>
+            {collectionDestinationUrl ? (
+              <a
+                href={collectionDestinationUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="daily30-source-url"
+                title={collectionDestinationUrl}
               >
-                {approving ? '承認中…' : 'Lead化承認'}
-              </button>
-            ) : blocked ? (
-              <span className="status-badge status-badge-status-warn">承認不可</span>
-            ) : badEmail && showApprove ? (
-              <span className="status-badge status-badge-status-warn">要確認</span>
-            ) : showApprove ? (
-              <span className={`status-badge status-badge-workflow-${workflow.variant}`}>
-                {workflow.label}
-              </span>
-            ) : siteUrl ? (
-              <ExternalLink href={siteUrl} />
+                {shortenDisplayUrl(collectionDestinationUrl, 48)}
+              </a>
             ) : (
-              <span className="hint">—</span>
+              <span className="hint daily30-source-url-missing">URL未記録</span>
             )}
-            {canExclude ? (
-              <button
-                type="button"
-                className="btn btn-exclude btn-sm"
-                disabled={approving || excluding}
-                onClick={onExclude}
-              >
-                {excluding ? '除外中…' : '除外'}
-              </button>
-            ) : null}
           </div>
+          {showActionColumn ? (
+            <div className="daily30-queue-col-actions daily30-card-actions">
+              {canApprove ? (
+                <button
+                  type="button"
+                  className="btn btn-primary candidate-btn-queue"
+                  disabled={approving || excluding}
+                  onClick={onApprove}
+                >
+                  {approving ? '承認中…' : 'Lead化承認'}
+                </button>
+              ) : blocked ? (
+                <span className="status-badge status-badge-status-warn">承認不可</span>
+              ) : badEmail && showApprove ? (
+                <span className="status-badge status-badge-status-warn">要確認</span>
+              ) : showApprove ? (
+                <span className={`status-badge status-badge-workflow-${workflow.variant}`}>
+                  {workflow.label}
+                </span>
+              ) : siteUrl ? (
+                <ExternalLink href={siteUrl} />
+              ) : (
+                <span className="hint">—</span>
+              )}
+              {canExclude ? (
+                <button
+                  type="button"
+                  className="btn btn-exclude candidate-btn-queue"
+                  disabled={approving || excluding}
+                  onClick={onExclude}
+                >
+                  {excluding ? '除外中…' : '除外'}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </article>
     );
@@ -338,6 +364,7 @@ export function Daily30CandidateList({
   emptyMessage = '候補がありません。',
   approvalBlockHints = {},
   layout = 'card',
+  showActionColumn = true,
 }: {
   candidates: ExternalLeadCandidate[];
   showApprove?: boolean;
@@ -348,6 +375,7 @@ export function Daily30CandidateList({
   emptyMessage?: string;
   approvalBlockHints?: Record<string, { blockReason: string; duplicateLeadName?: string }>;
   layout?: 'card' | 'queue';
+  showActionColumn?: boolean;
 }) {
   if (candidates.length === 0) {
     return <p className="hint daily30-candidate-empty">{emptyMessage}</p>;
@@ -368,6 +396,7 @@ export function Daily30CandidateList({
             onExclude={onExclude ? () => onExclude(c) : undefined}
             approvalBlockReason={hint?.blockReason ?? null}
             duplicateLeadName={hint?.duplicateLeadName ?? null}
+            showActionColumn={showActionColumn}
           />
         );
       })}

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Daily30CloudResultsPanel } from './Daily30CloudResultsPanel.js';
 import { Daily30LeadCandidatesPanel } from './Daily30LeadCandidatesPanel.js';
 import { Daily30DraftImportPanel } from './Daily30DraftImportPanel.js';
@@ -10,6 +10,7 @@ import type { Daily30DashboardResponse } from './daily30Api.js';
 import { Daily30OperationsPanel, Daily30SafetyRulesPanel } from './Daily30OperationsPanel.js';
 import { Daily30CloudStatusPanel } from './Daily30CloudStatusPanel.js';
 import { Daily30DashboardPanel } from './Daily30DashboardPanel.js';
+import type { CandidateDisplayMode } from './daily30CandidateFocusMode.js';
 
 interface CandidateCollectionViewProps {
   daily30?: Daily30DashboardResponse | null;
@@ -59,6 +60,17 @@ export function CandidateCollectionView({
   const [workView, setWorkView] = useState<CandidateCollectionWorkView>('results');
   const [showScheduleDetails, setShowScheduleDetails] = useState(false);
   const [showExternalReferenceDrawer, setShowExternalReferenceDrawer] = useState(false);
+  const [focusApprovalScreen, setFocusApprovalScreen] = useState(false);
+
+  const handleDisplayModeChange = useCallback((mode: CandidateDisplayMode) => {
+    setFocusApprovalScreen(mode === 'focus');
+  }, []);
+
+  useEffect(() => {
+    if (workView === 'draft_import') {
+      setFocusApprovalScreen(false);
+    }
+  }, [workView]);
 
   const markExcluded = useCallback((candidateId: string) => {
     setSessionExcludedIds((prev) => {
@@ -108,52 +120,56 @@ export function CandidateCollectionView({
         ].join('｜');
 
   return (
-    <div className="candidate-collection-view">
+    <div
+      className={`candidate-collection-view${focusApprovalScreen && workView !== 'draft_import' ? ' candidate-collection-view-focus' : ''}`}
+    >
       <div className="candidate-collection-header candidate-collection-header-sticky">
         <h2 className="candidate-collection-title">候補収集</h2>
 
-        <p className="candidate-header-line candidate-header-today">
-          <strong>今日：</strong>
-          <span>{todaySummaryLine}</span>
-        </p>
-        {cloudOk && totalCollected != null ? (
-          <p className="hint candidate-path-summary-compact">
-            総収集候補 {totalCollected}件｜フォームのみ {formOnly ?? 0}件｜導線なし {noEmail ?? 0}件
+        <div className="candidate-collection-header-compactible">
+          <p className="candidate-header-line candidate-header-today">
+            <strong>今日：</strong>
+            <span>{todaySummaryLine}</span>
           </p>
-        ) : null}
+          {cloudOk && totalCollected != null ? (
+            <p className="hint candidate-path-summary-compact">
+              総収集候補 {totalCollected}件｜フォームのみ {formOnly ?? 0}件｜導線なし {noEmail ?? 0}件
+            </p>
+          ) : null}
 
-        <div className="candidate-header-line candidate-header-tomorrow">
-          <p className="candidate-header-tomorrow-text">
-            <strong>明日：</strong>
-            <span>{scheduleSummary}</span>
-          </p>
-          <div className="candidate-schedule-summary-actions">
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              onClick={() => setShowScheduleDetails(true)}
-            >
-              変更
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={() => setShowScheduleDetails((v) => !v)}
-            >
-              詳細
-            </button>
+          <div className="candidate-header-line candidate-header-tomorrow">
+            <p className="candidate-header-tomorrow-text">
+              <strong>明日：</strong>
+              <span>{scheduleSummary}</span>
+            </p>
+            <div className="candidate-schedule-summary-actions">
+              <button
+                type="button"
+                className="btn btn-primary candidate-btn-toolbar"
+                onClick={() => setShowScheduleDetails(true)}
+              >
+                変更
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary candidate-btn-toolbar"
+                onClick={() => setShowScheduleDetails((v) => !v)}
+              >
+                詳細
+              </button>
+            </div>
           </div>
-        </div>
 
-        {showScheduleDetails ? (
-          <DevDetails title="明日の収集設定（詳細）" className="candidate-schedule-dev-details">
-            <Daily30CollectionSchedulePanel
-              onError={onError}
-              onSuccess={onSuccess}
-              refreshKey={refreshKey}
-            />
-          </DevDetails>
-        ) : null}
+          {showScheduleDetails ? (
+            <DevDetails title="明日の収集設定（詳細）" className="candidate-schedule-dev-details">
+              <Daily30CollectionSchedulePanel
+                onError={onError}
+                onSuccess={onSuccess}
+                refreshKey={refreshKey}
+              />
+            </DevDetails>
+          ) : null}
+        </div>
 
         <div className="candidate-work-nav">
           <div className="candidate-work-tabs">
@@ -195,6 +211,7 @@ export function CandidateCollectionView({
             onChanged={onDataChanged}
             sessionExcludedIds={sessionExcludedIds}
             onMarkExcluded={markExcluded}
+            onDisplayModeChange={handleDisplayModeChange}
           />
         ) : null}
 
@@ -205,7 +222,7 @@ export function CandidateCollectionView({
             refreshKey={refreshKey}
             onChanged={onDataChanged}
             sessionExcludedIds={sessionExcludedIds}
-            onMarkExcluded={markExcluded}
+            onDisplayModeChange={handleDisplayModeChange}
           />
         ) : null}
 
@@ -239,6 +256,7 @@ export function CandidateCollectionView({
         </div>
       ) : null}
 
+      <div className="candidate-collection-dev-zone">
       <DevDetails title="運用・安全（開発者向け）">
         <Daily30OperationsPanel onError={onError} refreshKey={refreshKey} />
         <Daily30CloudStatusPanel onError={onError} refreshKey={refreshKey} />
@@ -249,6 +267,7 @@ export function CandidateCollectionView({
           </DevDetails>
         ) : null}
       </DevDetails>
+      </div>
     </div>
   );
 }

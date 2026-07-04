@@ -7094,6 +7094,354 @@ async function verifyPhase429CandidateListFinalScreen(): Promise<void> {
   ok('Phase 42.9 candidate list final screen checks passed');
 }
 
+async function verifyPhase4211FocusViewport(): Promise<void> {
+  const styles = await readFile(join(SRC_ROOT, 'ui/styles.css'), 'utf-8');
+  const cloudPanel = await readFile(join(SRC_ROOT, 'ui/Daily30CloudResultsPanel.tsx'), 'utf-8');
+  const leadPanel = await readFile(join(SRC_ROOT, 'ui/Daily30LeadCandidatesPanel.tsx'), 'utf-8');
+  const focusView = await readFile(join(SRC_ROOT, 'ui/Daily30CandidateFocusView.tsx'), 'utf-8');
+
+  assert(
+    styles.includes('.daily30-work-queue-panel-focus'),
+    'focus panel class separates from list min-height'
+  );
+  assert(
+    styles.includes('.daily30-work-queue-panel:not(.daily30-work-queue-panel-focus)'),
+    'list panel keeps 5-row min-height only'
+  );
+  assert(styles.includes('.daily30-work-queue-focus'), 'focus work queue overflow policy');
+  assert(styles.includes('.daily30-candidate-focus-viewport'), 'dedicated focus viewport wrapper');
+  assert(cloudPanel.includes('daily30-work-queue-panel-focus'), 'results panel toggles focus class');
+  assert(leadPanel.includes('daily30-work-queue-panel-focus'), 'lead panel toggles focus class');
+  assert(cloudPanel.includes('daily30-candidate-focus-viewport'), 'results wraps focus view in viewport');
+  assert(leadPanel.includes('daily30-candidate-focus-viewport'), 'lead wraps focus view in viewport');
+  assert(
+    cloudPanel.includes("displayMode === 'focus' ? ' daily30-work-queue-focus'"),
+    'results toggles focus work-queue class'
+  );
+  assert(
+    leadPanel.includes("displayMode === 'focus' ? ' daily30-work-queue-focus'"),
+    'lead toggles focus work-queue class'
+  );
+  assert(focusView.includes('daily30-focus-card'), 'focus card retained');
+  assert(focusView.includes('daily30-focus-actions'), 'focus actions retained');
+  assert(
+    !cloudPanel.includes('daily30-candidate-queue-body') ||
+      cloudPanel.indexOf("displayMode === 'focus'") < cloudPanel.indexOf('daily30-candidate-queue-body'),
+    'results focus branch before list queue-body'
+  );
+
+  ok('Phase 42.11 focus viewport checks passed');
+}
+
+async function verifyPhase4212FocusApprovalScreen(): Promise<void> {
+  const styles = await readFile(join(SRC_ROOT, 'ui/styles.css'), 'utf-8');
+  const focusView = await readFile(join(SRC_ROOT, 'ui/Daily30CandidateFocusView.tsx'), 'utf-8');
+  const collectionView = await readFile(join(SRC_ROOT, 'ui/CandidateCollectionView.tsx'), 'utf-8');
+  const cloudPanel = await readFile(join(SRC_ROOT, 'ui/Daily30CloudResultsPanel.tsx'), 'utf-8');
+  const leadPanel = await readFile(join(SRC_ROOT, 'ui/Daily30LeadCandidatesPanel.tsx'), 'utf-8');
+
+  assert(styles.includes('.daily30-focus-approval-screen'), 'dedicated approval screen layout');
+  assert(styles.includes('.daily30-focus-grid'), '2-column focus grid');
+  assert(styles.includes('.daily30-focus-judgment-bar'), 'horizontal judgment bar');
+  assert(styles.includes('.candidate-collection-view-focus'), 'compressed collection header in focus');
+  assert(styles.includes('.candidate-collection-header-compactible'), 'collapsible header sections');
+  assert(styles.includes('.daily30-focus-mode-chrome'), 'minimal focus chrome toolbar');
+  assert(focusView.includes('daily30-focus-topbar'), 'topbar with queue title and nav');
+  assert(focusView.includes('daily30-focus-grid'), 'grid layout in focus view');
+  assert(focusView.includes('emailSourceDetail'), 'email source detail shown');
+  assert(focusView.includes('daily30-focus-judgment-bar'), 'judgment bar in focus view');
+  assert(focusView.includes('Lead化承認'), 'approve action retained');
+  assert(collectionView.includes('onDisplayModeChange'), 'collection view tracks focus mode');
+  assert(collectionView.includes('candidate-collection-view-focus'), 'focus class toggled from parent');
+  assert(cloudPanel.includes('daily30-focus-mode-chrome'), 'results focus chrome');
+  assert(leadPanel.includes('daily30-focus-mode-chrome'), 'lead focus chrome');
+  assert(
+    cloudPanel.includes("displayMode !== 'focus'") && cloudPanel.includes('daily30-candidate-work-aux'),
+    'results aux hidden in focus mode'
+  );
+  assert(
+    leadPanel.includes("displayMode !== 'focus'") && leadPanel.includes('daily30-candidate-work-aux'),
+    'lead aux hidden in focus mode'
+  );
+  assert(
+    styles.includes('.candidate-collection-view-focus .candidate-collection-work') &&
+      styles.match(/\.candidate-collection-view-focus[\s\S]*?overflow:\s*hidden/),
+    'focus approval screen prevents work-area page scroll'
+  );
+
+  ok('Phase 42.12 focus approval screen checks passed');
+}
+
+async function verifyPhase4213FocusButtonLayout(): Promise<void> {
+  const styles = await readFile(join(SRC_ROOT, 'ui/styles.css'), 'utf-8');
+  const toggle = await readFile(join(SRC_ROOT, 'ui/CandidateDisplayModeToggle.tsx'), 'utf-8');
+  const focusView = await readFile(join(SRC_ROOT, 'ui/Daily30CandidateFocusView.tsx'), 'utf-8');
+  const cloudPanel = await readFile(join(SRC_ROOT, 'ui/Daily30CloudResultsPanel.tsx'), 'utf-8');
+
+  assert(styles.includes('.daily30-focus-toolbar-btn'), 'unified toolbar button sizing');
+  assert(styles.includes('.daily30-focus-action-btn'), 'unified action button sizing');
+  assert(styles.includes('height: 40px') && styles.includes('min-width: 88px'), 'toolbar button dimensions');
+  assert(styles.includes('height: 44px') && styles.includes('min-width: 124px'), 'action button dimensions');
+  assert(styles.includes('border-radius: 10px'), 'unified border radius');
+  assert(toggle.includes('candidate-btn-toolbar') || toggle.includes('daily30-focus-toolbar-btn'), 'display mode toggle uses toolbar sizing');
+  assert(cloudPanel.includes('candidate-btn-toolbar') || cloudPanel.includes('daily30-focus-toolbar-btn'), 'filter button uses toolbar sizing');
+  assert(focusView.includes('candidate-btn-focus') || focusView.includes('daily30-focus-action-btn'), 'focus actions use unified sizing');
+  assert(
+    !styles.match(/\.daily30-focus-actions[\s\S]*?margin-top:\s*auto/),
+    'action buttons not pushed to viewport bottom'
+  );
+  assert(
+    focusView.indexOf('daily30-focus-judgment-bar') < focusView.indexOf('daily30-focus-actions'),
+    'actions follow judgment bar in DOM'
+  );
+
+  ok('Phase 42.13 focus button layout checks passed');
+}
+
+async function verifyPhase4214CandidateButtonTiers(): Promise<void> {
+  const styles = await readFile(join(SRC_ROOT, 'ui/styles.css'), 'utf-8');
+  const collectionView = await readFile(join(SRC_ROOT, 'ui/CandidateCollectionView.tsx'), 'utf-8');
+  const toggle = await readFile(join(SRC_ROOT, 'ui/CandidateDisplayModeToggle.tsx'), 'utf-8');
+  const cards = await readFile(join(SRC_ROOT, 'ui/Daily30CandidateCards.tsx'), 'utf-8');
+  const focusView = await readFile(join(SRC_ROOT, 'ui/Daily30CandidateFocusView.tsx'), 'utf-8');
+  const cloudPanel = await readFile(join(SRC_ROOT, 'ui/Daily30CloudResultsPanel.tsx'), 'utf-8');
+
+  assert(styles.includes('.candidate-btn-toolbar'), 'toolbar button tier');
+  assert(styles.includes('.candidate-btn-queue'), 'queue row button tier');
+  assert(styles.includes('.candidate-btn-focus'), 'focus action button tier');
+  assert(styles.includes('min-width: 96px'), 'toolbar min-width 96px');
+  assert(styles.includes('width: 104px'), 'queue fixed width 104px');
+  assert(collectionView.includes('candidate-btn-toolbar'), 'schedule change/detail use toolbar tier');
+  assert(toggle.includes('candidate-btn-toolbar'), 'display mode toggle uses toolbar tier');
+  assert(cloudPanel.includes('candidate-btn-toolbar'), 'filter button uses toolbar tier');
+  assert(cards.includes('candidate-btn-queue'), 'queue row actions use queue tier');
+  assert(focusView.includes('candidate-btn-focus'), 'focus actions use focus tier');
+  assert(
+    !styles.includes('.candidate-collection-work .daily30-queue-col-actions .btn-sm'),
+    'legacy queue btn-sm overrides removed'
+  );
+
+  ok('Phase 42.14 candidate button tier checks passed');
+}
+
+async function verifyPhase4215LeadFlowDedup(): Promise<void> {
+  const styles = await readFile(join(SRC_ROOT, 'ui/styles.css'), 'utf-8');
+  const leadPanel = await readFile(join(SRC_ROOT, 'ui/Daily30LeadCandidatesPanel.tsx'), 'utf-8');
+  const cards = await readFile(join(SRC_ROOT, 'ui/Daily30CandidateCards.tsx'), 'utf-8');
+
+  assert(
+    leadPanel.includes("useState<'actionable' | 'approved' | 'generated'>('actionable')"),
+    'lead panel view types exclude pending re-approval state'
+  );
+  assert(
+    !leadPanel.includes('<option value="pending">'),
+    'lead panel filter removes pending re-approval option'
+  );
+  assert(
+    leadPanel.includes('営業文作成待ち（推奨）'),
+    'lead panel defaults to copy creation queue label'
+  );
+  assert(
+    leadPanel.includes('showApprove={false}') &&
+      leadPanel.includes('showActionColumn={false}'),
+    'lead panel removes re-approval actions from list and focus views'
+  );
+  assert(
+    leadPanel.includes('Daily30CandidateQueueHeader showActions={false}'),
+    'lead queue header hides actions column'
+  );
+  assert(
+    leadPanel.includes('Lead登録済み候補から営業文作成へ進みます。'),
+    'lead panel hint explains post-approval copy flow'
+  );
+  assert(
+    cards.includes('showActionColumn?: boolean;'),
+    'candidate cards support hiding queue action column'
+  );
+  assert(
+    styles.includes('.daily30-queue-header-no-actions') &&
+      styles.includes('.daily30-queue-row-no-actions'),
+    'styles include no-actions queue layout'
+  );
+  assert(
+    !leadPanel.includes('confirmDaily30LeadApproval') && !leadPanel.includes('confirmDaily30CandidateExclude'),
+    'lead panel no longer wires second approval/exclude handlers'
+  );
+
+  ok('Phase 42.15 lead flow dedup checks passed');
+}
+
+async function verifyPhase4216PagerLayout(): Promise<void> {
+  const styles = await readFile(join(SRC_ROOT, 'ui/styles.css'), 'utf-8');
+  const cloudPanel = await readFile(join(SRC_ROOT, 'ui/Daily30CloudResultsPanel.tsx'), 'utf-8');
+  const leadPanel = await readFile(join(SRC_ROOT, 'ui/Daily30LeadCandidatesPanel.tsx'), 'utf-8');
+
+  assert(styles.includes('.daily30-page-size-label'), 'pager has dedicated page-size label container');
+  assert(styles.includes('.daily30-page-size {') && styles.includes('min-width: 88px'), 'page-size select width fixed');
+  assert(styles.includes('.daily30-pager-button {') && styles.includes('min-width: 64px'), 'pager buttons width fixed');
+  assert(styles.includes('.daily30-page-indicator {') && styles.includes('text-align: center'), 'page indicator centered');
+  assert(
+    styles.includes('.daily30-pager-compact {') &&
+      styles.includes('flex-wrap: nowrap;') &&
+      styles.includes('min-width: max-content;'),
+    'pager container stays on one line'
+  );
+  assert(!cloudPanel.includes('daily30-pager-count'), 'results pager removes crowded count text');
+  assert(!leadPanel.includes('daily30-pager-count'), 'lead pager removes crowded count text');
+  assert(
+    cloudPanel.includes('daily30-page-size-label') &&
+      cloudPanel.indexOf('daily30-page-size-label') < cloudPanel.indexOf('daily30-pager-button') &&
+      cloudPanel.indexOf('daily30-pager-button') < cloudPanel.indexOf('daily30-page-indicator'),
+    'results pager order is page size then prev then indicator then next'
+  );
+  assert(
+    leadPanel.includes('daily30-page-size-label') &&
+      leadPanel.indexOf('daily30-page-size-label') < leadPanel.indexOf('daily30-pager-button') &&
+      leadPanel.indexOf('daily30-pager-button') < leadPanel.indexOf('daily30-page-indicator'),
+    'lead pager order is page size then prev then indicator then next'
+  );
+
+  ok('Phase 42.16 pager layout checks passed');
+}
+
+async function verifyPhase4217SourceColumnWidth(): Promise<void> {
+  const styles = await readFile(join(SRC_ROOT, 'ui/styles.css'), 'utf-8');
+  const cards = await readFile(join(SRC_ROOT, 'ui/Daily30CandidateCards.tsx'), 'utf-8');
+
+  assert(cards.includes('daily30-queue-col-source daily30-source-label'), 'queue source column uses source label class');
+  assert(
+    styles.includes('minmax(15.5rem, 2.45fr)') &&
+      styles.includes('minmax(13.5rem, 13.5rem)'),
+    'list queue favors source column while keeping fixed action width'
+  );
+  assert(
+    styles.includes('minmax(17rem, 2.7fr)'),
+    'no-actions queue gives source column extra width'
+  );
+  assert(
+    styles.includes('.candidate-collection-work .daily30-source-label') &&
+      styles.includes('-webkit-line-clamp: 2;'),
+    'source label remains readable within two lines'
+  );
+
+  ok('Phase 42.17 source column width checks passed');
+}
+
+async function verifyPhase4218SourceUrlDisplay(): Promise<void> {
+  const cards = await readFile(join(SRC_ROOT, 'ui/Daily30CandidateCards.tsx'), 'utf-8');
+  const profileDisplay = await readFile(join(SRC_ROOT, 'candidates/resolveCollectionProfileDisplay.ts'), 'utf-8');
+  const styles = await readFile(join(SRC_ROOT, 'ui/styles.css'), 'utf-8');
+
+  assert(
+    profileDisplay.includes('candidate.discoverySourceUrl?.trim() || candidate.sourceUrl?.trim() || null'),
+    'source url resolution prefers discoverySourceUrl then sourceUrl'
+  );
+  assert(cards.includes('daily30-source-stack'), 'queue source column uses two-line stack');
+  assert(cards.includes('daily30-source-url'), 'queue source column renders source url row');
+  assert(cards.includes('URL未記録'), 'queue source column shows URL未記録 fallback');
+  assert(styles.includes('.daily30-source-url {'), 'styles define source url row');
+  assert(styles.includes('.daily30-source-url-missing {'), 'styles define missing url row');
+
+  ok('Phase 42.18 source URL display checks passed');
+}
+
+async function verifyPhase4219CollectionDestinationUrl(): Promise<void> {
+  const cards = await readFile(join(SRC_ROOT, 'ui/Daily30CandidateCards.tsx'), 'utf-8');
+  const profileDisplay = await readFile(join(SRC_ROOT, 'candidates/resolveCollectionProfileDisplay.ts'), 'utf-8');
+
+  assert(
+    profileDisplay.includes('function resolveCandidateCollectionDestinationUrl'),
+    'profile module defines collection destination url resolver'
+  );
+  assert(
+    profileDisplay.includes('emailCandidateSourceUrl?.trim()'),
+    'collection destination prefers email source page url'
+  );
+  assert(
+    profileDisplay.includes('officialSiteUrl?.trim() || candidate.websiteUrl?.trim()'),
+    'collection destination falls back to official site url'
+  );
+  const resolverBlock = profileDisplay.slice(
+    profileDisplay.indexOf('function resolveCandidateCollectionDestinationUrl'),
+    profileDisplay.indexOf('export function buildCollectionProfileDisplayFromCandidate')
+  );
+  assert(
+    !resolverBlock.includes('discoverySourceUrl') && !resolverBlock.includes('sourceUrl'),
+    'collection destination resolver does not use discovery source url'
+  );
+  assert(
+    cards.includes('resolveCandidateCollectionDestinationUrl'),
+    'queue cards import collection destination resolver'
+  );
+  assert(
+    cards.includes('const collectionDestinationUrl = resolveCandidateCollectionDestinationUrl(c);'),
+    'queue cards read collection destination url'
+  );
+  assert(
+    !cards.includes('const discoveryUrl = profileInfo.discoverySourceUrl'),
+    'queue cards no longer use discovery url for source column'
+  );
+  assert(cards.includes('URL未記録'), 'queue source column keeps URL未記録 fallback');
+
+  const mapsDiscoveryCandidate = {
+    externalCandidateId: 'verify-4219-maps',
+    sourceType: 'google_places' as const,
+    companyName: '収集先URLテスト',
+    area: '宮城県',
+    industry: '工務店',
+    websiteUrl: 'https://phase4219.example/',
+    officialSiteUrl: 'https://phase4219.example/',
+    phoneNumber: null,
+    address: null,
+    googlePlaceId: null,
+    sourceUrl: 'https://maps.google.com/?cid=4219',
+    sourceQuery: 'q',
+    category: '工務店',
+    contactFormUrl: null,
+    emailCandidates: ['info@phase4219.example'],
+    confidenceScore: 0.8,
+    importStatus: 'preview' as const,
+    riskLevel: 'low' as const,
+    duplicateReason: '',
+    duplicateKey: 'k4219',
+    pipelineStatus: 'email_found' as const,
+    prefecture: '宮城県',
+    regionGroup: '宮城' as const,
+    collectionPriority: 1,
+    collectionAreaSource: '宮城県',
+    collectionBatchId: '2026-07-05',
+    emailCandidateSourceUrls: ['https://phase4219.example/contact'],
+    emailVerifiedAt: null,
+    generatedEmailSubject: null,
+    generatedEmailBody: null,
+    generatedCustomHook: null,
+    generatedCustomHookReason: null,
+    targetEmail: 'info@phase4219.example',
+    emailCandidateSourceUrl: 'https://phase4219.example/contact',
+    failureReason: null,
+    copyGeneratedAt: null,
+    qualityCheckedAt: null,
+    humanReviewStatus: null,
+    gmailDraftStatus: null,
+    sendStatus: null,
+    notes: '',
+    collectedAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    discoverySource: 'google_places' as const,
+    discoverySourceUrl: 'https://maps.google.com/?cid=4219',
+  };
+
+  const { resolveCandidateCollectionDestinationUrl } = await import(
+    '../candidates/resolveCollectionProfileDisplay.js'
+  );
+  const resolved = resolveCandidateCollectionDestinationUrl(mapsDiscoveryCandidate);
+  assert(resolved === 'https://phase4219.example/contact', 'prefers email source page over maps url');
+  assert(!resolved?.includes('maps.google.com'), 'collection destination is not discovery url');
+
+  ok('Phase 42.19 collection destination URL checks passed');
+}
+
 function verifyPhase20LiteEmailImprovement(): void {
   assert(MAX_ADDITIONAL_CONTACT_PAGES === 4, 'additional page limit is 4');
 
@@ -7497,6 +7845,15 @@ async function main(): Promise<void> {
   await verifyPhase427CandidateListViewport();
   await verifyPhase428CandidateListLayoutFix();
   await verifyPhase429CandidateListFinalScreen();
+  await verifyPhase4211FocusViewport();
+  await verifyPhase4212FocusApprovalScreen();
+  await verifyPhase4213FocusButtonLayout();
+  await verifyPhase4214CandidateButtonTiers();
+  await verifyPhase4215LeadFlowDedup();
+  await verifyPhase4216PagerLayout();
+  await verifyPhase4217SourceColumnWidth();
+  await verifyPhase4218SourceUrlDisplay();
+  await verifyPhase4219CollectionDestinationUrl();
   verifyPhase20LiteEmailImprovement();
   await verifyPhase20LiteEmailImprovementAsync();
   await verifyPhaseBLeadInventory();

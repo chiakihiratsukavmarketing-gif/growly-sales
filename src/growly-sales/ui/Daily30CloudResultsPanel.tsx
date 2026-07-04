@@ -37,6 +37,7 @@ interface Daily30CloudResultsPanelProps {
   onChanged?: () => void;
   sessionExcludedIds?: ReadonlySet<string>;
   onMarkExcluded?: (candidateId: string) => void;
+  onDisplayModeChange?: (mode: CandidateDisplayMode) => void;
 }
 
 function formatTimestamp(iso: string | null): string {
@@ -81,6 +82,7 @@ export function Daily30CloudResultsPanel({
   onChanged,
   sessionExcludedIds,
   onMarkExcluded,
+  onDisplayModeChange,
 }: Daily30CloudResultsPanelProps) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<Daily30DashboardResponse | null>(null);
@@ -98,11 +100,20 @@ export function Daily30CloudResultsPanel({
   const [displayMode, setDisplayMode] = useState<CandidateDisplayMode>(() =>
     loadStoredDisplayMode(DISPLAY_MODE_STORAGE_KEY_RESULTS, 'focus')
   );
+  const [showFocusFilters, setShowFocusFilters] = useState(false);
 
-  const setDisplayModePersisted = useCallback((mode: CandidateDisplayMode) => {
-    setDisplayMode(mode);
-    saveStoredDisplayMode(DISPLAY_MODE_STORAGE_KEY_RESULTS, mode);
-  }, []);
+  const setDisplayModePersisted = useCallback(
+    (mode: CandidateDisplayMode) => {
+      setDisplayMode(mode);
+      saveStoredDisplayMode(DISPLAY_MODE_STORAGE_KEY_RESULTS, mode);
+      onDisplayModeChange?.(mode);
+    },
+    [onDisplayModeChange]
+  );
+
+  useEffect(() => {
+    onDisplayModeChange?.(displayMode);
+  }, [displayMode, onDisplayModeChange]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -299,90 +310,160 @@ export function Daily30CloudResultsPanel({
 
   return (
     <>
-      <div className="daily30-cloud-results-card daily30-work-queue-panel">
+      <div
+        className={`daily30-cloud-results-card daily30-work-queue-panel${displayMode === 'focus' ? ' daily30-work-queue-panel-focus' : ''}`}
+      >
         <div className="daily30-candidate-work-primary">
-          <section className="daily30-work-queue" aria-label="候補作業キュー">
-          <header className="daily30-work-queue-header">
-            <div className="daily30-work-queue-header-row">
-              <h3 className="daily30-work-queue-title">
-                {queueTitle}
-                <span className="daily30-section-count">{filteredCandidates.length}件</span>
-              </h3>
-              <CandidateDisplayModeToggle
-                mode={displayMode}
-                onChange={setDisplayModePersisted}
-                disabled={operationBusy}
-              />
-            </div>
-            <p className="hint daily30-work-queue-hint">
-              承認可能な候補を先頭に表示しています。Lead化承認後は「Lead化・営業文」タブへ。
-            </p>
-          </header>
-
-          <div
-            className={`daily30-candidate-tools daily30-candidate-tools-bar${displayMode === 'list' ? ' daily30-candidate-tools-compact' : ''}`}
+          <section
+            className={`daily30-work-queue${displayMode === 'focus' ? ' daily30-work-queue-focus' : ''}`}
+            aria-label="候補作業キュー"
           >
-          <div
-            className={`daily30-candidate-tools-row${displayMode === 'list' ? ' daily30-candidate-tools-row-list' : ''}`}
-          >
-            <input
-              className="input"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="会社名で検索"
-              aria-label="会社名で検索"
-            />
-            <select className="input" value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)}>
-              <option value="actionable">作業可能（推奨）</option>
-              <option value="all">すべて</option>
-              <option value="approvable">承認可能</option>
-              <option value="not_approvable">承認不可</option>
-              <option value="email_ok">メール確認済み</option>
-              <option value="email_missing">メール未確認</option>
-            </select>
-            <select className="input" value={prefecture} onChange={(e) => setPrefecture(e.target.value)}>
-              <option value="all">都道府県: すべて</option>
-              {prefectureOptions.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-            <select className="input" value={source} onChange={(e) => setSource(e.target.value)}>
-              <option value="all">収集元: すべて</option>
-              {sourceOptions.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-            {displayMode === 'list' ? (
-              <div className="daily30-pager daily30-pager-compact">
-                <span className="hint daily30-pager-count">
-                  {filteredCandidates.length === 0 ? '0件' : `${start + 1}–${end}`} / {filteredCandidates.length}
-                </span>
-                <label className="hint daily30-pager-size">
-                  表示件数{' '}
-                  <select className="input input-xs" value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
-                    <option value={10}>10</option>
-                    <option value={25}>25</option>
-                    <option value={50}>50</option>
-                  </select>
-                </label>
-                <button type="button" className="btn btn-secondary btn-sm" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-                  前へ
-                </button>
-                <span className="hint daily30-pager-page">{safePage} / {pageCount}</span>
-                <button type="button" className="btn btn-secondary btn-sm" disabled={safePage >= pageCount} onClick={() => setPage((p) => Math.min(pageCount, p + 1))}>
-                  次へ
+          {displayMode === 'focus' ? (
+            <div className="daily30-focus-mode-chrome">
+              <div className="daily30-focus-mode-toolbar">
+                <CandidateDisplayModeToggle
+                  mode={displayMode}
+                  onChange={setDisplayModePersisted}
+                  disabled={operationBusy}
+                />
+                <button
+                  type="button"
+                  className="btn btn-secondary candidate-btn-toolbar"
+                  aria-expanded={showFocusFilters}
+                  onClick={() => setShowFocusFilters((v) => !v)}
+                >
+                  絞り込み
                 </button>
               </div>
-            ) : null}
-          </div>
-        </div>
+              {showFocusFilters ? (
+                <div className="daily30-candidate-tools daily30-candidate-tools-bar daily30-candidate-tools-compact daily30-focus-filters">
+                  <div className="daily30-candidate-tools-row daily30-candidate-tools-row-list">
+                    <input
+                      className="input"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder="会社名で検索"
+                      aria-label="会社名で検索"
+                    />
+                    <select className="input" value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)}>
+                      <option value="actionable">作業可能（推奨）</option>
+                      <option value="all">すべて</option>
+                      <option value="approvable">承認可能</option>
+                      <option value="not_approvable">承認不可</option>
+                      <option value="email_ok">メール確認済み</option>
+                      <option value="email_missing">メール未確認</option>
+                    </select>
+                    <select className="input" value={prefecture} onChange={(e) => setPrefecture(e.target.value)}>
+                      <option value="all">都道府県: すべて</option>
+                      {prefectureOptions.map((p) => (
+                        <option key={p} value={p}>
+                          {p}
+                        </option>
+                      ))}
+                    </select>
+                    <select className="input" value={source} onChange={(e) => setSource(e.target.value)}>
+                      <option value="all">収集元: すべて</option>
+                      {sourceOptions.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <>
+              <header className="daily30-work-queue-header">
+                <div className="daily30-work-queue-header-row">
+                  <h3 className="daily30-work-queue-title">
+                    {queueTitle}
+                    <span className="daily30-section-count">{filteredCandidates.length}件</span>
+                  </h3>
+                  <CandidateDisplayModeToggle
+                    mode={displayMode}
+                    onChange={setDisplayModePersisted}
+                    disabled={operationBusy}
+                  />
+                </div>
+                <p className="hint daily30-work-queue-hint">
+                  承認可能な候補を先頭に表示しています。Lead化承認後は「Lead化・営業文」タブへ。
+                </p>
+              </header>
+
+              <div className="daily30-candidate-tools daily30-candidate-tools-bar daily30-candidate-tools-compact">
+                <div className="daily30-candidate-tools-row daily30-candidate-tools-row-list">
+                  <input
+                    className="input"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="会社名で検索"
+                    aria-label="会社名で検索"
+                  />
+                  <select className="input" value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)}>
+                    <option value="actionable">作業可能（推奨）</option>
+                    <option value="all">すべて</option>
+                    <option value="approvable">承認可能</option>
+                    <option value="not_approvable">承認不可</option>
+                    <option value="email_ok">メール確認済み</option>
+                    <option value="email_missing">メール未確認</option>
+                  </select>
+                  <select className="input" value={prefecture} onChange={(e) => setPrefecture(e.target.value)}>
+                    <option value="all">都道府県: すべて</option>
+                    {prefectureOptions.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                  <select className="input" value={source} onChange={(e) => setSource(e.target.value)}>
+                    <option value="all">収集元: すべて</option>
+                    {sourceOptions.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="daily30-pager daily30-pager-compact">
+                    <label className="hint daily30-page-size-label">
+                      <span>表示件数</span>
+                      <select
+                        className="input input-xs daily30-page-size"
+                        value={pageSize}
+                        onChange={(e) => setPageSize(Number(e.target.value))}
+                      >
+                        <option value={10}>10</option>
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                      </select>
+                    </label>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm daily30-pager-button"
+                      disabled={safePage <= 1}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    >
+                      前へ
+                    </button>
+                    <span className="hint daily30-page-indicator">{safePage} / {pageCount}</span>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm daily30-pager-button"
+                      disabled={safePage >= pageCount}
+                      onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                    >
+                      次へ
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
 
         {displayMode === 'focus' ? (
-          <Daily30CandidateFocusView
+          <div className="daily30-candidate-focus-viewport">
+            <Daily30CandidateFocusView
             variant="results"
             title={queueTitle}
             candidate={focusQueueState.currentCandidate}
@@ -415,7 +496,8 @@ export function Daily30CloudResultsPanel({
             onShowAll={() => setFilter('all')}
             onShowNotApprovable={() => setFilter('not_approvable')}
             emptyMessage="作業可能な候補はありません。"
-          />
+            />
+          </div>
         ) : (
           <div className="daily30-candidate-queue-list">
             <Daily30CandidateQueueHeader showActions />
@@ -438,6 +520,7 @@ export function Daily30CloudResultsPanel({
         </div>
       </div>
 
+      {displayMode !== 'focus' ? (
       <aside className="daily30-candidate-work-aux" aria-label="候補収集の補助情報">
         {humanExcludedCount > 0 ? (
           <p className="hint daily30-excluded-hint">除外済み {humanExcludedCount}件</p>
@@ -576,6 +659,7 @@ export function Daily30CloudResultsPanel({
         </dl>
         </DevDetails>
       </aside>
+      ) : null}
     </>
   );
 }

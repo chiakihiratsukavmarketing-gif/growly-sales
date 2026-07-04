@@ -230,6 +230,23 @@ export function buildCollectionProfileDisplayFromLead(lead: Lead): CollectionPro
   };
 }
 
+/** 候補企業の情報・メールを実際に確認したページURL（発見元URLではない） */
+export function resolveCandidateCollectionDestinationUrl(
+  candidate: ExternalLeadCandidate
+): string | null {
+  const pageUrl =
+    candidate.emailCandidateSourceUrl?.trim() ||
+    candidate.emailCandidateSourceUrls?.find((u) => u.trim())?.trim() ||
+    null;
+  if (pageUrl) return pageUrl;
+
+  const siteUrl =
+    candidate.officialSiteUrl?.trim() || candidate.websiteUrl?.trim() || null;
+  if (siteUrl) return siteUrl;
+
+  return candidate.contactFormUrl?.trim() || null;
+}
+
 export function buildCollectionProfileDisplayFromCandidate(
   candidate: ExternalLeadCandidate
 ): CollectionProfileDisplayInfo {
