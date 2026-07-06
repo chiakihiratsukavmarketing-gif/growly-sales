@@ -1,7 +1,7 @@
 # Growly Sales — NEXT_TASKS
 
-**更新日:** 2026-07-06  
-**進行:** Phase 43 **4 / 4** 完了 / Phase 44 **0 / 3**（live 化前監査完了）
+**更新日:** 2026-07-07
+**進行:** Phase 43 **4 / 4** 完了 / Phase 44 **0 / 3**（44.1 準備完了・No-Go 維持）
 
 ---
 
@@ -9,8 +9,8 @@
 
 | サブフェーズ | 内容 | 状態 |
 |-------------|------|------|
-| **44.0** | live 化前安全確認 | ✅ 監査完了（未 commit） |
-| **44.1** | 配信停止 live 準備（tenant境界・保存境界） | 進行中 |
+| **44.0** | live 化前安全確認 | ✅ `9c9dd45` |
+| **44.1** | 配信停止 live 準備（tenant境界・保存境界） | ✅ 準備完了 `9d07810` / **No-Go 維持** |
 | 44.2 | カスタムテンプレート live | 未着手 |
 | 44.3 | 開封計測 live | 未着手 |
 
@@ -21,20 +21,23 @@
 
 ### 44.1 Go 再評価に必要な人間作業
 
+- [x] **contactEmail** — `info@wantreach.jp`（Want Reach 既定 tenant・tenant 設定一元管理・2026-07-07 Human Approval）
 - [ ] 公開ドメイン・`PUBLIC_BASE_URL` 決定
 - [ ] Cloud Run mail-ops サービス作成承認
 - [ ] HTTPS 確認
 - [ ] Secret Manager（`UNSUBSCRIBE_TOKEN_PEPPER` 等）
 - [ ] suppression 保存先承認（推奨: GCS JSON + generation-match）
 - [ ] 法務・配信停止画面文案確認
+- [ ] 配信停止メール末尾文面確認
 - [ ] fail-closed 実装フェーズへの着手承認
 
 ### 44.1 実装原則（自社優先 + SaaS拡張余地）
 
-- [ ] `DEFAULT_TENANT_ID = want-reach`（single tenant）
-- [ ] 公開候補: `mailops.wantreach.jp`
-- [ ] tenant resolver / public URL resolver / store interface 経由（文字列の散在禁止）
-- [ ] suppression: `scope=platform|tenant`（platform UI は作らない）
+- [x] `DEFAULT_TENANT_ID = want-reach`（single tenant）
+- [x] 公開候補: `mailops.wantreach.jp`
+- [x] tenant resolver / public URL resolver / store interface 経由（文字列の散在禁止）
+- [x] suppression: `scope=platform|tenant`（platform UI は作らない）
+- [x] contactEmail: `info@wantreach.jp`（tenant 設定のみ・Gmail/live 未適用）
 
 ### Phase 43 完了（mock・参照）
 

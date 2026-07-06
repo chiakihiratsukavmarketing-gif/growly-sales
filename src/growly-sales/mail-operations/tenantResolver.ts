@@ -4,13 +4,13 @@ export const DEFAULT_TENANT_ID = 'want-reach';
 
 const NOW = new Date().toISOString();
 
-// IMPORTANT: Do not guess contactEmail; keep explicit empty placeholder for now.
+// contactEmail: Human Approval 済み（2026-07-07）。Want Reach 既定 tenant のみ。表示は tenant 経由。
 const DEFAULT_TENANT: MailOperationsTenant = {
   tenantId: DEFAULT_TENANT_ID,
   displayName: '合同会社Want Reach',
   legalName: '合同会社Want Reach',
   publicBaseUrl: 'https://mailops.wantreach.jp',
-  contactEmail: '',
+  contactEmail: 'info@wantreach.jp',
   status: 'active',
   createdAt: NOW,
   updatedAt: NOW,

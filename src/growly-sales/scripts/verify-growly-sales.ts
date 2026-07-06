@@ -8068,6 +8068,9 @@ async function verifyPhase441DefaultTenant(): Promise<void> {
   const resolver = await readFile(join(SRC_ROOT, 'mail-operations/tenantResolver.ts'), 'utf-8');
   assert(resolver.includes("DEFAULT_TENANT_ID = 'want-reach'"), 'default tenant want-reach');
   assert(resolver.includes('mailops.wantreach.jp'), 'public base url candidate recorded');
+  assert(resolver.includes("contactEmail: 'info@wantreach.jp'"), 'contactEmail on default tenant only');
+  const branding = await readFile(join(SRC_ROOT, 'mail-operations/unsubscribeBranding.ts'), 'utf-8');
+  assert(!branding.includes('info@wantreach.jp'), 'unsubscribe branding does not hardcode contactEmail');
   ok('Phase 44.1 default tenant checks passed');
 }
 

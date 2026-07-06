@@ -115,7 +115,7 @@
 | 実装・変更 | **未実施**（endpoint・Cloud・env・GCS live・Gmail 変更なし） |
 | commit / push | **未実施** |
 
-### 2026-07-06 — Phase 44.1 配信停止 live 化準備（tenant 境界・interface 追加）⏳
+### 2026-07-06 — Phase 44.1 配信停止 live 化準備（tenant 境界・interface 追加）✅ pushed `9d07810`
 
 | 項目 | 内容 |
 |------|------|
@@ -123,7 +123,20 @@
 | 既定 tenant | `want-reach` |
 | 公開候補 | `mailops.wantreach.jp`（**まだ live メールへ適用しない**） |
 | 追加 | tenant model / public URL resolver / suppression scope（tenant/platform）/ store interface |
-| 変更禁止 | 公開 endpoint 作成 / Cloud / env / GCS live 書き込み / Gmail 本文変更 / commit・push |
+| build / verify | `ui:build` ✅ / 2711 passed, 62 failed / Phase 43.1〜43.4 ✅ / Phase 44.1 verify 10件 ✅ |
+| Phase 44.1 判定 | **No-Go 維持**（live endpoint・Cloud・env・GCS live 未接続） |
+
+### 2026-07-07 — Phase 44.1 Human Approval: contactEmail ✅
+
+| 項目 | 内容 |
+|------|------|
+| 承認項目 | **問い合わせ先メールアドレス（contactEmail）** |
+| 確定値 | `info@wantreach.jp` |
+| 設定場所 | `tenantResolver.ts` の Want Reach 既定 tenant のみ（Secret ではなく tenant 設定として一元管理） |
+| 参照経路 | `resolveMailOperationsTenant` → `buildUnsubscribeScreenCopy` → mock 配信停止 API（`contactEmail` フィールド） |
+| 未適用 | Gmail 下書き本文 / live endpoint / 既存送信済みメール |
+| Phase 44.1 判定 | **No-Go 維持** |
+| commit / push | **未実施**（ローカル変更のみ） |
 
 
 ## 2026-07-03 — Phase 42 通常運用UI改善 **完了** ✅

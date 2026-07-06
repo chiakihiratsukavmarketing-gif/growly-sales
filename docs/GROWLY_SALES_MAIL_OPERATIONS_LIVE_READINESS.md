@@ -27,6 +27,10 @@
 - **現在:** single tenant deployment（自社運用）
   - `tenantId = want-reach`
   - 公開サブドメイン候補: `mailops.wantreach.jp`
+  - **contactEmail（Human Approval 済み 2026-07-07）:** `info@wantreach.jp`
+    - `tenantResolver` の Want Reach 既定 tenant のみ。Secret ではなく tenant 設定として一元管理
+    - 配信停止 mock 画面は `buildUnsubscribeScreenCopy(tenant)` 経由で参照
+    - **未適用:** Gmail 下書き本文 / live endpoint / 既存送信済みメール
 - **将来:** multi-tenant SaaS へ移行可能な境界を保持
   - 公開 URL は `resolveMailOperationsPublicBaseUrl(tenantId)` で解決
   - 共通 Growly ドメイン / 顧客独自ドメインへ交換可能
@@ -355,6 +359,7 @@
 
 | # | 項目 | 状態 |
 |---|------|------|
+| 0 | **contactEmail（問い合わせ先）** — Want Reach 既定 tenant | ✅ **Human Approval 済み**（`info@wantreach.jp`・tenant 設定一元管理・Gmail/live 未適用） |
 | 1 | 公開ドメイン決定（`PUBLIC_BASE_URL`） | ☐ 未 |
 | 2 | Cloud Run mail-ops サービス作成承認 | ☐ 未 |
 | 3 | HTTPS / 証明書確認 | ☐ 未 |
