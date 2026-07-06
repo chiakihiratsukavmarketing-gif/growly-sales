@@ -1,35 +1,43 @@
 # Growly Sales — NEXT_TASKS
 
 **更新日:** 2026-07-06  
-**進行:** Phase 43 **4 / 4** 完了（43.1 `98abff3` / 43.2 `5ed05de` / 43.3 `51acf05` / 43.4 `fc1a686` pushed）
+**進行:** Phase 43 **4 / 4** 完了 / Phase 44 **0 / 3**（live 化前監査完了）
 
 ---
 
-## Phase 43 — メール運用基盤強化
+## Phase 44 — メール運用機能 live 化
 
 | サブフェーズ | 内容 | 状態 |
 |-------------|------|------|
-| 43.1 | 基準線・設計 | ✅ pushed `98abff3` |
-| 43.2 | 配信停止 mock | ✅ pushed `5ed05de` |
-| 43.3 | カスタムメールテンプレート mock | ✅ pushed `51acf05` |
-| **43.4** | 開封計測 mock | ✅ pushed `fc1a686` |
+| **44.0** | live 化前安全確認 | ✅ 監査完了（未 commit） |
+| 44.1 | 配信停止 live | **No-Go** — 条件未達 |
+| 44.2 | カスタムテンプレート live | 未着手 |
+| 44.3 | 開封計測 live | 未着手 |
+
+**監査正本:** `docs/GROWLY_SALES_MAIL_OPERATIONS_LIVE_READINESS.md`
 
 **live 公開順:** ①配信停止 → ②カスタムメール → ③開封計測  
-配信停止チェック live 完了まで、新メール生成・下書きへの自動適用は **live 化しない**。
+44.1 live 完了まで、テンプレート・pixel のメール埋め込み live 化は **禁止**。
 
-### 43.4 完了（mock）
+### 44.1 Go 再評価に必要な人間作業
 
-- [x] open tracking 型・store・aggregator・privacy
-- [x] 手動送信記録時の mock tracking 作成（既存記録は不変）
-- [x] `POST /api/mock/open-events`
-- [x] SendRecords 開封バッジ / ダッシュボード参考開封率
-- [ ] 人間承認後: `/t/{token}.gif`・下書き MIME への pixel・`MAIL_OPEN_TRACKING_ENABLED`
+- [ ] 公開ドメイン・`PUBLIC_BASE_URL` 決定
+- [ ] Cloud Run mail-ops サービス作成承認
+- [ ] HTTPS 確認
+- [ ] Secret Manager（`UNSUBSCRIBE_TOKEN_PEPPER` 等）
+- [ ] suppression 保存先承認（推奨: GCS JSON + generation-match）
+- [ ] 法務・配信停止画面文案確認
+- [ ] fail-closed 実装フェーズへの着手承認
 
-### Phase 43 live 化（人間承認後・別タスク）
+### Phase 43 完了（mock・参照）
 
-- [ ] 公開 unsubscribe URL・Cloud Run・env
-- [ ] テンプレート本番運用
-- [ ] 開封 pixel・公開 tracking endpoint
+| サブ | commit |
+|------|--------|
+| 43.1 設計 | `98abff3` |
+| 43.2 配信停止 mock | `5ed05de` |
+| 43.3 テンプレート mock | `51acf05` |
+| 43.4 開封計測 mock | `fc1a686` |
+| 43 完了記録 | `e28e311` |
 
 ---
 
@@ -39,21 +47,15 @@
 2. Daily 30: 候補収集 → Lead化承認 → 営業文 → 下書き → Gmail手動送信 → 送信記録
 3. 各ゲート承認必須（`FETCH_DAILY_30` / `GENERATE_DAILY_30_COPY` / `IMPORT_*` / `CREATE_DRAFTS`）
 
-**禁止:** 自動送信 / force=true / 無断デプロイ / Scheduler・Secret変更 / Phase 43 live 機能の本番適用
+**禁止:** 自動送信 / force=true / 無断デプロイ / Scheduler・Secret変更 / Phase 44 live 機能の本番適用（Go 前）
 
 **WORK_LOG:** `## 通常営業運用` に日次件数を記録
-
----
-
-## Phase 42 完了（参照）
-
-通常運用UI横断改善 42.1〜42.20 完了。詳細は `WORK_LOG.md` 2026-07-03〜05 エントリ。
 
 ---
 
 ## 参照
 
 - Phase 43 仕様: `docs/GROWLY_SALES_MAIL_OPERATIONS_UPGRADE.md`
+- Phase 44 監査: `docs/GROWLY_SALES_MAIL_OPERATIONS_LIVE_READINESS.md`
 - Daily 30 運用: `docs/GROWLY_SALES_DAILY30_RUNBOOK.md`
-- 作業ログ: `WORK_LOG.md`（通常運用 / Phase 43 区分）
-- 履歴フェーズ: Phase 18（`FETCH_CANDIDATES`）/ Phase 19（`CREATE_DRAFTS`）/ Phase 21（Daily 30 互換コマンド）
+- 作業ログ: `WORK_LOG.md`（通常運用 / Phase 43・44 区分）
