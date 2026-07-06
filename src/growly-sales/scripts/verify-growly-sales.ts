@@ -7529,6 +7529,88 @@ async function verifyPhase4220CandidateCountAndDetailsCleanup(): Promise<void> {
   ok('Phase 42.20 candidate count and details cleanup checks passed');
 }
 
+const MAIL_OPS_UPGRADE_DOC = join(PROJECT_ROOT, 'docs/GROWLY_SALES_MAIL_OPERATIONS_UPGRADE.md');
+
+async function verifyPhase431BaselineOperationsPreserved(): Promise<void> {
+  const doc = await readFile(MAIL_OPS_UPGRADE_DOC, 'utf-8');
+  assert(doc.includes('FETCH_DAILY_30'), 'doc documents candidate collection gate');
+  assert(doc.includes('GENERATE_DAILY_30_COPY'), 'doc documents copy generation gate');
+  assert(doc.includes('CREATE_DRAFTS'), 'doc documents gmail draft gate');
+  assert(doc.includes('users.drafts.create'), 'doc documents drafts.create only');
+  assert(doc.includes('Gmail 自動送信禁止'), 'doc documents no auto-send rule');
+  assert(doc.includes('Human Approval'), 'doc documents human approval');
+
+  const gmailAdapter = await readFile(join(SRC_ROOT, 'integrations/gmail/gmailDraftAdapter.ts'), 'utf-8');
+  assert(gmailAdapter.includes('drafts.create'), 'gmail adapter still uses drafts.create');
+  assert(!gmailAdapter.includes('messages.send'), 'gmail adapter does not send messages');
+  assert(!gmailAdapter.includes('drafts.send'), 'gmail adapter does not drafts.send');
+
+  const generateCopy = await readFile(join(SRC_ROOT, 'candidates/generateDaily30SalesCopy.ts'), 'utf-8');
+  assert(generateCopy.includes('generateDaily30SalesCopyForCandidate'), 'daily30 copy path exists');
+
+  const recordSent = await readFile(join(SRC_ROOT, 'workflow/recordManualGmailSent.ts'), 'utf-8');
+  assert(recordSent.includes('manual'), 'manual send record workflow preserved');
+
+  const workLog = await readFile(join(PROJECT_ROOT, 'WORK_LOG.md'), 'utf-8');
+  assert(workLog.includes('## 通常営業運用'), 'WORK_LOG has routine operations section');
+  assert(workLog.includes('## Phase 43開発'), 'WORK_LOG has phase 43 dev section');
+
+  ok('Phase 43.1 baseline operations preserved checks passed');
+}
+
+async function verifyPhase432SuppressionDesign(): Promise<void> {
+  const doc = await readFile(MAIL_OPS_UPGRADE_DOC, 'utf-8');
+  assert(doc.includes('mail-suppressions.json'), 'doc defines suppression storage');
+  assert(doc.includes('suppressionId'), 'doc defines suppressionId');
+  assert(doc.includes('normalizedEmail'), 'doc defines normalizedEmail');
+  assert(doc.includes('tokenHash'), 'doc defines tokenHash not raw token');
+  assert(doc.includes('生トークン'), 'doc warns against raw token storage');
+  assert(doc.includes('unsubscribed'), 'doc defines unsubscribed status');
+  assert(doc.includes('manually_blocked'), 'doc defines manually_blocked status');
+  assert(doc.includes('assertNotSuppressed'), 'doc defines suppression check hook');
+  assert(doc.includes('generateDaily30SalesCopy.ts'), 'doc lists copy generation check point');
+  assert(doc.includes('selectGmailDraftCandidates.ts'), 'doc lists draft candidate check point');
+  assert(doc.includes('冪等'), 'doc defines idempotent unsubscribe');
+  assert(doc.includes('/u/{token}'), 'doc defines unsubscribe URL pattern');
+  assert(doc.includes('解除'), 'doc defines reactivation with human approval');
+
+  ok('Phase 43.2 suppression design checks passed');
+}
+
+async function verifyPhase433CustomTemplateDesign(): Promise<void> {
+  const doc = await readFile(MAIL_OPS_UPGRADE_DOC, 'utf-8');
+  assert(doc.includes('outreach-templates.json'), 'doc defines template storage');
+  assert(doc.includes('subjectTemplate'), 'doc defines subject template block');
+  assert(doc.includes('unsubscribeNotice'), 'doc defines unsubscribe notice block');
+  assert(doc.includes('次回 `generateSalesEmail`'), 'doc applies template on next generation only');
+  assert(doc.includes('既存 Lead'), 'doc preserves existing lead copy');
+  assert(doc.includes('generateSalesEmail.ts'), 'doc lists generateSalesEmail integration');
+  assert(doc.includes('bannedPhrases'), 'doc defines banned phrases constraint');
+  assert(doc.includes('バージョン履歴'), 'doc defines version history UI');
+
+  const generateSalesEmail = await readFile(join(SRC_ROOT, 'generation/generateSalesEmail.ts'), 'utf-8');
+  assert(generateSalesEmail.includes('export function generateSalesEmail'), 'generateSalesEmail entry point exists');
+
+  ok('Phase 43.3 custom template design checks passed');
+}
+
+async function verifyPhase434OpenTrackingDesign(): Promise<void> {
+  const doc = await readFile(MAIL_OPS_UPGRADE_DOC, 'utf-8');
+  assert(doc.includes('email-open-events.json'), 'doc defines open event storage');
+  assert(doc.includes('trackingTokenHash'), 'doc uses tracking token hash');
+  assert(doc.includes('IP は原則保存しない'), 'doc avoids IP storage');
+  assert(doc.includes('privacyProxySuspected'), 'doc defines privacy proxy handling');
+  assert(doc.includes('/t/{token}.gif'), 'doc defines tracking pixel URL');
+  assert(doc.includes('参考開封率'), 'doc labels open rate as reference only');
+  assert(doc.includes('mock/open-events'), 'doc defines mock open events endpoint');
+  assert(doc.includes('公開 endpoint（live・未作成）'), 'doc defers public tracking endpoint');
+
+  const sendRecordsView = await readFile(join(SRC_ROOT, 'ui/SendRecordsView.tsx'), 'utf-8');
+  assert(sendRecordsView.includes('send-record'), 'send records view exists for future open stats');
+
+  ok('Phase 43.4 open tracking design checks passed');
+}
+
 function verifyPhase20LiteEmailImprovement(): void {
   assert(MAX_ADDITIONAL_CONTACT_PAGES === 4, 'additional page limit is 4');
 
@@ -7942,6 +8024,10 @@ async function main(): Promise<void> {
   await verifyPhase4218SourceUrlDisplay();
   await verifyPhase4219CollectionDestinationUrl();
   await verifyPhase4220CandidateCountAndDetailsCleanup();
+  await verifyPhase431BaselineOperationsPreserved();
+  await verifyPhase432SuppressionDesign();
+  await verifyPhase433CustomTemplateDesign();
+  await verifyPhase434OpenTrackingDesign();
   verifyPhase20LiteEmailImprovement();
   await verifyPhase20LiteEmailImprovementAsync();
   await verifyPhaseBLeadInventory();

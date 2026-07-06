@@ -8,6 +8,43 @@
 
 ---
 
+## 記録区分（Phase 43 以降）
+
+以降のエントリは **通常営業運用** と **Phase 43開発** を分けて記録する。開発作業で通常運用の過去記録を上書き・削除しない。
+
+### 通常営業運用 — 記録項目
+
+毎回記録: 収集件数 / メール営業候補数 / Lead化承認件数 / 営業文作成件数 / Gmail下書き候補数 / Gmail手動送信件数 / 返信件数 / 配信停止件数 / フォローアップ件数 / 運用上の詰まり
+
+## 通常営業運用
+
+（日次運用の記録はこの見出し配下に追記する）
+
+### Phase 43開発 — 記録項目
+
+毎回記録: 開封計測の進捗 / 配信停止機能の進捗 / カスタムメール機能の進捗 / build・verify結果 / mock・liveの状態 / 人間作業待ち / 未解決事項
+
+## Phase 43開発
+
+### 2026-07-06 — Phase 43.1 基準線・設計確定 ✅
+
+| 項目 | 内容 |
+|------|------|
+| 進行 | Phase 43 **1 / 4** 完了 |
+| 開封計測 | endpoint・event schema・token hash・mock 境界を設計（`docs/GROWLY_SALES_MAIL_OPERATIONS_UPGRADE.md` §5） |
+| 配信停止 | suppression モデル・URL/token・冪等・チェック挿入点を設計（§3） |
+| カスタムメール | ブロックモデル・AI/人間分離・次回生成から適用を設計（§4） |
+| build / verify | `ui:build` スキップ（UI 未変更）/ Phase 43.1 verify 4件 ✅ / 全体は既存失敗あり |
+| mock / live | **mock のみ**。公開 URL・GCS 書き込み・DDL・env 変更なし |
+| 人間作業待ち | 公開 unsubscribe URL・Cloud Run・env secret・live 配信停止・pixel 埋め込み |
+| 未解決事項 | `doNotContact` と suppression の同期方針（43.2 で実装時に確定） |
+
+**成果物:** `docs/GROWLY_SALES_MAIL_OPERATIONS_UPGRADE.md`（仕様正本）
+
+**禁止遵守:** Gmail送信なし / DDLなし / envなし / commit・pushなし
+
+---
+
 ## 2026-07-03 — Phase 42 通常運用UI改善 **完了** ✅
 
 **進行:** 通常運用UI改善 **7 / 7 フェーズ完了**

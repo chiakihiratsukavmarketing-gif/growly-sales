@@ -1,52 +1,69 @@
 # Growly Sales — NEXT_TASKS
 
-**更新日:** 2026-07-03  
-**進行:** 通常運用UI改善 **7 / 7 フェーズ完了** ✅
+**更新日:** 2026-07-06  
+**進行:** 通常運用UI改善 **7 / 7 完了** ✅ | Phase 43 **1 / 4** 完了
 
 ---
 
-## Phase 42 完了
+## Phase 43 — メール運用基盤強化
 
-**通常運用UI横断改善** — 42.1〜42.9 完了（実装・sticky修正・URL表示・候補一覧密度・最終画面確認）。
+**仕様正本:** `docs/GROWLY_SALES_MAIL_OPERATIONS_UPGRADE.md`
 
-| サブフェーズ | 内容 |
-|-------------|------|
-| 42.1 | sticky 検索バー・送信記録収集元・フォローアップ→返信管理 |
-| 42.2 | 実画面確認（初回） |
-| 42.3 | 候補収集 sticky 重なり修正（ネストスクロール） |
-| 42.4 | 送信記録 URL 分離（収集方法 / 発見元URL / 公式サイト / メール取得元） |
-| 42.5 | 実画面最終確認・完了判定 |
-| 42.6 | 収集元列拡張・全文表示 |
-| 42.7 | 初期画面で候補5件表示を目標に密度調整 |
-| 42.8 | 二重スクロール・sticky競合・補助情報重なり修正 |
-| 42.9 | 実画面最終確認（5件完全表示・全文・切れ/潜り込み/重なりなし） |
+| サブフェーズ | 内容 | 状態 |
+|-------------|------|------|
+| **43.1** | 基準線・データ構造・安全要件 | ✅ 完了 |
+| 43.2 | 配信停止リンク・配信禁止企業管理 | 未着手 |
+| 43.3 | 営業メールのカスタムテンプレート | 未着手 |
+| 43.4 | 開封計測・開封率表示 | 未着手 |
 
-**レガシー Lead:** `discoverySourceUrl` 未保存のため送信記録で「URL未記録」は正常表示。
+**live 公開順:** ①配信停止 → ②カスタムメール → ③開封計測  
+配信停止チェック live 完了まで、新メール生成・下書きへの自動適用は **live 化しない**。
 
-**既知の軽微事項（非ブロッカー）:** ヘッダー/行列位置差最大約5px・補助情報表示時の二重スクロール可能性あり。操作阻害なし。
+### 43.2 次タスク（設計済み・実装待ち）
 
-**次ゴールは人間確認待ち**（push は人間承認後）。勝手に次フェーズを開始しない。
+- [ ] `mail-suppressions.json` 型・store（mock / `_verify_` のみ）
+- [ ] `assertNotSuppressed` を営業文・下書き・フォローアップ入口に挿入
+- [ ] 設定タブ「配信禁止リスト」UI mock
+- [ ] unsubscribe mock endpoint（ローカル API のみ）
+- [ ] 人間承認後: 公開 `/u/{token}`・env・Cloud Run
+
+### 43.3 次タスク
+
+- [ ] `outreach-templates.json` + デフォルトを `generateSalesEmail` から移植
+- [ ] 設定タブ「営業メールテンプレート」UI
+- [ ] 次回生成から適用（既存 Lead 本文不変）
+
+### 43.4 次タスク
+
+- [ ] open event mock・SendRecords 開封バッジ
+- [ ] ダッシュボード参考開封率
+- [ ] 人間承認後: `/t/{token}.gif`・下書き MIME への pixel
 
 ---
 
-## 今日の通常運用（人間作業）
+## 通常営業運用（人間作業）
 
-1. UI: `http://localhost:3847`（稼働中なら再起動不要）
-2. 本日 batch（2026-07-03）Lead化レビュー **28件**
-3. Lead化承認 → 営業文生成 → 下書き取り込み（各ゲート承認）
-4. Gmail送信は Gmail 画面で手動のみ
+1. UI: `http://localhost:3847`
+2. Daily 30: 候補収集 → Lead化承認 → 営業文 → 下書き → Gmail手動送信 → 送信記録
+3. 各ゲート承認必須（`FETCH_DAILY_30` / `GENERATE_DAILY_30_COPY` / `IMPORT_*` / `CREATE_DRAFTS`）
 
-**禁止:** 自動送信 / force=true / 再デプロイ / Scheduler・Secret変更
+**禁止:** 自動送信 / force=true / 無断デプロイ / Scheduler・Secret変更 / Phase 43 live 機能の本番適用
+
+**WORK_LOG:** `## 通常営業運用` に日次件数を記録
 
 ---
 
-## 未コミット（人間確認後）
+## Phase 42 完了（参照）
 
-Phase **42.4**（送信記録 URL 表示）・**42.1〜42.5** 等の未コミット変更が残る場合あり。**push は人間承認後。**
+通常運用UI横断改善 42.1〜42.20 完了。詳細は `WORK_LOG.md` 2026-07-03〜05 エントリ。
 
 ---
 
 ## 参照
 
-- 本運用α: `docs/GROWLY_SALES_DAILY30_RUNBOOK.md`（18/18 完了）
-- Phase 42: `WORK_LOG.md` 2026-07-03 エントリ
+- Phase 43 仕様: `docs/GROWLY_SALES_MAIL_OPERATIONS_UPGRADE.md`
+- Daily 30 運用: `docs/GROWLY_SALES_DAILY30_RUNBOOK.md`
+- 作業ログ: `WORK_LOG.md`（通常運用 / Phase 43 区分）
+- 履歴フェーズ: Phase 18（`FETCH_CANDIDATES`）/ Phase 19（`CREATE_DRAFTS`）/ Phase 21（Daily 30 互換コマンド）
+
+**commit / push:** Phase 43.1 は人間承認前のため未実施
