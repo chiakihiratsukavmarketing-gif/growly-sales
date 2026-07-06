@@ -14,15 +14,26 @@
 
 ### 通常営業運用 — 記録項目
 
-毎回記録: 収集件数 / メール営業候補数 / Lead化承認件数 / 営業文作成件数 / Gmail下書き候補数 / Gmail手動送信件数 / 返信件数 / 配信停止件数 / フォローアップ件数 / 運用上の詰まり
+毎回記録: 収集件数 / メール営業候補数 / Lead化承認件数 / 営業文作成件数 / Gmail下書き候補数 / Gmail手動送信件数 / 開封済み件数 / 参考開封率 / 返信件数 / 配信停止件数 / フォローアップ件数 / 運用上の詰まり
 
 ## 通常営業運用
 
-（日次運用の記録はこの見出し配下に追記する）
+### 2026-07-06 — 日次（Phase 43.4 commit セッション）
 
-### Phase 43開発 — 記録項目
-
-毎回記録: 開封計測の進捗 / 配信停止機能の進捗 / カスタムメール機能の進捗 / build・verify結果 / mock・liveの状態 / 人間作業待ち / 未解決事項
+| 項目 | 値 |
+|------|-----|
+| 収集件数 | 今回未取得 |
+| メール営業候補数 | 今回未取得 |
+| Lead化承認件数 | 今回未取得 |
+| 営業文作成件数 | 今回未取得 |
+| Gmail下書き候補数 | 今回未取得 |
+| Gmail手動送信件数 | 今回未取得 |
+| 開封済み件数 | 今回未取得 |
+| 参考開封率 | 今回未取得 |
+| 返信件数 | 今回未取得 |
+| 配信停止件数 | 今回未取得 |
+| フォローアップ件数 | 今回未取得 |
+| 運用上の詰まり | なし（開発セッション） |
 
 ## Phase 43開発
 
@@ -57,11 +68,11 @@
 | live | **未接続**（公開URL・GCS・env なし） |
 | 人間作業待ち | 公開 unsubscribe URL・Cloud Run・live 配信停止 |
 
-## 通常営業運用
+### Phase 43開発 — 記録項目
 
-今回未取得（テンプレート mock 実装セッション。件数は推測記録しない）
+毎回記録: 開封計測の進捗 / 配信停止機能の進捗 / カスタムメール機能の進捗 / build・verify結果 / mock・liveの状態 / 人間作業待ち / 未解決事項
 
-### 2026-07-06 — Phase 43.3 カスタムメールテンプレート mock ✅
+### 2026-07-06 — Phase 43.3 カスタムメールテンプレート mock ✅ pushed `51acf05`
 
 | 項目 | 内容 |
 |------|------|
@@ -69,12 +80,28 @@
 | テンプレート型 | `templateTypes.ts` / `OutreachTemplate` |
 | mock store | `outreach-templates.json`（gitignore） |
 | レンダラー | `templateRenderer.ts` — 次回 `generateSalesEmail` から適用 |
+| バリデーション | 未解決プレースホルダ・最大文字数・有効化時配信停止ブロック必須 |
 | UI | 設定「営業メールテンプレート」— 下書き・プレビュー・有効化（TEMPLATE_ACTIVATE） |
 | build / verify | `ui:build` ✅ / Phase 43.3 verify 6件 ✅ / 全体は既存失敗あり |
 | live | 未接続 |
 | 人間作業待ち | 本番テンプレート運用方針の承認 |
 
----
+### 2026-07-06 — Phase 43.4 開封計測 mock ✅
+
+| 項目 | 内容 |
+|------|------|
+| 進行 | Phase 43 **4 / 4**（mock 実装完了） |
+| 型・store | `openTrackingTypes.ts` / `email-send-tracking.json` + `email-open-events.json`（gitignore） |
+| トークン | `tokenHash` のみ保存（生 token 非永続） |
+| フック | 手動送信記録時のみ mock tracking 作成（suppression 済みは発行しない・既存送信記録は不変） |
+| 集約 | `openTrackingAggregator.ts` — rawEventCount / openCount 分離 |
+| privacy | UA カテゴリのみ・IP 非保存・プロキシ疑いフラグ |
+| mock API | `POST /api/mock/open-events` / `GET /api/send-records/:leadId/open-stats` |
+| UI | 送信記録「開封（参考）」バッジ / ダッシュボード参考開封率 |
+| build / verify | `ui:build` ✅ / Phase 43.4 verify 7件 ✅ / 全体は既存失敗あり |
+| live | **未接続**（`/t/{token}.gif`・下書き pixel なし） |
+| 人間作業待ち | live pixel 埋め込み・公開 endpoint・env |
+
 
 ## 2026-07-03 — Phase 42 通常運用UI改善 **完了** ✅
 

@@ -1,7 +1,7 @@
 # Growly Sales — NEXT_TASKS
 
 **更新日:** 2026-07-06  
-**進行:** Phase 43 **3 / 4** 完了（43.1 `98abff3` / 43.2 `5ed05de` pushed）
+**進行:** Phase 43 **4 / 4** mock 完了（43.1 `98abff3` / 43.2 `5ed05de` / 43.3 `51acf05` pushed）
 
 ---
 
@@ -11,30 +11,25 @@
 |-------------|------|------|
 | 43.1 | 基準線・設計 | ✅ pushed `98abff3` |
 | 43.2 | 配信停止 mock | ✅ pushed `5ed05de` |
-| **43.3** | カスタムメールテンプレート mock | ✅ 完了（未commit） |
-| 43.4 | 開封計測 | 未着手 |
+| 43.3 | カスタムメールテンプレート mock | ✅ pushed `51acf05` |
+| **43.4** | 開封計測 mock | ✅ 実装完了（未commit） |
 
 **live 公開順:** ①配信停止 → ②カスタムメール → ③開封計測  
 配信停止チェック live 完了まで、新メール生成・下書きへの自動適用は **live 化しない**。
 
-### 43.2 完了（mock）
+### 43.4 完了（mock）
 
-- [x] suppression 型・mock store・チェックフック
-- [x] 設定タブ「配信禁止リスト」
-- [x] mock unsubscribe API
-- [ ] 人間承認後: 公開 `/u/{token}`・env・Cloud Run
+- [x] open tracking 型・store・aggregator・privacy
+- [x] 手動送信記録時の mock tracking 作成（既存記録は不変）
+- [x] `POST /api/mock/open-events`
+- [x] SendRecords 開封バッジ / ダッシュボード参考開封率
+- [ ] 人間承認後: `/t/{token}.gif`・下書き MIME への pixel・`MAIL_OPEN_TRACKING_ENABLED`
 
-### 43.3 完了（mock）
+### Phase 43 live 化（人間承認後・別タスク）
 
-- [x] テンプレート型・store・renderer
-- [x] 設定UI（下書き・プレビュー・履歴・有効化ゲート）
-- [x] 次回生成分から適用（既存 Lead 不変）
-
-### 43.4 次タスク
-
-- [ ] open event mock・SendRecords 開封バッジ
-- [ ] ダッシュボード参考開封率
-- [ ] 人間承認後: `/t/{token}.gif`・下書き MIME への pixel
+- [ ] 公開 unsubscribe URL・Cloud Run・env
+- [ ] テンプレート本番運用
+- [ ] 開封 pixel・公開 tracking endpoint
 
 ---
 
@@ -62,5 +57,3 @@
 - Daily 30 運用: `docs/GROWLY_SALES_DAILY30_RUNBOOK.md`
 - 作業ログ: `WORK_LOG.md`（通常運用 / Phase 43 区分）
 - 履歴フェーズ: Phase 18（`FETCH_CANDIDATES`）/ Phase 19（`CREATE_DRAFTS`）/ Phase 21（Daily 30 互換コマンド）
-
-**commit / push:** Phase 43.1 は人間承認前のため未実施

@@ -25,6 +25,8 @@ import {
   type SendRecordRow,
 } from './leadFilterUtils.js';
 import type { SalesFlowTab } from './GrowlySalesDashboard.js';
+import { fetchOpenStatsForSentLeads } from './openTrackingApi.js';
+import type { LeadOpenStats } from '../mail-operations/openTrackingTypes.js';
 
 interface SendRecordsViewProps {
   onError: (message: string) => void;
@@ -53,6 +55,32 @@ function replyDisplayLabel(lead: Lead): string {
   return replyStatusLabel(status);
 }
 
+function openStatsLabel(stats: LeadOpenStats | undefined): string {
+  if (!stats || stats.status === 'not_tracked') return '計測なし';
+  if (stats.status === 'tracking_disabled') return '計測対象外';
+  if (!stats.isOpened) return '未開封';
+  if (stats.privacyProxySuspected) return '開封済み（参考）';
+  return '開封済み';
+}
+
+function openStatsBadgeClass(stats: LeadOpenStats | undefined): string {
+  if (!stats || stats.status === 'not_tracked' || stats.status === 'tracking_disabled') {
+    return 'open-tracking-badge open-tracking-badge-muted';
+  }
+  if (!stats.isOpened) return 'open-tracking-badge open-tracking-badge-pending';
+  return 'open-tracking-badge open-tracking-badge-opened';
+}
+
+function formatOpenDate(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('ja-JP', {
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export function SendRecordsView({
   onError,
   onRecordSuccess,
@@ -68,6 +96,8 @@ export function SendRecordsView({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [openStatsByLeadId, setOpenStatsByLeadId] = useState<Record<string, LeadOpenStats>>({});
+  const [openStatsNote, setOpenStatsNote] = useState<string | null>(null);
   const highlightRef = useRef<HTMLElement | null>(null);
 
   const allRows = useMemo((): SendRecordRow[] => {
@@ -105,6 +135,24 @@ export function SendRecordsView({
             return tb.localeCompare(ta);
           })
       );
+      const sentIds = allLeads.filter(isSentLead).map((l) => l.id);
+      if (sentIds.length > 0) {
+        try {
+          const openRes = await fetchOpenStatsForSentLeads(sentIds);
+          const map: Record<string, LeadOpenStats> = {};
+          for (const item of openRes.stats) {
+            map[item.leadId] = item;
+          }
+          setOpenStatsByLeadId(map);
+          setOpenStatsNote(openRes.note);
+        } catch {
+          setOpenStatsByLeadId({});
+          setOpenStatsNote(null);
+        }
+      } else {
+        setOpenStatsByLeadId({});
+        setOpenStatsNote(null);
+      }
     } catch (err) {
       onError(err instanceof Error ? err.message : '送信記録の読み込みに失敗しました');
     } finally {
@@ -150,6 +198,9 @@ export function SendRecordsView({
         title="送信記録"
         subtitle="Gmailで手動送信した後、ここで記録します。自動送信は行いません。"
       />
+      {openStatsNote && (
+        <p className="open-tracking-privacy-note send-record-open-note">{openStatsNote}</p>
+      )}
       {successMessage && <div className="alert alert-success">{successMessage}</div>}
 
       <SearchAndFilterBar
@@ -240,6 +291,7 @@ export function SendRecordsView({
                     <tr>
                       <th>会社名</th>
                       <th>送信日</th>
+                      <th>開封（参考）</th>
                       <th>返信状態</th>
                       <th>次アクション</th>
                     </tr>
@@ -259,6 +311,37 @@ export function SendRecordsView({
                             />
                           </td>
                           <td>{formatSentDate(lead)}</td>
+                          <td>
+                            <span className={openStatsBadgeClass(openStatsByLeadId[lead.id])}>
+                              {openStatsLabel(openStatsByLeadId[lead.id])}
+                            </span>
+                            {openStatsByLeadId[lead.id]?.isOpened && (
+                              <div className="open-tracking-meta">
+                                開封 {openStatsByLeadId[lead.id]?.openCount ?? 0}回
+                                {openStatsByLeadId[lead.id]?.uniqueOpenCount != null &&
+                                  openStatsByLeadId[lead.id]!.uniqueOpenCount !==
+                                    openStatsByLeadId[lead.id]!.openCount &&
+                                  `（ユニーク ${openStatsByLeadId[lead.id]!.uniqueOpenCount}）`}
+                              </div>
+                            )}
+                            {openStatsByLeadId[lead.id]?.firstOpenedAt && (
+                              <div className="open-tracking-meta">
+                                初回: {formatOpenDate(openStatsByLeadId[lead.id]?.firstOpenedAt)}
+                              </div>
+                            )}
+                            {openStatsByLeadId[lead.id]?.lastOpenedAt &&
+                              openStatsByLeadId[lead.id]!.openCount > 1 && (
+                                <div className="open-tracking-meta">
+                                  最終: {formatOpenDate(openStatsByLeadId[lead.id]?.lastOpenedAt)}
+                                </div>
+                              )}
+                            {openStatsByLeadId[lead.id]?.privacyProxySuspected &&
+                              openStatsByLeadId[lead.id]?.isOpened && (
+                                <div className="open-tracking-proxy-hint">
+                                  プライバシー保護経由の可能性
+                                </div>
+                              )}
+                          </td>
                           <td>
                             <span className={`reply-display reply-display-${lead.replyStatus ?? 'none'}`}>
                               {replyDisplayLabel(lead)}

@@ -7607,6 +7607,8 @@ async function verifyPhase434OpenTrackingDesign(): Promise<void> {
 
   const sendRecordsView = await readFile(join(SRC_ROOT, 'ui/SendRecordsView.tsx'), 'utf-8');
   assert(sendRecordsView.includes('send-record'), 'send records view exists for future open stats');
+  assert(sendRecordsView.includes('開封（参考）'), 'send records view shows open reference column');
+  assert(sendRecordsView.includes('open-tracking'), 'send records view has open tracking UI');
 
   ok('Phase 43.4 open tracking design checks passed');
 }
@@ -7928,6 +7930,135 @@ async function verifyPhase433NoExistingLeadOverwrite(): Promise<void> {
 
   setOutreachTemplateStoreOverrideForTests(null);
   ok('Phase 43.3 no existing lead overwrite checks passed');
+}
+
+async function verifyPhase434OpenTrackingTypes(): Promise<void> {
+  const types = await readFile(join(SRC_ROOT, 'mail-operations/openTrackingTypes.ts'), 'utf-8');
+  assert(types.includes('EmailSendTracking'), 'EmailSendTracking type exists');
+  assert(types.includes('tokenHash'), 'tokenHash field');
+  assert(types.includes('privacyProxySuspected'), 'privacyProxySuspected field');
+  assert(types.includes('EmailOpenEvent'), 'EmailOpenEvent type exists');
+  ok('Phase 43.4 open tracking types checks passed');
+}
+
+async function verifyPhase434OpenTrackingStore(): Promise<void> {
+  const storeSrc = await readFile(join(SRC_ROOT, 'mail-operations/openTrackingStore.ts'), 'utf-8');
+  assert(storeSrc.includes('setOpenTrackingStoreOverrideForTests'), 'open tracking test override');
+  assert(storeSrc.includes('getEmailSendTrackingPath'), 'send tracking path referenced');
+  assert(!storeSrc.includes('saveLeadsToJson'), 'open tracking store does not write leads');
+
+  const {
+    setOpenTrackingStoreOverrideForTests,
+    createMockSendTrackingForManualGmailSend,
+    recordMockOpenEvent,
+    hashOpenTrackingToken,
+  } = await import('../mail-operations/index.js');
+
+  setOpenTrackingStoreOverrideForTests({
+    events: { version: 1, events: [], updatedAt: new Date().toISOString() },
+    tracking: { version: 1, records: [], updatedAt: new Date().toISOString() },
+  });
+
+  const lead = createEmptyLead({
+    companyName: '開封計測テスト',
+    emailCandidates: ['test@example.com'],
+    gmailDraftId: 'draft-verify-434',
+    gmailDraftStatus: 'draft_created',
+    sendStatus: 'not_sent',
+  });
+  const preview = {
+    leadId: lead.id,
+    companyName: lead.companyName,
+    to: 'test@example.com',
+    from: 'from@example.com',
+    replyTo: 'reply@example.com',
+    draftId: 'draft-verify-434',
+    subject: '件名',
+    emailSourceUrl: null,
+    emailSourceLabel: 'test',
+    officialSiteUrl: null,
+    isOfficialSiteOrigin: true,
+    isPlaceholderEmail: false,
+    isPersonalEmail: false,
+    batchId: null,
+    source: null,
+    collectionProfileId: null,
+    collectionProfileName: null,
+    collectionMode: null,
+    industryCategory: null,
+    areaStrategy: null,
+    prefecture: null,
+    discoverySource: null,
+    discoverySourceSite: null,
+    discoverySourceLabel: null,
+    discoverySourceUrl: null,
+    sourceComplianceStatus: null,
+    collectionProfile: { label: 'test', detailLines: [] },
+  };
+  const sentAt = new Date().toISOString();
+  const { tracking, mockToken } = await createMockSendTrackingForManualGmailSend(lead, preview, sentAt);
+  assert(tracking.status === 'mock', 'tracking status mock');
+  assert(tracking.tokenHash.length > 0, 'token hash stored');
+  assert(mockToken.length > 0, 'mock token returned on create');
+
+  const opened = await recordMockOpenEvent({
+    token: mockToken,
+    userAgent: 'GoogleImageProxy',
+  });
+  assert(opened.tracking.openCount === 1, 'open count incremented');
+  assert(opened.tracking.privacyProxySuspected, 'gmail proxy flagged');
+  assert(hashOpenTrackingToken(mockToken) === tracking.tokenHash, 'token hash stable');
+
+  setOpenTrackingStoreOverrideForTests({ events: null, tracking: null });
+  ok('Phase 43.4 open tracking store checks passed');
+}
+
+async function verifyPhase434MockOpenEvents(): Promise<void> {
+  const server = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
+  assert(server.includes('/api/mock/open-events'), 'mock open events API');
+  assert(server.includes('/api/send-records/'), 'per-lead open stats API');
+  assert(server.includes('/api/open-tracking/sent-leads'), 'batch open stats API');
+  assert(!server.includes('/t/{token}.gif'), 'no live public tracking route');
+  ok('Phase 43.4 mock open events checks passed');
+}
+
+async function verifyPhase434SendRecordsUi(): Promise<void> {
+  const view = await readFile(join(SRC_ROOT, 'ui/SendRecordsView.tsx'), 'utf-8');
+  assert(view.includes('fetchOpenStatsForSentLeads'), 'send records loads open stats');
+  assert(view.includes('open-tracking-badge'), 'open tracking badge UI');
+  const api = await readFile(join(SRC_ROOT, 'ui/openTrackingApi.ts'), 'utf-8');
+  assert(api.includes('/api/mock/open-events'), 'open tracking API client');
+  ok('Phase 43.4 send records UI checks passed');
+}
+
+async function verifyPhase434DashboardReferenceRate(): Promise<void> {
+  const dashSrc = await readFile(join(SRC_ROOT, 'analytics/buildSalesDashboard.ts'), 'utf-8');
+  assert(dashSrc.includes('referenceOpenRate'), 'dashboard includes reference open rate');
+  assert(dashSrc.includes('mailOpsReference'), 'dashboard includes mail ops reference metrics');
+  const view = await readFile(join(SRC_ROOT, 'ui/SalesDashboardView.tsx'), 'utf-8');
+  assert(view.includes('参考開封率'), 'dashboard UI labels reference open rate');
+  assert(view.includes('開封率は画像読み込みに基づく参考値です') || view.includes('open-tracking-privacy-note'), 'dashboard has privacy note');
+  const privacy = await readFile(join(SRC_ROOT, 'mail-operations/openTrackingPrivacy.ts'), 'utf-8');
+  assert(privacy.includes('開封率は画像読み込みに基づく参考値です'), 'required privacy disclaimer');
+  ok('Phase 43.4 dashboard reference rate checks passed');
+}
+
+async function verifyPhase434NoRetroactiveTracking(): Promise<void> {
+  const recordSrc = await readFile(join(SRC_ROOT, 'workflow/recordManualGmailSent.ts'), 'utf-8');
+  assert(recordSrc.includes('createMockSendTrackingForManualGmailSend'), 'tracking created on new send record only');
+  const storeSrc = await readFile(join(SRC_ROOT, 'mail-operations/openTrackingStore.ts'), 'utf-8');
+  assert(storeSrc.includes('checkNotSuppressed'), 'skips tracking for suppressed targets');
+  assert(!storeSrc.includes('saveLeadsToJson'), 'store does not scan leads retroactively');
+  ok('Phase 43.4 no retroactive tracking checks passed');
+}
+
+async function verifyPhase434NoLiveMailChanges(): Promise<void> {
+  const gmailAdapter = await readFile(join(SRC_ROOT, 'integrations/gmail/gmailDraftAdapter.ts'), 'utf-8');
+  assert(!gmailAdapter.includes('tracking pixel'), 'no tracking pixel in gmail adapter');
+  assert(!gmailAdapter.includes('/t/'), 'no public tracking URL in gmail adapter');
+  const createDraft = await readFile(join(SRC_ROOT, 'workflow/createGmailDraftForLead.ts'), 'utf-8');
+  assert(!createDraft.includes('open-tracking'), 'draft creation unchanged for open tracking live');
+  ok('Phase 43.4 no live mail changes checks passed');
 }
 
 function verifyPhase20LiteEmailImprovement(): void {
@@ -8361,6 +8492,13 @@ async function main(): Promise<void> {
   await verifyPhase433TemplateApplyOnNextGenOnly();
   await verifyPhase433TemplateUi();
   await verifyPhase433NoExistingLeadOverwrite();
+  await verifyPhase434OpenTrackingTypes();
+  await verifyPhase434OpenTrackingStore();
+  await verifyPhase434MockOpenEvents();
+  await verifyPhase434SendRecordsUi();
+  await verifyPhase434DashboardReferenceRate();
+  await verifyPhase434NoRetroactiveTracking();
+  await verifyPhase434NoLiveMailChanges();
   verifyPhase20LiteEmailImprovement();
   await verifyPhase20LiteEmailImprovementAsync();
   await verifyPhaseBLeadInventory();

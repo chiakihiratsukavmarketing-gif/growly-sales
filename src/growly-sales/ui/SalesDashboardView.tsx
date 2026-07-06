@@ -155,7 +155,7 @@ export function SalesDashboardView({
     return <p className="hint">ダッシュボードデータを取得できませんでした。</p>;
   }
 
-  const { metrics, dailyChecklist } = reconciled;
+  const { metrics, dailyChecklist, referenceOpenRate, mailOpsReference } = reconciled;
   const weeklySummary = reconciled.weeklySummary ?? { thisWeek: EMPTY_WEEKLY, lastWeek: EMPTY_WEEKLY };
   const todaySalesQueue: SalesQueueItem[] = reconciled.todaySalesQueue ?? [];
   const weekly = weekView === 'thisWeek' ? weeklySummary.thisWeek : weeklySummary.lastWeek;
@@ -267,6 +267,44 @@ export function SalesDashboardView({
             <WeeklyStat label="フォロー対象" value={weekly.currentFollowUpTargetCount} />
           </div>
 
+          <div className="dashboard-open-rate-panel" aria-label="参考開封率">
+            <h4 className="dashboard-open-rate-title">メール運用参考値（mock）</h4>
+            <div className="dashboard-weekly-stats">
+              <WeeklyStat label="手動送信済み" value={mailOpsReference?.manualSentCount ?? 0} />
+              <WeeklyStat label="計測可能" value={mailOpsReference?.trackableSendCount ?? 0} />
+              <WeeklyStat label="開封済み" value={mailOpsReference?.openedSendCount ?? 0} />
+              <WeeklyStat
+                label="参考開封率"
+                value={
+                  mailOpsReference?.referenceOpenRate != null
+                    ? `${Math.round(mailOpsReference.referenceOpenRate * 100)}%`
+                    : '—'
+                }
+              />
+              <WeeklyStat label="返信数" value={mailOpsReference?.replyCount ?? 0} />
+              <WeeklyStat
+                label="返信率"
+                value={
+                  mailOpsReference?.referenceReplyRate != null
+                    ? `${Math.round(mailOpsReference.referenceReplyRate * 100)}%`
+                    : '—'
+                }
+              />
+              <WeeklyStat label="配信停止" value={mailOpsReference?.activeSuppressionCount ?? 0} />
+              <WeeklyStat
+                label="配信停止率"
+                value={
+                  mailOpsReference?.referenceSuppressionRate != null
+                    ? `${Math.round(mailOpsReference.referenceSuppressionRate * 100)}%`
+                    : '—'
+                }
+              />
+            </div>
+            <p className="hint open-tracking-privacy-note">
+              {mailOpsReference?.note ?? referenceOpenRate?.note}
+            </p>
+          </div>
+
           {onNavigate && (
             <DashboardCompactChecklist items={dailyChecklist} onNavigate={(tab) => onNavigate(tab)} />
           )}
@@ -332,7 +370,7 @@ function WeeklyStat({
   highlight,
 }: {
   label: string;
-  value: number;
+  value: number | string;
   highlight?: boolean;
 }) {
   return (

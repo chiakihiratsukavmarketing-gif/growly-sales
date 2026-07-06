@@ -72,3 +72,51 @@ export {
   buildTemplateAiSlots,
 } from './templateRenderer.js';
 export { validateOutreachTemplate, validateOutreachTemplateForActivation, shouldApplyActiveTemplate, findUnresolvedTemplatePlaceholders } from './templatePolicy.js';
+export type {
+  EmailSendTracking,
+  EmailSendTrackingStatus,
+  EmailOpenEvent,
+  EmailOpenEventStore,
+  EmailSendTrackingStore,
+  LeadOpenStats,
+  ReferenceOpenRateMetrics,
+  UserAgentCategory,
+} from './openTrackingTypes.js';
+export {
+  hashOpenTrackingToken,
+  generateOpenTrackingToken,
+} from './openTrackingToken.js';
+export {
+  categorizeUserAgent,
+  isPrivacyProxyCategory,
+  OPEN_TRACKING_PRIVACY_NOTE,
+} from './openTrackingPrivacy.js';
+export {
+  applyOpenEventToTracking,
+  buildOpenEventFromInput,
+} from './openTrackingAggregator.js';
+export {
+  REFERENCE_OPEN_RATE_NOTE,
+  buildManualGmailSendRecordId,
+  formatOpenTrackingStatusLabel,
+  buildLeadOpenStats,
+  buildReferenceOpenRateMetrics,
+  assertMockOpenEventAllowed,
+  isLiveOpenTrackingPixelEnabled,
+} from './openTrackingPolicy.js';
+export {
+  loadEmailOpenEventStore,
+  loadEmailOpenEventStoreSync,
+  loadEmailSendTrackingStore,
+  loadEmailSendTrackingStoreSync,
+  setOpenTrackingStoreOverrideForTests,
+  clearMockOpenTrackingTokenRegistryForTests,
+  createMockSendTrackingForManualGmailSend,
+  recordMockOpenEvent,
+  getLeadOpenStats,
+  getOpenStatsForLeadIds,
+  getReferenceOpenRateMetrics,
+  getReferenceOpenRateMetricsSync,
+  findTrackingByLeadId,
+  registerMockOpenTrackingTokenForTests,
+} from './openTrackingStore.js';

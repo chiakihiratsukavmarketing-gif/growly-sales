@@ -522,6 +522,70 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
       return;
     }
 
+    if (req.method === 'POST' && pathname === '/api/mock/open-events') {
+      const body = await readJsonBody<{
+        token?: string;
+        tokenHash?: string;
+        userAgent?: string;
+      }>(req);
+      try {
+        const { recordMockOpenEvent } = await import('../mail-operations/openTrackingStore.js');
+        const result = await recordMockOpenEvent({
+          token: body.token,
+          tokenHash: body.tokenHash,
+          userAgent: body.userAgent,
+        });
+        sendJson(res, 200, {
+          event: result.event,
+          tracking: result.tracking,
+          mock: true,
+          message: 'mock 開封イベントを記録しました（参考値）',
+        });
+      } catch (err) {
+        sendApiError(
+          res,
+          400,
+          pathname,
+          err instanceof Error ? err.message : 'mock 開封イベントの記録に失敗しました'
+        );
+      }
+      return;
+    }
+
+    const sendRecordOpenStatsMatch = pathname.match(/^\/api\/send-records\/([^/]+)\/open-stats$/);
+    if (req.method === 'GET' && sendRecordOpenStatsMatch) {
+      const leadId = decodeURIComponent(sendRecordOpenStatsMatch[1]);
+      const { getLeadOpenStats, REFERENCE_OPEN_RATE_NOTE } = await import(
+        '../mail-operations/index.js'
+      );
+      const stats = await getLeadOpenStats(leadId);
+      sendJson(res, 200, {
+        leadId,
+        stats,
+        note: REFERENCE_OPEN_RATE_NOTE,
+        mock: true,
+      });
+      return;
+    }
+
+    if (req.method === 'GET' && pathname === '/api/open-tracking/sent-leads') {
+      const leadIdsParam = url.searchParams.get('leadIds') ?? '';
+      const leadIds = leadIdsParam
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean);
+      const { getOpenStatsForLeadIds, REFERENCE_OPEN_RATE_NOTE } = await import(
+        '../mail-operations/index.js'
+      );
+      const stats = await getOpenStatsForLeadIds(leadIds);
+      sendJson(res, 200, {
+        stats,
+        note: REFERENCE_OPEN_RATE_NOTE,
+        mock: true,
+      });
+      return;
+    }
+
     if (req.method === 'POST' && pathname === '/api/mock/unsubscribe/register') {
       const body = await readJsonBody<{ emailAddress?: string; leadId?: string; companyId?: string }>(req);
       const emailAddress = body.emailAddress?.trim();

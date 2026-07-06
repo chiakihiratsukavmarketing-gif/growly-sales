@@ -216,5 +216,16 @@ export async function recordManualGmailSent(
   if (!found) throw new LeadNotFoundError(leadId);
   await saveLeadsToJson(jsonPath, updated);
   await saveLeadsToCsv(csvPath, updated);
-  return { lead: found, preview: buildManualGmailSendPreview(found) };
+
+  const preview = buildManualGmailSendPreview(found);
+  try {
+    const { createMockSendTrackingForManualGmailSend } = await import(
+      '../mail-operations/openTrackingStore.js'
+    );
+    await createMockSendTrackingForManualGmailSend(found, preview, sentAt);
+  } catch {
+    // 開封計測 mock は送信記録の成否に影響しない
+  }
+
+  return { lead: found, preview };
 }

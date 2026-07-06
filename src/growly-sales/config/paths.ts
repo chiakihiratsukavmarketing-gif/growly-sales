@@ -116,6 +116,14 @@ export function getOutreachTemplateDefaultsPath(): string {
   return join(getConfigRoot(), 'outreach-template-defaults.json');
 }
 
+export function getEmailOpenEventsPath(): string {
+  return join(getGrowlySalesDataDir(), 'email-open-events.json');
+}
+
+export function getEmailSendTrackingPath(): string {
+  return join(getGrowlySalesDataDir(), 'email-send-tracking.json');
+}
+
 export function getUiDistDir(): string {
   return join(getProjectRoot(), 'dist', 'ui');
 }

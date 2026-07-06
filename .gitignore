@@ -29,3 +29,7 @@ data/growly-sales/mail-suppressions.json
 
 # Phase 43 mock outreach templates runtime (do not commit)
 data/growly-sales/outreach-templates.json
+
+# Phase 43 mock open tracking runtime (do not commit)
+data/growly-sales/email-open-events.json
+data/growly-sales/email-send-tracking.json

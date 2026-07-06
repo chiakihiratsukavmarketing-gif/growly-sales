@@ -28,6 +28,27 @@ import {
   type WeeklySalesSummary,
 } from './buildWeeklySalesSummary.js';
 import { buildTodaySalesQueue, type SalesQueueItem } from './buildTodaySalesQueue.js';
+import {
+  getReferenceOpenRateMetricsSync,
+} from '../mail-operations/openTrackingStore.js';
+import type { ReferenceOpenRateMetrics } from '../mail-operations/openTrackingTypes.js';
+import { loadMailSuppressionStoreSync } from '../mail-operations/suppressionStore.js';
+import { isActiveSuppressionStatus } from '../mail-operations/suppressionTypes.js';
+import { OPEN_TRACKING_PRIVACY_NOTE } from '../mail-operations/openTrackingPrivacy.js';
+
+export type { ReferenceOpenRateMetrics };
+
+export interface MailOpsReferenceMetrics {
+  manualSentCount: number;
+  trackableSendCount: number;
+  openedSendCount: number;
+  referenceOpenRate: number | null;
+  replyCount: number;
+  referenceReplyRate: number | null;
+  activeSuppressionCount: number;
+  referenceSuppressionRate: number | null;
+  note: string;
+}
 
 export type { DailyChecklistItem };
 
@@ -113,6 +134,8 @@ export interface SalesDashboard {
   requestedReportLeadsPreview: { leadId: string; companyName: string }[];
   todaySalesQueue: SalesQueueItem[];
   gmailDraftCandidatesPreview: EmailOutreachCandidateView[];
+  referenceOpenRate: ReferenceOpenRateMetrics;
+  mailOpsReference: MailOpsReferenceMetrics;
 }
 
 function buildMimeVerificationStatus(): MimeVerificationStatus {
@@ -286,6 +309,35 @@ export function buildTopRecommendedAction(
   };
 }
 
+function buildMailOpsReferenceMetrics(
+  leads: Lead[],
+  openRate: ReferenceOpenRateMetrics
+): MailOpsReferenceMetrics {
+  const sentLeads = leads.filter(
+    (l) => l.sendStatus === 'sent' || l.sendStatus === 'manual_sent'
+  );
+  const manualSentCount = sentLeads.length;
+  const replyCount = sentLeads.filter(
+    (l) => l.replyStatus && l.replyStatus !== 'none'
+  ).length;
+  const suppressionStore = loadMailSuppressionStoreSync();
+  const activeSuppressionCount = suppressionStore.records.filter((r) =>
+    isActiveSuppressionStatus(r.status)
+  ).length;
+  return {
+    manualSentCount,
+    trackableSendCount: openRate.trackableSendCount,
+    openedSendCount: openRate.openedSendCount,
+    referenceOpenRate: openRate.referenceOpenRate,
+    replyCount,
+    referenceReplyRate: manualSentCount > 0 ? replyCount / manualSentCount : null,
+    activeSuppressionCount,
+    referenceSuppressionRate:
+      manualSentCount > 0 ? activeSuppressionCount / manualSentCount : null,
+    note: OPEN_TRACKING_PRIVACY_NOTE,
+  };
+}
+
 export function buildSalesDashboard(leads: Lead[], offer?: OfferProfile): SalesDashboard {
   const initialEmailSentCount = leads.filter((l) => l.sendStatus === 'sent').length;
   const manualSentCount = leads.filter((l) => l.sendStatus === 'manual_sent').length;
@@ -322,6 +374,8 @@ export function buildSalesDashboard(leads: Lead[], offer?: OfferProfile): SalesD
     }),
   };
   const todaySalesQueue = buildTodaySalesQueue(leads, offer);
+  const referenceOpenRate = getReferenceOpenRateMetricsSync();
+  const mailOpsReference = buildMailOpsReferenceMetrics(leads, referenceOpenRate);
 
   return {
     metrics: {
@@ -357,5 +411,7 @@ export function buildSalesDashboard(leads: Lead[], offer?: OfferProfile): SalesD
     gmailDraftCandidatesPreview: readyTargets
       .slice(0, 8)
       .map((lead) => buildEmailOutreachCandidateView(lead, offer)),
+    referenceOpenRate,
+    mailOpsReference,
   };
 }
