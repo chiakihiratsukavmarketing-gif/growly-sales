@@ -86,11 +86,11 @@
 | live | 未接続 |
 | 人間作業待ち | 本番テンプレート運用方針の承認 |
 
-### 2026-07-06 — Phase 43.4 開封計測 mock ✅
+### 2026-07-06 — Phase 43.4 開封計測 mock ✅ pushed `fc1a686`
 
 | 項目 | 内容 |
 |------|------|
-| 進行 | Phase 43 **4 / 4**（mock 実装完了） |
+| 進行 | Phase 43 **4 / 4** mock 完了・pushed `fc1a686` |
 | 型・store | `openTrackingTypes.ts` / `email-send-tracking.json` + `email-open-events.json`（gitignore） |
 | トークン | `tokenHash` のみ保存（生 token 非永続） |
 | フック | 手動送信記録時のみ mock tracking 作成（suppression 済みは発行しない・既存送信記録は不変） |
