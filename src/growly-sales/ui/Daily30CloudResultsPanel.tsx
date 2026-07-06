@@ -6,17 +6,12 @@ import { confirmDaily30CandidateExclude } from './confirmDaily30CandidateExclude
 import { fetchDaily30Dashboard, type Daily30DashboardResponse } from './daily30Api.js';
 import { EmptyState } from './common/EmptyState.js';
 import { DevDetails } from './common/DevDetails.js';
-import { Daily30RunCollectionProfileSummary } from './Daily30RunCollectionProfileSummary.js';
-import { InfoBanner } from './InfoBanner.js';
 import { isDevApiErrorMessage } from './displayLabels.js';
-import { cloudRunStatusLabel } from './daily30StatusLabels.js';
 import {
   Daily30CandidateList,
   Daily30CandidateQueueHeader,
-  pipelineCountChips,
   workQueueTitleForFilter,
 } from './Daily30CandidateCards.js';
-import { Daily30ExternalReferenceSupplementBanner } from './Daily30ExternalReferenceSupplementBanner.js';
 import { filterDaily30UiListCandidates } from './daily30ExcludeUi.js';
 import { filterByCompanyName } from './leadFilterUtils.js';
 import { CandidateDisplayModeToggle } from './CandidateDisplayModeToggle.js';
@@ -38,32 +33,6 @@ interface Daily30CloudResultsPanelProps {
   sessionExcludedIds?: ReadonlySet<string>;
   onMarkExcluded?: (candidateId: string) => void;
   onDisplayModeChange?: (mode: CandidateDisplayMode) => void;
-}
-
-function formatTimestamp(iso: string | null): string {
-  if (!iso) return '—';
-  try {
-    return new Date(iso).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
-  } catch {
-    return iso;
-  }
-}
-
-function bannerVariant(status: string): 'success' | 'warning' | 'danger' | 'info' {
-  if (status === 'success') return 'success';
-  if (status === 'partial_success') return 'warning';
-  if (status === 'failed') return 'danger';
-  if (status === 'blocked') return 'warning';
-  return 'info';
-}
-
-function countByPipeline(candidates: ExternalLeadCandidate[]): Record<string, number> {
-  const m: Record<string, number> = {};
-  for (const c of candidates) {
-    const k = c.pipelineStatus || 'unknown';
-    m[k] = (m[k] ?? 0) + 1;
-  }
-  return m;
 }
 
 function collectPrefectureOptions(candidates: ExternalLeadCandidate[]): string[] {
@@ -303,9 +272,6 @@ export function Daily30CloudResultsPanel({
     );
   }
 
-  const isGcs = data.storageBackend === 'gcs';
-  const pipelineCounts = countByPipeline(allCandidates);
-  const humanExcludedCount = data.humanExcludedCount ?? 0;
   const queueTitle = workQueueTitleForFilter(filter);
 
   return (
@@ -351,7 +317,7 @@ export function Daily30CloudResultsPanel({
                       <option value="approvable">承認可能</option>
                       <option value="not_approvable">承認不可</option>
                       <option value="email_ok">メール確認済み</option>
-                      <option value="email_missing">メール未確認</option>
+                      <option value="email_missing">メール未確認（フォームのみ含む）</option>
                     </select>
                     <select className="input" value={prefecture} onChange={(e) => setPrefecture(e.target.value)}>
                       <option value="all">都道府県: すべて</option>
@@ -407,7 +373,7 @@ export function Daily30CloudResultsPanel({
                     <option value="approvable">承認可能</option>
                     <option value="not_approvable">承認不可</option>
                     <option value="email_ok">メール確認済み</option>
-                    <option value="email_missing">メール未確認</option>
+                    <option value="email_missing">メール未確認（フォームのみ含む）</option>
                   </select>
                   <select className="input" value={prefecture} onChange={(e) => setPrefecture(e.target.value)}>
                     <option value="all">都道府県: すべて</option>
@@ -519,147 +485,6 @@ export function Daily30CloudResultsPanel({
           </section>
         </div>
       </div>
-
-      {displayMode !== 'focus' ? (
-      <aside className="daily30-candidate-work-aux" aria-label="候補収集の補助情報">
-        {humanExcludedCount > 0 ? (
-          <p className="hint daily30-excluded-hint">除外済み {humanExcludedCount}件</p>
-        ) : null}
-
-        {(data.humanExcludedCandidates?.length ?? 0) > 0 ? (
-          <DevDetails title={`除外済み候補（${data.humanExcludedCandidates!.length}件）`}>
-            <ul className="hint-list daily30-excluded-dev-list">
-              {data.humanExcludedCandidates!.map((c) => (
-                <li key={c.externalCandidateId}>
-                  {c.companyName} — {c.excludedReason ?? '理由未記録'}（{c.excludedAt ?? '—'}）
-                </li>
-              ))}
-            </ul>
-          </DevDetails>
-        ) : null}
-
-        <DevDetails title="今日の収集情報" className="daily30-collection-info-collapse">
-        <InfoBanner variant={bannerVariant(data.status)}>
-          <span className="daily30-run-banner">
-            <strong>{cloudRunStatusLabel(data.status)}</strong>
-            {isGcs ? (
-              <>
-                {' · '}
-                メール取得済（収集時） <strong>{data.emailFound}件</strong> / {data.targetEmailFound ?? 30}
-                {' · '}
-                総収集 <strong>{data.totalCollected ?? data.collected}件</strong>
-              </>
-            ) : (
-              <> · ローカル保存</>
-            )}
-            {' · '}
-            次回 {data.nextScheduledRun}
-          </span>
-        </InfoBanner>
-
-        <Daily30RunCollectionProfileSummary
-          title="今回使用した収集設定"
-          runContext={data.lastRunResolvedContext ?? data.resolvedForToday}
-          areasUsed={data.lastRunAreasUsed}
-          scheduleSourceLabel={data.lastRunScheduleSource ?? undefined}
-        />
-        {data.lastRunScheduleWarning ? (
-          <p className="hint warning-text daily30-run-profile-warning-banner">{data.lastRunScheduleWarning}</p>
-        ) : null}
-
-        <Daily30ExternalReferenceSupplementBanner summary={data} />
-
-        <div className="hint daily30-pipeline-summary">
-          パイプライン内訳: {pipelineCountChips(pipelineCounts) ?? '—'}
-        </div>
-
-        <dl className="daily30-run-meta">
-          <div>
-            <dt>collectionProfile</dt>
-            <dd>{data.lastRunCollectionProfileName ?? '—'}</dd>
-          </div>
-          <div>
-            <dt>schedule source</dt>
-            <dd>{data.lastRunScheduleSource ?? '—'}</dd>
-          </div>
-          <div>
-            <dt>areas used</dt>
-            <dd>{data.lastRunAreasUsed?.length ? data.lastRunAreasUsed.join(', ') : '—'}</dd>
-          </div>
-          <div>
-            <dt>batchId</dt>
-            <dd>{data.batchId}</dd>
-          </div>
-          <div>
-            <dt>mode</dt>
-            <dd>{data.mode}</dd>
-          </div>
-          <div>
-            <dt>収集時メール取得</dt>
-            <dd>
-              {data.emailFound} / {data.targetEmailFound ?? 30}
-            </dd>
-          </div>
-          <div>
-            <dt>総収集候補</dt>
-            <dd>{data.totalCollected ?? data.collected}</dd>
-          </div>
-          <div>
-            <dt>フォームのみ</dt>
-            <dd>{data.formOnly ?? 0}</dd>
-          </div>
-          <div>
-            <dt>導線なし</dt>
-            <dd>{data.noEmail ?? 0}</dd>
-          </div>
-          <div>
-            <dt>stoppedReason</dt>
-            <dd>{data.stoppedReason ?? '—'}</dd>
-          </div>
-          <div>
-            <dt>duplicates</dt>
-            <dd>{data.duplicates}</dd>
-          </div>
-          <div>
-            <dt>excluded</dt>
-            <dd>{data.excluded}</dd>
-          </div>
-          <div>
-            <dt>humanExcluded</dt>
-            <dd>{humanExcludedCount}</dd>
-          </div>
-          <div>
-            <dt>最終実行</dt>
-            <dd>{formatTimestamp(data.finishedAt)}</dd>
-          </div>
-          {data.durationMs != null ? (
-            <div>
-              <dt>所要時間</dt>
-              <dd>{Math.round(data.durationMs / 1000)}秒</dd>
-            </div>
-          ) : null}
-          <div>
-            <dt>Scheduler</dt>
-            <dd>{data.schedulerConfigured ? '設定済み' : '未設定'}</dd>
-          </div>
-          {data.errorCode ? (
-            <div className="daily30-run-meta-error">
-              <dt>errorCode</dt>
-              <dd>
-                <code>{data.errorCode}</code>
-              </dd>
-            </div>
-          ) : null}
-          {data.recoveryHint ? (
-            <div className="daily30-run-meta-error daily30-run-meta-wide">
-              <dt>recoveryHint</dt>
-              <dd>{data.recoveryHint}</dd>
-            </div>
-          ) : null}
-        </dl>
-        </DevDetails>
-      </aside>
-      ) : null}
     </>
   );
 }

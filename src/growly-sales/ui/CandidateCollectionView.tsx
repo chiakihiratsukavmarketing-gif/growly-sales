@@ -3,13 +3,11 @@ import { Daily30CloudResultsPanel } from './Daily30CloudResultsPanel.js';
 import { Daily30LeadCandidatesPanel } from './Daily30LeadCandidatesPanel.js';
 import { Daily30DraftImportPanel } from './Daily30DraftImportPanel.js';
 import { DevDetails } from './common/DevDetails.js';
-import { Daily30CollectionSchedulePanel } from './Daily30CollectionSchedulePanel.js';
 import { Daily30ManualExternalReferencePanel } from './Daily30ManualExternalReferencePanel.js';
 import { Daily30ExternalReferenceApprovalPanel } from './Daily30ExternalReferenceApprovalPanel.js';
 import type { Daily30DashboardResponse } from './daily30Api.js';
-import { Daily30OperationsPanel, Daily30SafetyRulesPanel } from './Daily30OperationsPanel.js';
-import { Daily30CloudStatusPanel } from './Daily30CloudStatusPanel.js';
-import { Daily30DashboardPanel } from './Daily30DashboardPanel.js';
+import { CandidateCollectionDetailsPanel } from './CandidateCollectionDetailsPanel.js';
+import { isDeveloperUiEnabled } from './developerUi.js';
 import type { CandidateDisplayMode } from './daily30CandidateFocusMode.js';
 
 interface CandidateCollectionViewProps {
@@ -58,7 +56,9 @@ export function CandidateCollectionView({
     () => new Set()
   );
   const [workView, setWorkView] = useState<CandidateCollectionWorkView>('results');
-  const [showScheduleDetails, setShowScheduleDetails] = useState(false);
+  const [showCollectionDetails, setShowCollectionDetails] = useState(false);
+  const [showScheduleEditor, setShowScheduleEditor] = useState(false);
+  const showDeveloperUi = isDeveloperUiEnabled();
   const [showExternalReferenceDrawer, setShowExternalReferenceDrawer] = useState(false);
   const [focusApprovalScreen, setFocusApprovalScreen] = useState(false);
 
@@ -87,9 +87,6 @@ export function CandidateCollectionView({
   const emailFoundAtCollection = daily30Loading
     ? null
     : (d?.emailFoundAtCollection ?? daily30?.emailFound ?? d?.emailFoundCount ?? null);
-  const totalCollected = cloudOk ? (d?.totalCollectedAtCollection ?? d?.totalCollected ?? 0) : null;
-  const formOnly = cloudOk ? (d?.formOnlyAtCollection ?? d?.formOnlyCount ?? 0) : null;
-  const noEmail = cloudOk ? (d?.noEmailAtCollection ?? d?.noEmailCount ?? 0) : null;
   const leadApprovalPending = daily30Loading ? null : (d?.leadApprovalPendingCount ?? 0);
   const copyGenerated = daily30Loading ? null : (d?.copyGeneratedCount ?? 0);
   const draftImportPending = daily30Loading ? null : (d?.draftImportPendingCount ?? d?.readyForDraftCount ?? 0);
@@ -104,7 +101,7 @@ export function CandidateCollectionView({
     return `${name}｜${strategy}｜${source}`;
   }, [cloudOk, daily30?.resolvedForToday]);
 
-  const resultsCount = cloudOk ? (daily30?.emailFoundCandidates?.length ?? daily30?.emailFound ?? null) : null;
+  const resultsCount = cloudOk ? (leadApprovalPending ?? 0) : null;
   const leadCount = cloudOk ? (leadApprovalPending ?? 0) : null;
   const draftCount = cloudOk ? (draftImportPending ?? 0) : null;
 
@@ -113,7 +110,7 @@ export function CandidateCollectionView({
     : !cloudOk
       ? '収集結果を読み込めません'
       : [
-          `収集時メール取得 ${emailFoundAtCollection ?? '—'} / ${target}`,
+          `メール営業候補 ${emailFoundAtCollection ?? '—'} / ${target}`,
           `Lead化承認待ち ${leadApprovalPending ?? '—'}`,
           `営業文生成済み ${copyGenerated ?? '—'}`,
           `取り込み待ち ${draftImportPending ?? '—'}`,
@@ -131,12 +128,6 @@ export function CandidateCollectionView({
             <strong>今日：</strong>
             <span>{todaySummaryLine}</span>
           </p>
-          {cloudOk && totalCollected != null ? (
-            <p className="hint candidate-path-summary-compact">
-              総収集候補 {totalCollected}件｜フォームのみ {formOnly ?? 0}件｜導線なし {noEmail ?? 0}件
-            </p>
-          ) : null}
-
           <div className="candidate-header-line candidate-header-tomorrow">
             <p className="candidate-header-tomorrow-text">
               <strong>明日：</strong>
@@ -146,28 +137,34 @@ export function CandidateCollectionView({
               <button
                 type="button"
                 className="btn btn-primary candidate-btn-toolbar"
-                onClick={() => setShowScheduleDetails(true)}
+                onClick={() => {
+                  setShowCollectionDetails(true);
+                  setShowScheduleEditor(true);
+                }}
               >
                 変更
               </button>
               <button
                 type="button"
                 className="btn btn-secondary candidate-btn-toolbar"
-                onClick={() => setShowScheduleDetails((v) => !v)}
+                onClick={() => setShowCollectionDetails((v) => !v)}
               >
                 詳細
               </button>
             </div>
           </div>
 
-          {showScheduleDetails ? (
-            <DevDetails title="明日の収集設定（詳細）" className="candidate-schedule-dev-details">
-              <Daily30CollectionSchedulePanel
+          {showCollectionDetails ? (
+            <div className="candidate-collection-details">
+              <CandidateCollectionDetailsPanel
+                daily30={daily30}
+                daily30Loading={daily30Loading}
+                showScheduleEditor={showScheduleEditor}
                 onError={onError}
                 onSuccess={onSuccess}
                 refreshKey={refreshKey}
               />
-            </DevDetails>
+            </div>
           ) : null}
         </div>
 
@@ -256,18 +253,11 @@ export function CandidateCollectionView({
         </div>
       ) : null}
 
-      <div className="candidate-collection-dev-zone">
-      <DevDetails title="運用・安全（開発者向け）">
-        <Daily30OperationsPanel onError={onError} refreshKey={refreshKey} />
-        <Daily30CloudStatusPanel onError={onError} refreshKey={refreshKey} />
-        <Daily30SafetyRulesPanel />
-        {workView === 'results' ? (
-          <DevDetails title="手動実行（開発者向け）">
-            <Daily30DashboardPanel onError={onError} refreshKey={refreshKey} onFetched={onDataChanged} />
-          </DevDetails>
-        ) : null}
-      </DevDetails>
-      </div>
+      {showDeveloperUi ? (
+        <div className="candidate-collection-dev-zone">
+          <p className="hint">開発者モード — 運用パネルは設定タブにもあります。</p>
+        </div>
+      ) : null}
     </div>
   );
 }

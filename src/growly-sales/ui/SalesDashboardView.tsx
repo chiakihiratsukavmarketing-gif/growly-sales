@@ -103,7 +103,7 @@ export function SalesDashboardView({
 
     if (emailShortfall != null && emailShortfall > 0) {
       return {
-        title: `収集時メール取得 ${emailFoundAtCollection} / ${target}`,
+        title: `メール営業候補 ${emailFoundAtCollection} / ${target}`,
         hint: '9時の自動収集後、候補収集で確認してください。',
         tab: 'candidate-collection',
         cta: '候補収集へ',
@@ -197,7 +197,7 @@ export function SalesDashboardView({
         <h3 className="dashboard-section-label">営業サイクル進捗</h3>
         <div className="dashboard-cycle-strip-row">
           <CycleStepCompact
-            label="収集時メール"
+            label="メール営業候補"
             count={daily30Loading ? null : emailFoundAtCollection}
             suffix={daily30Loading ? '' : `/${collectionTarget}`}
             loading={daily30Loading}

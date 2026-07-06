@@ -2,7 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { fetchSalesDashboard, type SalesDashboardResponse } from './salesDashboardApi.js';
 import { SectionCard } from './SectionCard.js';
 import { SignatureRefreshPanel } from './SignatureRefreshPanel.js';
-import { Daily30SafetyRulesPanel } from './Daily30OperationsPanel.js';
+import { Daily30SafetyRulesPanel, Daily30OperationsPanel } from './Daily30OperationsPanel.js';
+import { Daily30CloudStatusPanel } from './Daily30CloudStatusPanel.js';
+import { Daily30DashboardPanel } from './Daily30DashboardPanel.js';
+import { isDeveloperUiEnabled } from './developerUi.js';
 import { PageHeader } from './common/PageHeader.js';
 import { DevDetails } from './common/DevDetails.js';
 
@@ -98,6 +101,17 @@ export function SettingsView({ onError, onDataChanged }: SettingsViewProps) {
           </ul>
         </SectionCard>
         <Daily30SafetyRulesPanel />
+        {isDeveloperUiEnabled() ? (
+          <>
+            <Daily30OperationsPanel onError={onError} refreshKey={0} />
+            <Daily30CloudStatusPanel onError={onError} refreshKey={0} />
+            <Daily30DashboardPanel
+              onError={onError}
+              refreshKey={0}
+              onFetched={() => onDataChanged?.()}
+            />
+          </>
+        ) : null}
       </DevDetails>
     </div>
   );

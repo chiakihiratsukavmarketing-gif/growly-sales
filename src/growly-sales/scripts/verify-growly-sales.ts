@@ -2699,8 +2699,8 @@ async function verifyPhase23Daily30Collection(): Promise<void> {
   assert(uiServer.includes('/api/daily30-fetch'), 'uiServer exposes daily30-fetch');
   assert(uiServer.includes(FETCH_DAILY_30_CONFIRM_TOKEN), 'uiServer gates daily30-fetch');
 
-  const candidateView = await readFile(join(SRC_ROOT, 'ui/CandidateCollectionView.tsx'), 'utf-8');
-  assert(candidateView.includes('Daily30DashboardPanel'), 'CandidateCollectionView embeds Daily30 panel');
+  const settingsView = await readFile(join(SRC_ROOT, 'ui/SettingsView.tsx'), 'utf-8');
+  assert(settingsView.includes('Daily30DashboardPanel'), 'Settings embeds Daily30 manual fetch panel');
 
   const { buildDaily30Dashboard } = await import('../candidates/buildDaily30Dashboard.js');
   const { DAILY_30_TARGET } = await import('../candidates/daily30CandidateStatus.js');
@@ -3517,11 +3517,12 @@ async function verifyPhase33EmailFoundCollection(): Promise<void> {
   assert(stateFile.includes('partial_success'), 'duplicate guard includes partial_success');
 
   const candidateView = await readFile(join(SRC_ROOT, 'ui/CandidateCollectionView.tsx'), 'utf-8');
-  assert(candidateView.includes('収集時メール取得'), 'UI separates collection-time email KPI');
+  const detailsPanel = await readFile(join(SRC_ROOT, 'ui/CandidateCollectionDetailsPanel.tsx'), 'utf-8');
+  assert(candidateView.includes('メール営業候補'), 'UI separates email sales candidate KPI');
   assert(candidateView.includes('Lead化承認待ち'), 'UI shows lead approval pending');
   assert(!candidateView.includes('今日の収集'), 'UI removed misleading collected KPI label');
-  assert(candidateView.includes('総収集候補'), 'UI shows total collected helper');
-  assert(candidateView.includes('フォームのみ'), 'UI shows form-only helper');
+  assert(candidateView.includes('CandidateCollectionDetailsPanel'), 'UI moves total collected to details panel');
+  assert(detailsPanel.includes('問い合わせフォームのみ'), 'UI shows form-only in details');
 
   const {
     DAILY_30_TARGET_EMAIL_FOUND,
@@ -3975,7 +3976,7 @@ async function verifyPhase37PartialSuccessState(): Promise<void> {
   assert(dashboard.collectionRunStatus === 'partial_success', 'dashboard exposes run status');
 
   const candidateView = await readFile(join(SRC_ROOT, 'ui/CandidateCollectionView.tsx'), 'utf-8');
-  assert(candidateView.includes('収集時メール取得'), 'candidate view collection-time label');
+  assert(candidateView.includes('メール営業候補'), 'candidate view email sales label');
   assert(candidateView.includes('Lead化承認済み'), 'candidate view approved label');
   assert(candidateView.includes('daily30Loading'), 'candidate view handles loading');
 
@@ -5879,6 +5880,8 @@ async function verifyPhase414Daily30ExternalReferenceSupplement(): Promise<void>
   const dashboard = await readFile(join(SRC_ROOT, 'candidates/buildDaily30CloudDashboard.ts'), 'utf-8');
   const resultsPanel = await readFile(join(SRC_ROOT, 'ui/Daily30CloudResultsPanel.tsx'), 'utf-8');
   const collectionView = await readFile(join(SRC_ROOT, 'ui/CandidateCollectionView.tsx'), 'utf-8');
+  const detailsPanel = await readFile(join(SRC_ROOT, 'ui/CandidateCollectionDetailsPanel.tsx'), 'utf-8');
+  const settingsView = await readFile(join(SRC_ROOT, 'ui/SettingsView.tsx'), 'utf-8');
 
   assert(fetchSrc.includes('runDaily30ExternalReferenceSupplement'), 'fetch calls supplement');
   assert(fetchSrc.includes('resolveDiscoveryAdapterExecutionPlan') === false, 'fetch uses supplement module not direct plan');
@@ -5892,12 +5895,12 @@ async function verifyPhase414Daily30ExternalReferenceSupplement(): Promise<void>
   assert(cloudFetch.includes('previewDaily30ExternalReferenceSupplement'), 'dry run preview supplement');
   assert(cloudState.includes('externalReferenceSupplementMode'), 'state has supplement mode');
   assert(dashboard.includes('externalReferenceFieldsFromEntry'), 'dashboard exposes supplement fields');
-  assert(resultsPanel.includes('Daily30ExternalReferenceSupplementBanner'), 'results panel shows supplement');
-  assert(collectionView.includes('Daily30ExternalReferenceSupplementBanner'), 'collection view shows supplement');
+  assert(!resultsPanel.includes('Daily30ExternalReferenceSupplementBanner'), 'supplement moved out of results sidebar');
+  assert(detailsPanel.includes('Daily30ExternalReferenceSupplementBanner'), 'details panel shows supplement');
   assert(
-    collectionView.includes("from './Daily30DashboardPanel") ||
-      collectionView.includes('from "./Daily30DashboardPanel'),
-    'candidate collection view imports Daily30DashboardPanel'
+    settingsView.includes("from './Daily30DashboardPanel") ||
+      settingsView.includes('from "./Daily30DashboardPanel'),
+    'settings view imports Daily30DashboardPanel for developer mode'
   );
   assert(!cloudFetch.includes('messages.send'), 'phase41.4 no gmail send');
   assert(!cloudFetch.includes('users.drafts.create'), 'phase41.4 no drafts create');
@@ -7031,12 +7034,11 @@ async function verifyPhase428CandidateListLayoutFix(): Promise<void> {
     !leadPanel.includes('daily30-candidate-tools-sticky'),
     'lead panel removes sticky tools overlap'
   );
-  assert(cloudPanel.includes('daily30-candidate-work-aux'), 'results aux block separated');
+  assert(cloudPanel.includes('daily30-candidate-work-primary'), 'results primary work block');
   assert(leadPanel.includes('daily30-candidate-work-aux'), 'lead aux block separated');
   assert(
-    cloudPanel.includes('</div>\n\n      <aside className="daily30-candidate-work-aux"') ||
-      cloudPanel.includes('</div>\r\n\r\n      <aside className="daily30-candidate-work-aux"'),
-    'results aux is sibling after panel'
+    !cloudPanel.includes('daily30-candidate-work-aux'),
+    'results aux moved out of work panel'
   );
   assert(
     cloudPanel.includes('daily30-candidate-queue-list') &&
@@ -7156,8 +7158,9 @@ async function verifyPhase4212FocusApprovalScreen(): Promise<void> {
   assert(cloudPanel.includes('daily30-focus-mode-chrome'), 'results focus chrome');
   assert(leadPanel.includes('daily30-focus-mode-chrome'), 'lead focus chrome');
   assert(
-    cloudPanel.includes("displayMode !== 'focus'") && cloudPanel.includes('daily30-candidate-work-aux'),
-    'results aux hidden in focus mode'
+    collectionView.includes('CandidateCollectionDetailsPanel') &&
+      styles.includes('.candidate-collection-view-focus .candidate-collection-header-compactible'),
+    'collection details hidden in focus mode via compactible header'
   );
   assert(
     leadPanel.includes("displayMode !== 'focus'") && leadPanel.includes('daily30-candidate-work-aux'),
@@ -7442,6 +7445,90 @@ async function verifyPhase4219CollectionDestinationUrl(): Promise<void> {
   ok('Phase 42.19 collection destination URL checks passed');
 }
 
+async function verifyPhase4220CandidateCountAndDetailsCleanup(): Promise<void> {
+  const collectionView = await readFile(join(SRC_ROOT, 'ui/CandidateCollectionView.tsx'), 'utf-8');
+  const detailsPanel = await readFile(join(SRC_ROOT, 'ui/CandidateCollectionDetailsPanel.tsx'), 'utf-8');
+  const cloudPanel = await readFile(join(SRC_ROOT, 'ui/Daily30CloudResultsPanel.tsx'), 'utf-8');
+  const settingsView = await readFile(join(SRC_ROOT, 'ui/SettingsView.tsx'), 'utf-8');
+  const developerUi = await readFile(join(SRC_ROOT, 'ui/developerUi.ts'), 'utf-8');
+  const batchMetrics = await readFile(join(SRC_ROOT, 'candidates/daily30BatchMetrics.ts'), 'utf-8');
+
+  assert(collectionView.includes('メール営業候補'), 'header uses email sales candidate label');
+  assert(!collectionView.includes('candidate-path-summary-compact'), 'total collected removed from main header');
+  assert(!collectionView.includes('総収集候補'), 'legacy total collected label removed from header');
+  assert(collectionView.includes('leadApprovalPendingCount'), 'results tab uses approval pending count');
+  assert(
+    collectionView.includes('const resultsCount = cloudOk ? (leadApprovalPending ?? 0) : null'),
+    'results tab badge matches actionable queue count'
+  );
+  assert(collectionView.includes('CandidateCollectionDetailsPanel'), 'details panel component wired');
+  assert(collectionView.includes('showCollectionDetails'), 'details toggle in header');
+  assert(!collectionView.includes('運用・安全（開発者向け）'), 'ops/safety panel removed from normal view');
+
+  assert(detailsPanel.includes('全収集'), 'details shows total collected');
+  assert(detailsPanel.includes('メール営業候補'), 'details shows email sales count');
+  assert(detailsPanel.includes('問い合わせフォームのみ'), 'details shows form-only label');
+  assert(detailsPanel.includes('メール・フォームなし'), 'details shows no-contact label');
+  assert(detailsPanel.includes('除外済み候補'), 'details shows excluded section');
+  assert(detailsPanel.includes('収集条件・実行情報'), 'details shows run info section');
+
+  assert(!cloudPanel.includes('daily30-candidate-work-aux'), 'auxiliary sidebar removed from results panel');
+  assert(!cloudPanel.includes('今日の収集情報'), 'today collection info removed from results sidebar');
+
+  assert(developerUi.includes('isDeveloperUiEnabled'), 'developer UI gate exists');
+  assert(settingsView.includes('Daily30OperationsPanel'), 'operations panel available in settings dev section');
+  assert(settingsView.includes('isDeveloperUiEnabled'), 'settings gates developer panels');
+
+  assert(batchMetrics.includes('isDaily30EmailFoundCandidate'), 'email sales metric uses email_found candidates');
+  assert(batchMetrics.includes('isDaily30FormOnlyCandidate'), 'form-only tracked separately');
+  assert(batchMetrics.includes('isDaily30NoEmailCandidate'), 'no-contact tracked separately');
+
+  const { countDaily30BatchMetrics } = await import('../candidates/daily30BatchMetrics.js');
+  const batchId = '2026-07-05';
+  const emailCandidate = {
+    externalCandidateId: 'verify-4220-email',
+    pipelineStatus: 'email_found' as const,
+    collectionBatchId: batchId,
+    importStatus: 'preview' as const,
+    emailCandidates: ['info@example.test'],
+    contactFormUrl: null,
+    companyName: 'メールあり',
+  };
+  const formOnlyCandidate = {
+    externalCandidateId: 'verify-4220-form',
+    pipelineStatus: 'email_not_found' as const,
+    collectionBatchId: batchId,
+    importStatus: 'preview' as const,
+    emailCandidates: [],
+    contactFormUrl: 'https://example.test/contact',
+    companyName: 'フォームのみ',
+  };
+  const noContactCandidate = {
+    externalCandidateId: 'verify-4220-none',
+    pipelineStatus: 'email_not_found' as const,
+    collectionBatchId: batchId,
+    importStatus: 'preview' as const,
+    emailCandidates: [],
+    contactFormUrl: null,
+    companyName: '導線なし',
+  };
+
+  const metrics = countDaily30BatchMetrics(
+    [emailCandidate, formOnlyCandidate, noContactCandidate] as never[],
+    batchId
+  );
+  assert(metrics.emailFound === 1, 'email sales count excludes form-only and no-contact');
+  assert(metrics.formOnly === 1, 'form-only data preserved in metrics');
+  assert(metrics.noEmail === 1, 'no-contact data preserved in metrics');
+  assert(metrics.totalCollected === 3, 'total collected includes all categories');
+  assert(
+    metrics.emailFound + metrics.formOnly + metrics.noEmail === metrics.totalCollected,
+    'collection breakdown has no double counting'
+  );
+
+  ok('Phase 42.20 candidate count and details cleanup checks passed');
+}
+
 function verifyPhase20LiteEmailImprovement(): void {
   assert(MAX_ADDITIONAL_CONTACT_PAGES === 4, 'additional page limit is 4');
 
@@ -7673,12 +7760,12 @@ async function verifyPhaseCCloudDaily30Status(): Promise<void> {
 
   const candidateView = await readFile(join(SRC_ROOT, 'ui/CandidateCollectionView.tsx'), 'utf-8');
   assert(
-    candidateView.includes('収集時メール取得') || candidateView.includes('メール取得済'),
-    'candidate view shows email-found KPI'
+    candidateView.includes('メール営業候補'),
+    'candidate view shows email sales KPI'
   );
   assert(
-    candidateView.includes('総候補') || candidateView.includes('総収集候補'),
-    'candidate view shows total collected helper'
+    candidateView.includes('全収集') || candidateView.includes('CandidateCollectionDetailsPanel'),
+    'candidate view shows total collected in details'
   );
   assert(candidateView.includes('cloudOk'), 'candidate view handles cloud unavailable');
 
@@ -7854,6 +7941,7 @@ async function main(): Promise<void> {
   await verifyPhase4217SourceColumnWidth();
   await verifyPhase4218SourceUrlDisplay();
   await verifyPhase4219CollectionDestinationUrl();
+  await verifyPhase4220CandidateCountAndDetailsCleanup();
   verifyPhase20LiteEmailImprovement();
   await verifyPhase20LiteEmailImprovementAsync();
   await verifyPhaseBLeadInventory();
