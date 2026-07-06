@@ -13,7 +13,7 @@ export function CandidateDisplayModeToggle({
     <div className="candidate-display-mode-toggle" role="group" aria-label="表示モード">
       <button
         type="button"
-        className={`btn btn-sm ${mode === 'focus' ? 'btn-primary' : 'btn-secondary'}`}
+        className={`btn candidate-btn-toolbar ${mode === 'focus' ? 'btn-primary' : 'btn-secondary'}`}
         disabled={disabled}
         aria-pressed={mode === 'focus'}
         onClick={() => onChange('focus')}
@@ -22,7 +22,7 @@ export function CandidateDisplayModeToggle({
       </button>
       <button
         type="button"
-        className={`btn btn-sm ${mode === 'list' ? 'btn-primary' : 'btn-secondary'}`}
+        className={`btn candidate-btn-toolbar ${mode === 'list' ? 'btn-primary' : 'btn-secondary'}`}
         disabled={disabled}
         aria-pressed={mode === 'list'}
         onClick={() => onChange('list')}

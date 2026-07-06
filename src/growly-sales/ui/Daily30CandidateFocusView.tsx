@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
 import type { ExternalLeadCandidate } from '../adapters/externalLeadCandidateTypes.js';
-import { resolveEmailSourceFromCandidate } from '../candidates/resolveEmailSourceDisplay.js';
+import {
+  resolveEmailSourceFromCandidate,
+  shortenEmailSourceUrl,
+} from '../candidates/resolveEmailSourceDisplay.js';
 import { buildCollectionProfileDisplayFromCandidate } from '../candidates/resolveCollectionProfileDisplay.js';
-import { DevDetails } from './common/DevDetails.js';
-import { EmailSourceDisplay } from './EmailSourceDisplay.js';
 import {
   resolveFocusLeadability,
   type ApprovalBlockHints,
@@ -51,7 +52,6 @@ export interface Daily30CandidateFocusViewProps {
 }
 
 export function Daily30CandidateFocusView({
-  variant,
   title,
   candidate,
   approvalBlockHints,
@@ -134,9 +134,13 @@ export function Daily30CandidateFocusView({
   const siteUrl = candidate.officialSiteUrl ?? candidate.websiteUrl ?? '';
   const email = candidate.emailCandidates?.[0] ?? candidate.targetEmail ?? '';
   const emailSource = resolveEmailSourceFromCandidate(candidate);
-  const discoveryLabel =
-    candidate.discoverySourceLabel ?? candidate.discoverySource ?? '—';
-  buildCollectionProfileDisplayFromCandidate(candidate);
+  const profile = buildCollectionProfileDisplayFromCandidate(candidate);
+  const collectionSourceLabel = profile.discoverySourceLabel || '—';
+  const discoveryDetail =
+    profile.discoverySourceSiteLabel && profile.discoverySourceSiteLabel !== '—'
+      ? profile.discoverySourceSiteLabel
+      : collectionSourceLabel;
+  const discoveryUrl = profile.discoverySourceUrl;
   const leadability = resolveFocusLeadability(candidate, approvalBlockHints);
   const industryLabel = candidate.industryCategory ?? candidate.industry ?? '—';
   const prefecture = candidate.prefecture ?? candidate.area ?? '—';
@@ -147,74 +151,110 @@ export function Daily30CandidateFocusView({
     leadability.kind === 'approvable' &&
     candidate.importStatus !== 'approved_for_lead';
 
+  const emailSourceDetail = email
+    ? emailSource.emailSourceLabel || emailSource.emailSourceCompactLabel || '—'
+    : '—';
+  const emailSourceUrl = emailSource.emailSourceUrl?.trim() || '';
+
   return (
-    <div className="daily30-focus-panel">
-      <div className="daily30-focus-meta">
-        <h3 className="daily30-focus-queue-title">{title}</h3>
-        <p className="hint daily30-focus-counts">
-          残り <strong>{remainingCount}</strong>件
-          {processedCount > 0 ? (
-            <>
-              {' '}
-              ｜ 今日処理済み <strong>{processedCount}</strong>件
-            </>
-          ) : null}
-        </p>
-      </div>
+    <div className="daily30-focus-panel daily30-focus-approval-screen">
+      <header className="daily30-focus-topbar">
+        <div className="daily30-focus-topbar-title">
+          <h3 className="daily30-focus-queue-title">{title}</h3>
+          <span className="daily30-focus-counts">
+            残り <strong>{remainingCount}</strong>件
+            {processedCount > 0 ? (
+              <>
+                {' '}
+                ｜ 今日処理済み <strong>{processedCount}</strong>件
+              </>
+            ) : null}
+          </span>
+        </div>
+        <nav className="daily30-focus-topbar-nav" aria-label="候補ナビゲーション">
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            disabled={!canGoPrev || busy}
+            onClick={onPrev}
+          >
+            前へ
+          </button>
+          <span className="hint daily30-focus-position">
+            {focusIndex + 1} / {remainingCount}
+          </span>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            disabled={!canGoNext || busy}
+            onClick={onNext}
+          >
+            次へ
+          </button>
+        </nav>
+      </header>
 
-      <article className="daily30-focus-card">
-        <h4 className="daily30-focus-company">{candidate.companyName}</h4>
-        <p className="daily30-focus-subline">
-          {prefecture}｜{industryLabel}｜{discoveryLabel}
-        </p>
+      <article className="daily30-focus-card daily30-focus-card-grid">
+        <div className="daily30-focus-identity">
+          <h4 className="daily30-focus-company">{candidate.companyName}</h4>
+          <p className="daily30-focus-subline">
+            <span>{prefecture}</span>
+            <span className="daily30-focus-subline-sep">｜</span>
+            <span>{industryLabel}</span>
+            <span className="daily30-focus-subline-sep">｜</span>
+            <span>{collectionSourceLabel}</span>
+          </p>
+        </div>
 
-        <div className="daily30-focus-fields">
-          <div className="daily30-focus-field">
+        <div className="daily30-focus-grid">
+          <section className="daily30-focus-cell">
             <span className="daily30-focus-label">公式サイト</span>
-            <span className="daily30-focus-value">
-              {siteUrl ? <ExternalLink href={siteUrl} /> : '—'}
+            <span className="daily30-focus-value daily30-field-ellipsis">
+              {siteUrl ? <ExternalLink href={siteUrl} label={shortenEmailSourceUrl(siteUrl, 42)} /> : '—'}
             </span>
-          </div>
-          <div className="daily30-focus-field">
+          </section>
+          <section className="daily30-focus-cell">
             <span className="daily30-focus-label">代表メール</span>
             <span className="daily30-focus-value daily30-field-ellipsis" title={email}>
               {email || '—'}
             </span>
-          </div>
-          <div className="daily30-focus-field daily30-focus-field-wide">
+          </section>
+          <section className="daily30-focus-cell">
             <span className="daily30-focus-label">メール取得元</span>
-            <span className="daily30-focus-value">
-              {email ? (
-                <EmailSourceDisplay info={emailSource} variant="compact" showWarnings />
-              ) : (
-                '—'
-              )}
-            </span>
-          </div>
-          <div className="daily30-focus-field">
+            <span className="daily30-focus-value daily30-focus-email-source-detail">{emailSourceDetail}</span>
+            {email && emailSourceUrl ? (
+              <ExternalLink href={emailSourceUrl} label={shortenEmailSourceUrl(emailSourceUrl, 42)} />
+            ) : email ? (
+              <span className="hint daily30-focus-missing-url">メール取得元URL未確認</span>
+            ) : null}
+          </section>
+          <section className="daily30-focus-cell">
             <span className="daily30-focus-label">発見元</span>
-            <span className="daily30-focus-value">{discoveryLabel}</span>
-          </div>
+            <span className="daily30-focus-value">{discoveryDetail}</span>
+            {discoveryUrl ? (
+              <ExternalLink href={discoveryUrl} label={shortenEmailSourceUrl(discoveryUrl, 42)} />
+            ) : null}
+          </section>
         </div>
 
-        <div className="daily30-focus-judgment">
+        <div className="daily30-focus-judgment-bar">
           <span className="daily30-focus-label">判定</span>
-          <ul className="daily30-focus-judgment-list">
-            <li>{leadability.representativeEmailLabel}</li>
-            <li>{leadability.blockReasonJa ? leadability.blockReasonJa : 'ブロック理由なし'}</li>
-            <li>
-              <strong className={`daily30-focus-status daily30-focus-status-${leadability.kind}`}>
-                {leadability.label}
-              </strong>
-            </li>
-          </ul>
+          <p className="daily30-focus-judgment-text">
+            <span>{leadability.representativeEmailLabel}</span>
+            <span className="daily30-focus-judgment-sep">｜</span>
+            <span>{leadability.blockReasonJa ? leadability.blockReasonJa : 'ブロック理由なし'}</span>
+            <span className="daily30-focus-judgment-sep">｜</span>
+            <strong className={`daily30-focus-status daily30-focus-status-${leadability.kind}`}>
+              {leadability.label}
+            </strong>
+          </p>
         </div>
 
-        <div className="daily30-focus-actions">
+        <footer className="daily30-focus-actions">
           {showExclude && onExclude ? (
             <button
               type="button"
-              className="btn btn-exclude"
+              className="btn btn-exclude candidate-btn-focus"
               disabled={busy}
               onClick={onExclude}
             >
@@ -222,14 +262,19 @@ export function Daily30CandidateFocusView({
             </button>
           ) : null}
           {showDefer && onDefer ? (
-            <button type="button" className="btn btn-secondary" disabled={busy} onClick={onDefer}>
+            <button
+              type="button"
+              className="btn btn-secondary candidate-btn-focus"
+              disabled={busy}
+              onClick={onDefer}
+            >
               あとで確認
             </button>
           ) : null}
           {primaryAction === 'generate_copy' && onGenerateCopy ? (
             <button
               type="button"
-              className="btn btn-primary"
+              className="btn btn-primary candidate-btn-focus"
               disabled={busy}
               onClick={onGenerateCopy}
             >
@@ -244,76 +289,15 @@ export function Daily30CandidateFocusView({
           {canApprove && onApprove ? (
             <button
               type="button"
-              className="btn btn-primary"
+              className="btn btn-primary candidate-btn-focus"
               disabled={busy}
               onClick={onApprove}
             >
               {approving ? '承認中…' : 'Lead化承認'}
             </button>
           ) : null}
-        </div>
-
-        <DevDetails title="開発者向け詳細">
-          <dl className="daily30-focus-dev-dl">
-            <div>
-              <dt>候補ID</dt>
-              <dd>{candidate.externalCandidateId}</dd>
-            </div>
-            <div>
-              <dt>collectionProfileId</dt>
-              <dd>{candidate.collectionProfileId ?? '—'}</dd>
-            </div>
-            <div>
-              <dt>collectionRunId</dt>
-              <dd>{candidate.collectionRunId ?? candidate.collectionBatchId ?? '—'}</dd>
-            </div>
-            <div>
-              <dt>discoverySourceUrl</dt>
-              <dd>{candidate.discoverySourceUrl ?? '—'}</dd>
-            </div>
-            <div>
-              <dt>emailSourceUrl</dt>
-              <dd>{emailSource.emailSourceUrl ?? '—'}</dd>
-            </div>
-            <div>
-              <dt>pipelineStatus</dt>
-              <dd>{candidate.pipelineStatus}</dd>
-            </div>
-            <div>
-              <dt>importStatus</dt>
-              <dd>{candidate.importStatus}</dd>
-            </div>
-          </dl>
-        </DevDetails>
+        </footer>
       </article>
-
-      <div className="daily30-focus-nav">
-        <button
-          type="button"
-          className="btn btn-secondary btn-sm"
-          disabled={!canGoPrev || busy}
-          onClick={onPrev}
-        >
-          前へ
-        </button>
-        <span className="hint daily30-focus-position">
-          {focusIndex + 1} / {remainingCount}
-        </span>
-        <button
-          type="button"
-          className="btn btn-secondary btn-sm"
-          disabled={!canGoNext || busy}
-          onClick={onNext}
-        >
-          次へ
-        </button>
-      </div>
-      {!canGoPrev && remainingCount > 1 ? (
-        <p className="hint daily30-focus-nav-hint">先頭の候補です</p>
-      ) : null}
-      {!canGoNext && remainingCount > 1 ? (
-        <p className="hint daily30-focus-nav-hint">末尾の候補です</p>
-      ) : null}
     </div>
   );
 }
