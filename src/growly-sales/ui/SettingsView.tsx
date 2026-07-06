@@ -9,6 +9,7 @@ import { isDeveloperUiEnabled } from './developerUi.js';
 import { PageHeader } from './common/PageHeader.js';
 import { DevDetails } from './common/DevDetails.js';
 import { MailSuppressionListPanel } from './MailSuppressionListPanel.js';
+import { OutreachTemplatePanel } from './OutreachTemplatePanel.js';
 
 interface SettingsViewProps {
   onError: (message: string) => void;
@@ -91,6 +92,8 @@ export function SettingsView({ onError, onDataChanged }: SettingsViewProps) {
       />
 
       <MailSuppressionListPanel onError={onError} refreshKey={0} />
+
+      <OutreachTemplatePanel onError={onError} />
 
       <DevDetails title="開発者向け詳細（MIME・安全ルール）">
         <SectionCard title="MIME / Gmail下書き品質">

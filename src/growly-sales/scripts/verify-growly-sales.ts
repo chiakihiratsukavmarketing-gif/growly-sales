@@ -7791,6 +7791,145 @@ async function verifyPhase432OperationsLoggingPreserved(): Promise<void> {
   ok('Phase 43.2 operations logging preserved checks passed');
 }
 
+async function verifyPhase433TemplateTypes(): Promise<void> {
+  const types = await readFile(join(SRC_ROOT, 'mail-operations/templateTypes.ts'), 'utf-8');
+  assert(types.includes('OutreachTemplate'), 'OutreachTemplate type exists');
+  assert(types.includes('subjectTemplate'), 'subjectTemplate field');
+  assert(types.includes('aiEditableSlots'), 'aiEditableSlots field');
+  assert(types.includes('humanLockedBlocks'), 'humanLockedBlocks field');
+  ok('Phase 43.3 template types checks passed');
+}
+
+async function verifyPhase433TemplateStore(): Promise<void> {
+  const storeSrc = await readFile(join(SRC_ROOT, 'mail-operations/templateStore.ts'), 'utf-8');
+  assert(storeSrc.includes('setOutreachTemplateStoreOverrideForTests'), 'template store test override');
+  assert(storeSrc.includes('getOutreachTemplatesPath'), 'runtime template path referenced');
+
+  const {
+    setOutreachTemplateStoreOverrideForTests,
+    saveOutreachTemplateDraft,
+    activateOutreachTemplate,
+    loadActiveOutreachTemplateSync,
+  } = await import('../mail-operations/templateStore.js');
+
+  setOutreachTemplateStoreOverrideForTests({
+    version: 1,
+    templates: [],
+    activeTemplateId: null,
+    updatedAt: new Date().toISOString(),
+  });
+
+  const draft = await saveOutreachTemplateDraft({
+    name: 'verify-433',
+    subjectTemplate: '{{companyName}}様向けテスト',
+    openingBlock: '{{companyName}}\nご担当者様',
+    companyIntroBlock: '{{customOpening}}',
+    proposalBlock: '{{diagnosisBlock}}',
+    proofBlock: '免責文',
+    ctaBlock: '{{customCTA}}',
+    signatureBlock: '{{signature}}',
+  });
+  const activated = await activateOutreachTemplate(draft.templateId);
+  assert(activated?.status === 'active', 'template activated');
+  assert(loadActiveOutreachTemplateSync()?.templateId === draft.templateId, 'active template loaded');
+
+  setOutreachTemplateStoreOverrideForTests(null);
+  ok('Phase 43.3 template store checks passed');
+}
+
+async function verifyPhase433TemplateRenderer(): Promise<void> {
+  const { buildBuiltinDefaultTemplate } = await import('../mail-operations/templateStore.js');
+  const { renderOutreachTemplatePreview } = await import('../mail-operations/templateRenderer.js');
+  const offer = await loadOfferProfile();
+  const template = buildBuiltinDefaultTemplate();
+  const result = renderOutreachTemplatePreview(
+    template,
+    { companyName: 'テスト工務店', area: '仙台市', industry: '工務店' },
+    offer
+  );
+  assert(result.emailSubject.includes('テスト工務店'), 'preview subject uses company name');
+  assert(result.emailBody.includes('テスト工務店'), 'preview body uses company name');
+  assert(result.emailBody.includes('合同会社Want Reach'), 'preview includes signature block');
+
+  const generateSalesEmailSrc = await readFile(join(SRC_ROOT, 'generation/generateSalesEmail.ts'), 'utf-8');
+  assert(generateSalesEmailSrc.includes('loadActiveOutreachTemplateSync'), 'generateSalesEmail uses active template');
+  assert(generateSalesEmailSrc.includes('renderOutreachTemplate'), 'generateSalesEmail delegates to renderer');
+  ok('Phase 43.3 template renderer checks passed');
+}
+
+async function verifyPhase433TemplateApplyOnNextGenOnly(): Promise<void> {
+  const doc = await readFile(MAIL_OPS_UPGRADE_DOC, 'utf-8');
+  assert(doc.includes('次回'), 'doc says apply on next generation');
+  const storeSrc = await readFile(join(SRC_ROOT, 'mail-operations/templateStore.ts'), 'utf-8');
+  assert(!storeSrc.includes('saveLeadsToJson'), 'template store does not write leads');
+  const applySrc = await readFile(join(SRC_ROOT, 'generation/applyFullGeneration.ts'), 'utf-8');
+  assert(!applySrc.includes('outreach-templates'), 'applyFullGeneration does not bulk-rewrite from templates file');
+  ok('Phase 43.3 apply on next generation only checks passed');
+}
+
+async function verifyPhase433TemplateUi(): Promise<void> {
+  const settings = await readFile(join(SRC_ROOT, 'ui/SettingsView.tsx'), 'utf-8');
+  assert(settings.includes('OutreachTemplatePanel'), 'settings has template panel');
+  const panel = await readFile(join(SRC_ROOT, 'ui/OutreachTemplatePanel.tsx'), 'utf-8');
+  assert(panel.includes('TEMPLATE_ACTIVATE'), 'activate human approval token');
+  assert(panel.includes('次回生成から'), 'UI notes next generation apply');
+  const server = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
+  assert(server.includes('/api/outreach-templates'), 'template API exists');
+  assert(server.includes('/api/outreach-templates/preview'), 'template preview API');
+  ok('Phase 43.3 template UI checks passed');
+}
+
+async function verifyPhase433NoExistingLeadOverwrite(): Promise<void> {
+  const { setOutreachTemplateStoreOverrideForTests, saveOutreachTemplateDraft, activateOutreachTemplate } =
+    await import('../mail-operations/templateStore.js');
+  const { generateSalesEmail } = await import('../generation/generateSalesEmail.js');
+  const offer = await loadOfferProfile();
+
+  setOutreachTemplateStoreOverrideForTests({
+    version: 1,
+    templates: [],
+    activeTemplateId: null,
+    updatedAt: new Date().toISOString(),
+  });
+
+  const lead = createEmptyLead({
+    companyName: '既存Lead保存テスト',
+    area: '仙台市',
+    industry: '工務店',
+    websiteUrl: 'https://existing-lead.test',
+    emailSubject: '既存の件名を維持',
+    emailBody: '既存の本文を維持します。',
+  });
+
+  const beforeSubject = lead.emailSubject;
+  const beforeBody = lead.emailBody;
+
+  const draft = await saveOutreachTemplateDraft({
+    name: 'overwrite-guard',
+    subjectTemplate: '上書き禁止テスト件名',
+    openingBlock: '上書き禁止',
+    companyIntroBlock: '{{customOpening}}',
+    proposalBlock: '提案',
+    proofBlock: '免責',
+    ctaBlock: '{{customCTA}}',
+    signatureBlock: '{{signature}}',
+  });
+  await activateOutreachTemplate(draft.templateId);
+
+  assert(lead.emailSubject === beforeSubject, 'existing lead subject unchanged without regeneration');
+  assert(lead.emailBody === beforeBody, 'existing lead body unchanged without regeneration');
+
+  const generated = generateSalesEmail(lead, {
+    customHook: 'ホームページを拝見し、施工事例の見せ方に工夫を感じました。',
+    salesAngle: 'SNS診断',
+    offer,
+  });
+  assert(generated.emailSubject === '上書き禁止テスト件名', 'new generation uses active template subject');
+
+  setOutreachTemplateStoreOverrideForTests(null);
+  ok('Phase 43.3 no existing lead overwrite checks passed');
+}
+
 function verifyPhase20LiteEmailImprovement(): void {
   assert(MAX_ADDITIONAL_CONTACT_PAGES === 4, 'additional page limit is 4');
 
@@ -8216,6 +8355,12 @@ async function main(): Promise<void> {
   await verifyPhase432MockUnsubscribe();
   await verifyPhase432NoLiveMailChanges();
   await verifyPhase432OperationsLoggingPreserved();
+  await verifyPhase433TemplateTypes();
+  await verifyPhase433TemplateStore();
+  await verifyPhase433TemplateRenderer();
+  await verifyPhase433TemplateApplyOnNextGenOnly();
+  await verifyPhase433TemplateUi();
+  await verifyPhase433NoExistingLeadOverwrite();
   verifyPhase20LiteEmailImprovement();
   await verifyPhase20LiteEmailImprovementAsync();
   await verifyPhaseBLeadInventory();

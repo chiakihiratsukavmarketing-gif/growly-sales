@@ -108,6 +108,14 @@ export function getMailSuppressionsPath(): string {
   return join(getGrowlySalesDataDir(), 'mail-suppressions.json');
 }
 
+export function getOutreachTemplatesPath(): string {
+  return join(getGrowlySalesDataDir(), 'outreach-templates.json');
+}
+
+export function getOutreachTemplateDefaultsPath(): string {
+  return join(getConfigRoot(), 'outreach-template-defaults.json');
+}
+
 export function getUiDistDir(): string {
   return join(getProjectRoot(), 'dist', 'ui');
 }

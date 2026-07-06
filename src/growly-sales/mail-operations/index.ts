@@ -44,3 +44,31 @@ export {
 } from './suppressionPolicy.js';
 export { logSuppressionBlock } from './suppressionAudit.js';
 export { buildSuppressionBlocksForLeads } from './buildLeadSuppressionBlocks.js';
+export type {
+  OutreachTemplate,
+  OutreachTemplateStore,
+  OutreachTemplateStatus,
+  OutreachTemplateTone,
+  TemplatePreviewInput,
+} from './templateTypes.js';
+export {
+  OUTREACH_TEMPLATE_AI_SLOTS,
+  OUTREACH_TEMPLATE_HUMAN_BLOCKS,
+} from './templateTypes.js';
+export {
+  loadOutreachTemplateStore,
+  loadOutreachTemplateStoreSync,
+  loadActiveOutreachTemplateSync,
+  listOutreachTemplates,
+  saveOutreachTemplateDraft,
+  activateOutreachTemplate,
+  resetOutreachTemplatesToDefault,
+  buildBuiltinDefaultTemplate,
+  setOutreachTemplateStoreOverrideForTests,
+} from './templateStore.js';
+export {
+  renderOutreachTemplate,
+  renderOutreachTemplatePreview,
+  buildTemplateAiSlots,
+} from './templateRenderer.js';
+export { validateOutreachTemplate, validateOutreachTemplateForActivation, shouldApplyActiveTemplate, findUnresolvedTemplatePlaceholders } from './templatePolicy.js';

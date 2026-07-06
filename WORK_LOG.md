@@ -59,7 +59,20 @@
 
 ## 通常営業運用
 
-今回未取得（設計・mock実装セッション。件数は推測記録しない）
+今回未取得（テンプレート mock 実装セッション。件数は推測記録しない）
+
+### 2026-07-06 — Phase 43.3 カスタムメールテンプレート mock ✅
+
+| 項目 | 内容 |
+|------|------|
+| 進行 | Phase 43 **3 / 4** |
+| テンプレート型 | `templateTypes.ts` / `OutreachTemplate` |
+| mock store | `outreach-templates.json`（gitignore） |
+| レンダラー | `templateRenderer.ts` — 次回 `generateSalesEmail` から適用 |
+| UI | 設定「営業メールテンプレート」— 下書き・プレビュー・有効化（TEMPLATE_ACTIVATE） |
+| build / verify | `ui:build` ✅ / Phase 43.3 verify 6件 ✅ / 全体は既存失敗あり |
+| live | 未接続 |
+| 人間作業待ち | 本番テンプレート運用方針の承認 |
 
 ---
 

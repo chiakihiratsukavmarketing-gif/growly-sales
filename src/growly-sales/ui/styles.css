@@ -5986,3 +5986,54 @@ body {
   opacity: 0.55;
   cursor: not-allowed;
 }
+
+/* Phase 43.3 — outreach template UI */
+.template-editor-grid {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+}
+
+.template-field-locked textarea,
+.template-field-ai textarea,
+.template-field-locked input,
+.template-field-ai input {
+  width: 100%;
+}
+
+.template-field-ai {
+  border-left: 3px solid #2563eb;
+  padding-left: 0.5rem;
+}
+
+.template-field-locked {
+  border-left: 3px solid #64748b;
+  padding-left: 0.5rem;
+}
+
+.template-slot-hint {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.template-preview-body {
+  white-space: pre-wrap;
+  font-size: 0.82rem;
+  background: #f8fafc;
+  padding: 0.75rem;
+  border-radius: 4px;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.template-history-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 0.85rem;
+}
+
+.template-activate-panel {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border, #e2e8f0);
+}

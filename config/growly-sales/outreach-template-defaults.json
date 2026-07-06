@@ -1,0 +1,17 @@
+{
+  "templateId": "default-v1",
+  "name": "標準テンプレート（初期値）",
+  "version": 1,
+  "tone": "formal",
+  "subjectTemplate": "{{companyName}}様向け｜SNS無料診断レポートのご案内",
+  "openingBlock": "{{companyName}}\nご担当者様\n\n突然のご連絡失礼いたします。\nSNS運用サポートを行っております、合同会社Want Reachの平塚と申します。",
+  "companyIntroBlock": "{{customOpening}}",
+  "proposalBlock": "{{area}}で{{industry}}として活動されている{{companyName}}様向けに、{{offerName}}の{{entryOffer}}をご用意しております。\n\n【{{entryOffer}}で見られる項目の例】\n{{diagnosisBlock}}",
+  "proofBlock": "売上や問い合わせ数を保証するものではなく、公開情報をもとに改善のヒントをお伝えする内容です。",
+  "ctaBlock": "{{customCTA}}",
+  "signatureBlock": "{{signature}}",
+  "unsubscribeBlock": "",
+  "requiredPhrases": [],
+  "prohibitedPhrases": [],
+  "maxBodyLength": 4000
+}

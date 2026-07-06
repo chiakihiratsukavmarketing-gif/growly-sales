@@ -431,6 +431,97 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
       }
     }
 
+    if (req.method === 'GET' && pathname === '/api/outreach-templates') {
+      const {
+        listOutreachTemplates,
+        getActiveOutreachTemplate,
+      } = await import('../mail-operations/templateStore.js');
+      const store = await listOutreachTemplates();
+      sendJson(res, 200, {
+        ...store,
+        activeTemplate: getActiveOutreachTemplate(store),
+        generatedAt: new Date().toISOString(),
+        note: 'mockテンプレート。既存 Lead の営業文は変更しません。次回生成から適用。',
+      });
+      return;
+    }
+
+    if (req.method === 'POST' && pathname === '/api/outreach-templates/draft') {
+      const body = await readJsonBody<Partial<import('../mail-operations/templateTypes.js').OutreachTemplate> & { name?: string }>(req);
+      if (!body.name?.trim()) {
+        sendApiError(res, 400, pathname, 'name が必要です');
+        return;
+      }
+      const { saveOutreachTemplateDraft, validateOutreachTemplate } = await import('../mail-operations/index.js');
+      const template = await saveOutreachTemplateDraft(body as never);
+      const validation = validateOutreachTemplate(template);
+      sendJson(res, 200, {
+        template,
+        validation,
+        message: '下書きを保存しました（既存 Lead 本文は未変更）',
+      });
+      return;
+    }
+
+    if (req.method === 'POST' && pathname === '/api/outreach-templates/activate') {
+      const body = await readJsonBody<{ templateId?: string; confirmToken?: string }>(req);
+      if (body.confirmToken?.trim() !== 'TEMPLATE_ACTIVATE') {
+        sendApiError(res, 403, pathname, '確認トークン TEMPLATE_ACTIVATE が必要です（Human Approval）');
+        return;
+      }
+      const templateId = body.templateId?.trim();
+      if (!templateId) {
+        sendApiError(res, 400, pathname, 'templateId が必要です');
+        return;
+      }
+      const { activateOutreachTemplate, validateOutreachTemplateForActivation } = await import('../mail-operations/index.js');
+      const template = await activateOutreachTemplate(templateId);
+      if (!template) {
+        sendApiError(res, 404, pathname, 'テンプレートが見つかりません');
+        return;
+      }
+      const validation = validateOutreachTemplateForActivation(template);
+      if (!validation.ok) {
+        sendApiError(res, 400, pathname, validation.errors.join(' / '));
+        return;
+      }
+      sendJson(res, 200, {
+        template,
+        message: 'テンプレートを有効化しました。次回の営業文生成から適用されます。',
+      });
+      return;
+    }
+
+    if (req.method === 'POST' && pathname === '/api/outreach-templates/preview') {
+      const body = await readJsonBody<{
+        template?: Partial<import('../mail-operations/templateTypes.js').OutreachTemplate>;
+        preview?: import('../mail-operations/templateTypes.js').TemplatePreviewInput;
+      }>(req);
+      const offer = await loadOfferProfile();
+      const { buildBuiltinDefaultTemplate } = await import('../mail-operations/templateStore.js');
+      const { renderOutreachTemplatePreview } = await import('../mail-operations/templateRenderer.js');
+      const base = body.template?.templateId
+        ? { ...buildBuiltinDefaultTemplate(), ...body.template }
+        : { ...buildBuiltinDefaultTemplate(), ...body.template };
+      const preview = renderOutreachTemplatePreview(base, body.preview ?? {}, offer);
+      sendJson(res, 200, {
+        ...preview,
+        templateId: base.templateId ?? null,
+        mock: true,
+      });
+      return;
+    }
+
+    if (req.method === 'POST' && pathname === '/api/outreach-templates/reset-defaults') {
+      const { resetOutreachTemplatesToDefault } = await import('../mail-operations/templateStore.js');
+      const template = await resetOutreachTemplatesToDefault();
+      sendJson(res, 200, {
+        template,
+        message: '初期テンプレートを下書きとして読み込みました（有効化は別途必要）',
+      });
+      return;
+    }
+
     if (req.method === 'POST' && pathname === '/api/mock/unsubscribe/register') {
       const body = await readJsonBody<{ emailAddress?: string; leadId?: string; companyId?: string }>(req);
       const emailAddress = body.emailAddress?.trim();

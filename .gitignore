@@ -26,3 +26,6 @@ data/growly-sales/phase415h-compliance-dry-run-report.json
 
 # Phase 43 mock suppression runtime (do not commit)
 data/growly-sales/mail-suppressions.json
+
+# Phase 43 mock outreach templates runtime (do not commit)
+data/growly-sales/outreach-templates.json
