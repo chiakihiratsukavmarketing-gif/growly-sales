@@ -8,12 +8,14 @@ const API_BASE = '';
 export const GENERATE_DAILY_30_COPY_GATE_LABEL = 'GENERATE_DAILY_30_COPY';
 
 import type { Daily30LeadApprovalBlockHint } from '../candidates/getDaily30LeadApprovalBlockReason.js';
+import type { Daily30SuppressionBlockHint } from '../candidates/buildDaily30CopySuppressionHints.js';
 
 export interface Daily30LeadCandidatesResponse {
   reviewCandidates: ExternalLeadCandidate[];
   approvalPending: ExternalLeadCandidate[];
   approvedForLead: ExternalLeadCandidate[];
   approvalBlockHints?: Record<string, Daily30LeadApprovalBlockHint>;
+  copySuppressionHints?: Record<string, Daily30SuppressionBlockHint>;
   humanExcludedCount?: number;
   generatedAt: string;
   note: string;

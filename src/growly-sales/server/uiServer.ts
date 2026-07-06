@@ -190,7 +190,12 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
 
     if (req.method === 'GET' && pathname === '/api/leads') {
       const leads = await loadLeadsForApi('GET /api/leads');
-      sendJson(res, 200, { leads, leadsPath });
+      const { buildSuppressionBlocksForLeads } = await import('../mail-operations/buildLeadSuppressionBlocks.js');
+      sendJson(res, 200, {
+        leads,
+        leadsPath,
+        suppressionBlocks: buildSuppressionBlocksForLeads(leads),
+      });
       return;
     }
 
@@ -268,6 +273,182 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
         generatedAt: new Date().toISOString(),
         leadsPath,
         note: analytics.note,
+      });
+      return;
+    }
+
+      return;
+    }
+
+    if (req.method === 'GET' && pathname === '/api/mail-suppressions') {
+      const { listMailSuppressions, getMailOpsMode } = await import('../mail-operations/index.js');
+      const records = await listMailSuppressions();
+      sendJson(res, 200, {
+        records,
+        generatedAt: new Date().toISOString(),
+        mode: getMailOpsMode(),
+        note: 'mock配信禁止リスト。GCS live書き込み・公開URLは未接続です。',
+      });
+      return;
+    }
+
+    if (req.method === 'GET' && pathname === '/api/mail-suppressions/check') {
+      const { checkNotSuppressed } = await import('../mail-operations/index.js');
+      const leadId = url.searchParams.get('leadId')?.trim() || undefined;
+      const emailAddress = url.searchParams.get('emailAddress')?.trim() || undefined;
+      const result = checkNotSuppressed({
+        leadId,
+        emailAddress,
+        operation: 'select_draft_candidate',
+      });
+      if (result.allowed) {
+        sendJson(res, 200, {
+          allowed: true,
+          blockReason: null,
+          statusLabel: null,
+          blockedAt: null,
+        });
+        return;
+      }
+      const lines = result.blockedReason.split('\n');
+      sendJson(res, 200, {
+        allowed: false,
+        blockReason: result.blockedReason,
+        statusLabel: lines[0]?.replace(/^配信禁止：/, '') ?? null,
+        blockedAt: lines[1]?.replace(/^停止日時：/, '') ?? null,
+      });
+      return;
+    }
+
+    if (req.method === 'POST' && pathname === '/api/mail-suppressions/manual') {
+      const body = await readJsonBody<{
+        emailAddress?: string;
+        leadId?: string;
+        companyId?: string;
+        reason?: string;
+        confirmToken?: string;
+      }>(req);
+      if (body.confirmToken?.trim() !== 'SUPPRESSION_MANUAL') {
+        sendApiError(res, 403, pathname, '確認トークン SUPPRESSION_MANUAL が必要です');
+        return;
+      }
+      const emailAddress = body.emailAddress?.trim();
+      const reason = body.reason?.trim();
+      if (!emailAddress || !reason) {
+        sendApiError(res, 400, pathname, 'emailAddress と reason が必要です');
+        return;
+      }
+      const { addManualSuppression } = await import('../mail-operations/index.js');
+      const record = await addManualSuppression({
+        emailAddress,
+        leadId: body.leadId?.trim(),
+        companyId: body.companyId?.trim(),
+        reason,
+      });
+      sendJson(res, 200, {
+        record,
+        message: '配信禁止を手動登録しました（mock）',
+      });
+      return;
+    }
+
+    if (req.method === 'POST' && pathname === '/api/mail-suppressions/reactivate') {
+      const body = await readJsonBody<{
+        suppressionId?: string;
+        reactivationMemo?: string;
+        confirmToken?: string;
+      }>(req);
+      if (body.confirmToken?.trim() !== 'SUPPRESSION_REACTIVATE') {
+        sendApiError(res, 403, pathname, '確認トークン SUPPRESSION_REACTIVATE が必要です（Human Approval）');
+        return;
+      }
+      const suppressionId = body.suppressionId?.trim();
+      const reactivationMemo = body.reactivationMemo?.trim();
+      if (!suppressionId || !reactivationMemo) {
+        sendApiError(res, 400, pathname, 'suppressionId と reactivationMemo が必要です');
+        return;
+      }
+      const { reactivateSuppression } = await import('../mail-operations/index.js');
+      const record = await reactivateSuppression({ suppressionId, reactivationMemo });
+      if (!record) {
+        sendApiError(res, 404, pathname, 'suppression が見つかりません');
+        return;
+      }
+      sendJson(res, 200, {
+        record,
+        message: '配信禁止を解除しました（mock・Human Approval 記録済み）',
+      });
+      return;
+    }
+
+    const mockUnsubscribeMatch = pathname.match(/^\/api\/mock\/unsubscribe\/([^/]+)$/);
+    if (mockUnsubscribeMatch) {
+      const token = decodeURIComponent(mockUnsubscribeMatch[1]);
+      const { resolveMockUnsubscribeToken, confirmMockUnsubscribe } = await import(
+        '../mail-operations/suppressionStore.js'
+      );
+      const { isMockTokenExpired } = await import('../mail-operations/suppressionToken.js');
+      if (req.method === 'GET') {
+        const record = resolveMockUnsubscribeToken(token);
+        if (!record) {
+          sendJson(res, 200, { status: 'invalid_token', message: 'リンクが無効です', mock: true });
+          return;
+        }
+        if (isMockTokenExpired(record)) {
+          sendJson(res, 200, { status: 'expired_token', message: 'リンクの有効期限が切れています', mock: true });
+          return;
+        }
+        const masked = record.emailAddress.replace(/^(.).+(@.+)$/, '$1***$2');
+        sendJson(res, 200, {
+          status: 'ready',
+          message: '配信を停止しますか？（mock）',
+          emailMasked: masked,
+          mock: true,
+        });
+        return;
+      }
+      if (req.method === 'POST') {
+        const result = await confirmMockUnsubscribe(token);
+        if (!result.ok) {
+          sendJson(res, 200, {
+            ok: false,
+            status: result.status,
+            message: result.message,
+            mock: true,
+          });
+          return;
+        }
+        sendJson(res, 200, {
+          ok: true,
+          status: 'success',
+          message: result.alreadySuppressed
+            ? '既に配信停止済みです（冪等）'
+            : '配信を停止しました（mock）',
+          alreadySuppressed: result.alreadySuppressed,
+          mock: true,
+        });
+        return;
+      }
+    }
+
+    if (req.method === 'POST' && pathname === '/api/mock/unsubscribe/register') {
+      const body = await readJsonBody<{ emailAddress?: string; leadId?: string; companyId?: string }>(req);
+      const emailAddress = body.emailAddress?.trim();
+      if (!emailAddress) {
+        sendApiError(res, 400, pathname, 'emailAddress が必要です');
+        return;
+      }
+      const { registerMockUnsubscribeToken } = await import('../mail-operations/index.js');
+      const { token, previewPath } = registerMockUnsubscribeToken({
+        emailAddress,
+        leadId: body.leadId?.trim(),
+        companyId: body.companyId?.trim(),
+      });
+      sendJson(res, 200, {
+        token,
+        previewPath,
+        message: 'mockトークンを発行しました。生トークンはレスポンスのみで保存しません。',
+        mock: true,
       });
       return;
     }
@@ -427,11 +608,16 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
         leads,
         candidates
       );
+      const { buildDaily30CopySuppressionHints } = await import(
+        '../candidates/buildDaily30CopySuppressionHints.js'
+      );
+      const copySuppressionHints = buildDaily30CopySuppressionHints(approvedForLead);
       sendJson(res, 200, {
         reviewCandidates,
         approvalPending,
         approvedForLead,
         approvalBlockHints,
+        copySuppressionHints,
         humanExcludedCount: candidates.filter(isDaily30HumanExcludedCandidate).length,
         generatedAt: new Date().toISOString(),
         note: 'Lead化候補一覧。leads.json への自動取り込みは行いません。',

@@ -3,6 +3,7 @@ import type { OfferProfile } from '../config/offerProfile.js';
 import { selectGmailDraftTabLeads, selectGmailDraftCreationTargets } from '../outreach/outreachPolicy.js';
 import { isPendingGmailSendRecordLead } from '../workflow/recordManualGmailSent.js';
 import { selectAwaitingReplyLeads, inferNextActionForLead } from '../workflow/replyManagement.js';
+import { isFollowUpSuppressed, isResendSuppressed } from '../mail-operations/index.js';
 
 export type SalesQueueCategory =
   | 'requested_report_unhandled'
@@ -48,7 +49,9 @@ export function buildTodaySalesQueue(leads: Lead[], offer?: OfferProfile): Sales
   const requestedUnhandled = requestedReport.filter((l) => l.dealStatus === 'none');
   const requestedInProgress = requestedReport.filter((l) => l.dealStatus === 'open');
 
-  const followUpTargets = leads.filter((l) => inferNextActionForLead(l) === 'フォローアップ' && !l.doNotContact);
+  const followUpTargets = leads.filter(
+    (l) => inferNextActionForLead(l) === 'フォローアップ' && !l.doNotContact && !isFollowUpSuppressed(l)
+  );
   const followUpOverdue = followUpTargets.filter((l) => {
     if (!l.followUpDueAt) return false;
     const t = Date.parse(l.followUpDueAt);
@@ -57,6 +60,7 @@ export function buildTodaySalesQueue(leads: Lead[], offer?: OfferProfile): Sales
 
   const awaiting = selectAwaitingReplyLeads(leads);
   const noReply7Plus = awaiting.filter((l) => {
+    if (isResendSuppressed(l)) return false;
     const days = elapsedDaysFromSent(l, today);
     return days !== null && days >= 7;
   });

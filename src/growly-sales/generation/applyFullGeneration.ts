@@ -9,6 +9,7 @@ import { isInitialOutreachEligible, isFollowUpOnlyLead } from '../outreach/outre
 import { generateSalesAngle } from '../scoring/generateSalesAngle.js';
 import { scoreLead } from '../scoring/scoreLead.js';
 import { reviewSalesEmail } from '../review/reviewSalesEmail.js';
+import { assertNotSuppressed } from '../mail-operations/index.js';
 
 export interface GenerationProfiles {
   target: TargetProfile;
@@ -57,6 +58,14 @@ function preserveWorkflowState(before: Lead, after: Lead): Lead {
 }
 
 export function applyFullGenerationToLead(lead: Lead, profiles: GenerationProfiles): Lead {
+  const primaryEmail = lead.emailCandidates[0] ?? null;
+  assertNotSuppressed({
+    lead,
+    leadId: lead.id,
+    emailAddress: primaryEmail,
+    operation: 'generate_sales_copy',
+  });
+
   const now = new Date().toISOString();
   const salesAngle = generateSalesAngle(lead, profiles.offer);
   const leadScore = scoreLead(lead, profiles.target);

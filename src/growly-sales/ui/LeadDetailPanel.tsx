@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Lead } from '../../types/lead.js';
 import { resolveEmailSourceFromLead } from '../candidates/resolveEmailSourceDisplay.js';
 import { EmailSourceDisplay } from './EmailSourceDisplay.js';
@@ -9,6 +9,8 @@ import { leadListNextAction } from './leadDisplayUtils.js';
 import { CollectionProfileDisplay } from './CollectionProfileDisplay.js';
 import { buildCollectionProfileDisplayFromLead } from '../candidates/resolveCollectionProfileDisplay.js';
 import { DevDetails } from './common/DevDetails.js';
+import { SuppressionBlockBanner, isSuppressionBlockReason } from './SuppressionBlockBanner.js';
+import { checkSuppressionApi } from './mailSuppressionsApi.js';
 
 function shortenUrl(url: string, maxLen = 36): string {
   const trimmed = url.trim();
@@ -53,10 +55,26 @@ function UrlLink({ label, url }: { label: string; url: string | null }) {
 
 export function LeadDetailPanel({ lead, onUpdated, onError }: LeadDetailPanelProps) {
   const scrollRef = useRef<HTMLElement>(null);
+  const [suppressionBlock, setSuppressionBlock] = useState<string | null>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo(0, 0);
   }, [lead?.id]);
+
+  useEffect(() => {
+    if (!lead) {
+      setSuppressionBlock(null);
+      return;
+    }
+    void checkSuppressionApi({
+      leadId: lead.id,
+      emailAddress: lead.emailCandidates[0] ?? undefined,
+    })
+      .then((result) => {
+        setSuppressionBlock(result.allowed ? null : result.blockReason);
+      })
+      .catch(() => setSuppressionBlock(null));
+  }, [lead?.id, lead?.emailCandidates]);
 
   if (!lead) {
     return (
@@ -79,6 +97,7 @@ export function LeadDetailPanel({ lead, onUpdated, onError }: LeadDetailPanelPro
           <p className="detail-next-action">
             次アクション: <strong>{leadListNextAction(lead)}</strong>
           </p>
+          {suppressionBlock ? <SuppressionBlockBanner blockReason={suppressionBlock} /> : null}
         </header>
         <LeadReviewActions lead={lead} onUpdated={onUpdated} onError={onError} />
       </div>

@@ -20,6 +20,7 @@ import { DevDetails } from './common/DevDetails.js';
 import { EmptyState } from './common/EmptyState.js';
 import { SearchAndFilterBar } from './common/SearchAndFilterBar.js';
 import { FilterEmptyState } from './common/FilterEmptyState.js';
+import { SuppressionBlockBanner, isSuppressionBlockReason } from './SuppressionBlockBanner.js';
 import {
   DRAFT_CANDIDATE_FILTER_OPTIONS,
   filterByCompanyName,
@@ -158,9 +159,12 @@ export function GmailDraftCandidatesView({
           <div className="candidate-badges">
             <LeadStatusBadge kind="human" value={candidate.humanReviewStatus} />
           </div>
-          {!candidate.canCreate && candidate.blockReason && (
+          {!candidate.canCreate && candidate.blockReason && isSuppressionBlockReason(candidate.blockReason) ? (
+            <SuppressionBlockBanner blockReason={candidate.blockReason} />
+          ) : null}
+          {!candidate.canCreate && candidate.blockReason && !isSuppressionBlockReason(candidate.blockReason) ? (
             <p className="hint warning-text">{candidate.blockReason}</p>
-          )}
+          ) : null}
         </div>
         <div className="gmail-candidate-actions">
           {isPending ? (

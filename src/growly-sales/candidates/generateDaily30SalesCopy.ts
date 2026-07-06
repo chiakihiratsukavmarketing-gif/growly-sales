@@ -7,6 +7,9 @@ import { generateSalesAngle } from '../scoring/generateSalesAngle.js';
 import { scoreLead } from '../scoring/scoreLead.js';
 import { buildLeadStubFromExternalCandidate } from './buildLeadStubFromExternalCandidate.js';
 import { pickDaily30TargetEmail } from './pickDaily30TargetEmail.js';
+import { assertNotSuppressed, SuppressionBlockedError } from '../mail-operations/index.js';
+
+export { SuppressionBlockedError };
 
 export interface Daily30SalesCopyResult {
   candidate: ExternalLeadCandidate;
@@ -18,6 +21,15 @@ export function generateDaily30SalesCopyForCandidate(
   candidate: ExternalLeadCandidate,
   profiles: GenerationProfiles
 ): Daily30SalesCopyResult {
+  const targetEmail = pickDaily30TargetEmail(candidate.emailCandidates ?? []);
+  if (targetEmail) {
+    assertNotSuppressed({
+      emailAddress: targetEmail,
+      leadId: candidate.externalCandidateId,
+      operation: 'generate_sales_copy',
+    });
+  }
+
   const stubLead = buildLeadStubFromExternalCandidate(candidate);
   const salesAngle = generateSalesAngle(stubLead, profiles.offer);
   const leadScore = scoreLead(stubLead, profiles.target);
@@ -33,7 +45,6 @@ export function generateDaily30SalesCopyForCandidate(
     offer: profiles.offer,
   });
 
-  const targetEmail = pickDaily30TargetEmail(candidate.emailCandidates ?? []);
   const primarySourceUrl =
     candidate.emailCandidateSourceUrls?.[0]?.trim() ||
     candidate.sourceUrl?.trim() ||

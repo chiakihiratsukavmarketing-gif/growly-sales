@@ -12,6 +12,7 @@ import { containsProhibitedClaim } from '../config/offerProfileRules.js';
 import { containsProhibitedPhrase } from '../generation/generationUtils.js';
 import { hasEmailCandidates, hasContactForm, isFormCopyOnlyLead } from '../analytics/contactPathTypes.js';
 import { isFollowUpOnlyLead } from './outreachEligibility.js';
+import { getSuppressionExclusionReasonForLead } from '../mail-operations/index.js';
 
 export type OutreachDeferStatus =
   | 'email_ready'
@@ -86,6 +87,9 @@ export function isRepliedInitialOutreachExcluded(lead: Lead): boolean {
 
 /** Gmail下書き作成対象外の理由。null なら作成候補 */
 export function getGmailDraftExclusionReason(lead: Lead, offer?: OfferProfile): string | null {
+  const suppressionReason = getSuppressionExclusionReasonForLead(lead);
+  if (suppressionReason) return suppressionReason;
+
   if (!hasEmailCandidates(lead)) {
     if (hasContactForm(lead)) {
       return 'contactFormOnly（form_later・Gmail下書き対象外）';

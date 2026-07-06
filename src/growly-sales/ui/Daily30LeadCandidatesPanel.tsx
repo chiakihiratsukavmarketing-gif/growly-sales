@@ -24,6 +24,7 @@ import {
   type CandidateDisplayMode,
 } from './daily30CandidateFocusMode.js';
 import { useCandidateFocusQueue } from './useCandidateFocusQueue.js';
+import type { Daily30SuppressionBlockHint } from '../candidates/buildDaily30CopySuppressionHints.js';
 
 interface Daily30LeadCandidatesPanelProps {
   onError: (message: string) => void;
@@ -57,6 +58,9 @@ export function Daily30LeadCandidatesPanel({
 }: Daily30LeadCandidatesPanelProps) {
   const [loading, setLoading] = useState(true);
   const [approvedForLead, setApprovedForLead] = useState<ExternalLeadCandidate[]>([]);
+  const [copySuppressionHints, setCopySuppressionHints] = useState<
+    Record<string, Daily30SuppressionBlockHint>
+  >({});
   const [gateInput, setGateInput] = useState('');
   const [generating, setGenerating] = useState(false);
   const [generateMessage, setGenerateMessage] = useState<string | null>(null);
@@ -96,9 +100,11 @@ export function Daily30LeadCandidatesPanel({
   const copyTargets = useMemo(
     () =>
       approvedForLead.filter(
-        (c) => c.pipelineStatus === 'ready_for_copy' || c.pipelineStatus === 'needs_review'
+        (c) =>
+          (c.pipelineStatus === 'ready_for_copy' || c.pipelineStatus === 'needs_review') &&
+          !copySuppressionHints[c.externalCandidateId]
       ),
-    [approvedForLead]
+    [approvedForLead, copySuppressionHints]
   );
 
   const generateDisabledReason = resolveGenerateCopyDisabledReason(
@@ -112,6 +118,7 @@ export function Daily30LeadCandidatesPanel({
     try {
       const data = await fetchDaily30LeadCandidates();
       setApprovedForLead(filterDaily30UiListCandidates(data.approvedForLead, sessionExcludedIds));
+      setCopySuppressionHints(data.copySuppressionHints ?? {});
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Lead化候補の読み込みに失敗しました');
     } finally {
@@ -348,6 +355,7 @@ export function Daily30LeadCandidatesPanel({
                 layout="queue"
                 showApprove={false}
                 approvalBlockHints={{}}
+                copySuppressionHints={copySuppressionHints}
                 showActionColumn={false}
                 emptyMessage="表示できる候補がありません。"
               />

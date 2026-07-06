@@ -5920,3 +5920,69 @@ body {
 .daily30-run-profile-warning-banner {
   margin: 0.35rem 0 0.65rem;
 }
+
+/* Phase 43.2 — suppression UI */
+.suppression-block-banner {
+  margin: 0.5rem 0;
+  padding: 0.65rem 0.75rem;
+  border-left: 3px solid #b45309;
+  background: #fff7ed;
+  border-radius: 4px;
+}
+
+.suppression-block-title {
+  margin: 0;
+  font-weight: 700;
+  color: #9a3412;
+}
+
+.suppression-block-reason,
+.suppression-block-meta {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  color: #7c2d12;
+}
+
+.suppression-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.suppression-table-wrap {
+  overflow-x: auto;
+}
+
+.suppression-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.suppression-table th,
+.suppression-table td {
+  border-bottom: 1px solid var(--border, #e2e8f0);
+  padding: 0.4rem 0.5rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.suppression-mock-preview {
+  white-space: pre-wrap;
+  font-size: 0.8rem;
+  background: #f8fafc;
+  padding: 0.75rem;
+  border-radius: 4px;
+}
+
+.follow-up-lead-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.follow-up-lead-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

@@ -8,6 +8,7 @@ import { Daily30DashboardPanel } from './Daily30DashboardPanel.js';
 import { isDeveloperUiEnabled } from './developerUi.js';
 import { PageHeader } from './common/PageHeader.js';
 import { DevDetails } from './common/DevDetails.js';
+import { MailSuppressionListPanel } from './MailSuppressionListPanel.js';
 
 interface SettingsViewProps {
   onError: (message: string) => void;
@@ -88,6 +89,8 @@ export function SettingsView({ onError, onDataChanged }: SettingsViewProps) {
           void load();
         }}
       />
+
+      <MailSuppressionListPanel onError={onError} refreshKey={0} />
 
       <DevDetails title="開発者向け詳細（MIME・安全ルール）">
         <SectionCard title="MIME / Gmail下書き品質">

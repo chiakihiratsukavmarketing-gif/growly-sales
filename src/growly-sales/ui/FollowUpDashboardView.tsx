@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Lead } from '../../types/lead.js';
-import { fetchLeads } from './api.js';
 import { LeadStatusBadge } from './LeadStatusBadge.js';
 import { SectionCard } from './SectionCard.js';
 import { PageHeader } from './common/PageHeader.js';
@@ -14,6 +13,7 @@ import {
   matchesFollowUpFilter,
 } from './leadFilterUtils.js';
 import type { SalesFlowTab } from './GrowlySalesDashboard.js';
+import { SuppressionBlockBanner, isSuppressionBlockReason } from './SuppressionBlockBanner.js';
 
 interface FollowUpDashboardViewProps {
   onError: (message: string) => void;
@@ -45,6 +45,7 @@ export function FollowUpDashboardView({
   const [leads, setLeads] = useState<Lead[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [suppressionBlocks, setSuppressionBlocks] = useState<Record<string, string>>({});
 
   const today = useMemo(() => {
     const d = new Date();
@@ -55,8 +56,7 @@ export function FollowUpDashboardView({
   const contactedLeads = useMemo(
     () =>
       leads.filter(
-        (l) =>
-          (l.sendStatus === 'sent' || l.sendStatus === 'manual_sent') && !l.doNotContact
+        (l) => (l.sendStatus === 'sent' || l.sendStatus === 'manual_sent')
       ),
     [leads]
   );
@@ -76,10 +76,13 @@ export function FollowUpDashboardView({
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const allLeads = await fetchLeads();
-      setLeads(allLeads);
+      const res = await fetch('/api/leads');
+      if (!res.ok) throw new Error('リード一覧の取得に失敗しました');
+      const data = (await res.json()) as { leads: Lead[]; suppressionBlocks?: Record<string, string> };
+      setLeads(data.leads);
+      setSuppressionBlocks(data.suppressionBlocks ?? {});
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'フォローアップ情報の読み込みに失敗しました');
+      onError(err instanceof Error ? err.message : 'フォローアップ対象の読み込みに失敗しました');
     } finally {
       setLoading(false);
     }
@@ -148,6 +151,7 @@ export function FollowUpDashboardView({
                 emptyLabel={`${BUCKET_LABELS[bucket]}はありません`}
                 highlight={bucket === 'overdue'}
                 onOpenLead={(leadId) => onNavigateToTab?.('reply-management', leadId)}
+                suppressionBlocks={suppressionBlocks}
               />
             );
           })}
@@ -160,6 +164,7 @@ export function FollowUpDashboardView({
                 <FollowUpLeadButton
                   lead={l}
                   formatDue={formatDue}
+                  blockReason={suppressionBlocks[l.id] ?? null}
                   onOpen={() => onNavigateToTab?.('reply-management', l.id)}
                 />
               </li>
@@ -180,20 +185,33 @@ export function FollowUpDashboardView({
 function FollowUpLeadButton({
   lead,
   formatDue,
+  blockReason,
   onOpen,
 }: {
   lead: Lead;
   formatDue: (lead: Lead) => string;
+  blockReason: string | null;
   onOpen: () => void;
 }) {
+  const suppressed = Boolean(blockReason);
   return (
-    <button type="button" className="follow-up-lead-button" onClick={onOpen}>
-      <span className="follow-up-lead-name">{lead.companyName}</span>
-      <span className="follow-up-meta">
-        予定 {formatDue(lead)} · {lead.nextAction || '—'}
-      </span>
-      <span className="follow-up-lead-action-hint">返信管理で開く</span>
-    </button>
+    <div className="follow-up-lead-item">
+      {suppressed ? <SuppressionBlockBanner blockReason={blockReason} /> : null}
+      <button
+        type="button"
+        className="follow-up-lead-button"
+        onClick={onOpen}
+        disabled={suppressed}
+      >
+        <span className="follow-up-lead-name">{lead.companyName}</span>
+        <span className="follow-up-meta">
+          予定 {formatDue(lead)} · {lead.nextAction || '—'}
+        </span>
+        <span className="follow-up-lead-action-hint">
+          {suppressed ? '配信禁止のため操作不可' : '返信管理で開く'}
+        </span>
+      </button>
+    </div>
   );
 }
 
@@ -203,12 +221,14 @@ function FollowBucket({
   emptyLabel,
   highlight,
   onOpenLead,
+  suppressionBlocks,
 }: {
   title: string;
   items: Lead[];
   emptyLabel: string;
   highlight?: boolean;
   onOpenLead: (leadId: string) => void;
+  suppressionBlocks: Record<string, string>;
 }) {
   return (
     <SectionCard title={`${title}（${items.length}件）`} className={highlight ? 'follow-bucket-attn' : ''}>
@@ -221,6 +241,7 @@ function FollowBucket({
               <FollowUpLeadButton
                 lead={l}
                 formatDue={formatDue}
+                blockReason={suppressionBlocks[l.id] ?? null}
                 onOpen={() => onOpenLead(l.id)}
               />
             </li>

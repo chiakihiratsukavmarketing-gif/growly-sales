@@ -23,6 +23,7 @@ import {
   getGmailDraftExclusionReason,
   isGmailDraftEligible,
 } from '../outreach/outreachPolicy.js';
+import { assertNotSuppressed } from '../mail-operations/index.js';
 import {
   verifyLeadEmailBodyForGmailDraft,
   buildGmailDraftMimeChecklist,
@@ -110,6 +111,13 @@ async function loadLeadById(leadId: string): Promise<Lead> {
 }
 
 function assertEligibleForGmailDraftCreate(lead: Lead, offer?: OfferProfile): void {
+  assertNotSuppressed({
+    lead,
+    leadId: lead.id,
+    emailAddress: lead.emailCandidates[0] ?? null,
+    operation: 'create_gmail_draft',
+  });
+
   if (lead.sendStatus === 'sent' || lead.sendStatus === 'manual_sent') {
     throw new GmailDraftCreateNotAllowedError('送信済み Lead は Gmail 下書き作成対象外です');
   }

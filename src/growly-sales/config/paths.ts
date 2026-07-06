@@ -104,6 +104,10 @@ export function getDaily30CollectionSchedulePath(): string {
   return join(getGrowlySalesDataDir(), 'daily30-collection-schedule.json');
 }
 
+export function getMailSuppressionsPath(): string {
+  return join(getGrowlySalesDataDir(), 'mail-suppressions.json');
+}
+
 export function getUiDistDir(): string {
   return join(getProjectRoot(), 'dist', 'ui');
 }

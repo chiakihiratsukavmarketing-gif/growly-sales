@@ -363,6 +363,7 @@ export function Daily30CandidateList({
   onExclude,
   emptyMessage = '候補がありません。',
   approvalBlockHints = {},
+  copySuppressionHints = {},
   layout = 'card',
   showActionColumn = true,
 }: {
@@ -374,6 +375,7 @@ export function Daily30CandidateList({
   onExclude?: (candidate: ExternalLeadCandidate) => void;
   emptyMessage?: string;
   approvalBlockHints?: Record<string, { blockReason: string; duplicateLeadName?: string }>;
+  copySuppressionHints?: Record<string, { blockReason: string }>;
   layout?: 'card' | 'queue';
   showActionColumn?: boolean;
 }) {
@@ -384,6 +386,7 @@ export function Daily30CandidateList({
     <div className={`daily30-candidate-list ${layout === 'queue' ? 'daily30-candidate-list-queue' : 'daily30-candidate-list-compact'}`}>
       {candidates.map((c) => {
         const hint = approvalBlockHints[c.externalCandidateId];
+        const suppression = copySuppressionHints[c.externalCandidateId];
         return (
           <Daily30CandidateCard
             key={c.externalCandidateId}
@@ -394,7 +397,7 @@ export function Daily30CandidateList({
             excluding={excludingId === c.externalCandidateId}
             onApprove={onApprove ? () => onApprove(c) : undefined}
             onExclude={onExclude ? () => onExclude(c) : undefined}
-            approvalBlockReason={hint?.blockReason ?? null}
+            approvalBlockReason={suppression?.blockReason ?? hint?.blockReason ?? null}
             duplicateLeadName={hint?.duplicateLeadName ?? null}
             showActionColumn={showActionColumn}
           />

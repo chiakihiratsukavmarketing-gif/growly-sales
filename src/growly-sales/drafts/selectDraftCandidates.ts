@@ -4,6 +4,7 @@ import { containsProhibitedClaim } from '../config/offerProfile.js';
 import { containsProhibitedPhrase } from '../generation/generationUtils.js';
 import { hasEmailCandidates, hasContactForm } from '../analytics/contactPathTypes.js';
 import { isFollowUpOnlyLead } from '../outreach/outreachEligibility.js';
+import { getSuppressionExclusionReasonForLead } from '../mail-operations/index.js';
 import { MOJIBAKE_REPLACEMENT_CHAR } from '../storage/csvEncoding.js';
 
 export interface DraftCandidateRecord {
@@ -63,6 +64,9 @@ function findProhibitedPhrase(lead: Lead, offer?: OfferProfile): string | null {
 
 /** 下書きエクスポート対象外の理由。null なら候補 */
 export function getDraftExclusionReason(lead: Lead, offer?: OfferProfile): string | null {
+  const suppressionReason = getSuppressionExclusionReasonForLead(lead);
+  if (suppressionReason) return suppressionReason;
+
   if (isFollowUpOnlyLead(lead)) {
     return '初回営業済み・返信あり（フォローアップのみ・新規営業メール対象外）';
   }

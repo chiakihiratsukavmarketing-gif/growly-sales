@@ -7611,6 +7611,186 @@ async function verifyPhase434OpenTrackingDesign(): Promise<void> {
   ok('Phase 43.4 open tracking design checks passed');
 }
 
+async function verifyPhase432SuppressionTypes(): Promise<void> {
+  const types = await readFile(join(SRC_ROOT, 'mail-operations/suppressionTypes.ts'), 'utf-8');
+  assert(types.includes('MailSuppressionStatus'), 'suppression status type exists');
+  assert(types.includes('unsubscribed'), 'unsubscribed status');
+  assert(types.includes('manually_blocked'), 'manually_blocked status');
+  assert(types.includes('tokenHash'), 'tokenHash field');
+  assert(types.includes('SuppressionCheckResult'), 'check result union');
+  ok('Phase 43.2 suppression types checks passed');
+}
+
+async function verifyPhase432SuppressionStore(): Promise<void> {
+  const storeSrc = await readFile(join(SRC_ROOT, 'mail-operations/suppressionStore.ts'), 'utf-8');
+  assert(!storeSrc.includes('token: string') || storeSrc.includes('tokenHash'), 'store avoids persisting raw token');
+  assert(storeSrc.includes('setSuppressionStoreOverrideForTests'), 'test override exists');
+
+  const { normalizeEmailAddress, hashUnsubscribeToken } = await import('../mail-operations/suppressionToken.js');
+  assert(normalizeEmailAddress('  Info@Corp.TEST ') === 'info@corp.test', 'email normalize trim lowercase');
+  assert(normalizeEmailAddress('a.b+c@corp.test') === 'a.b+c@corp.test', 'no gmail dot/plus stripping');
+
+  const {
+    setSuppressionStoreOverrideForTests,
+    addManualSuppression,
+    listMailSuppressions,
+    clearMockUnsubscribeTokenRegistryForTests,
+  } = await import('../mail-operations/suppressionStore.js');
+
+  setSuppressionStoreOverrideForTests({ version: 1, records: [], updatedAt: new Date().toISOString() });
+  clearMockUnsubscribeTokenRegistryForTests();
+  const created = await addManualSuppression({
+    emailAddress: 'blocked@verify-phase432.test',
+    reason: 'verify manual',
+  });
+  assert(created.normalizedEmail === 'blocked@verify-phase432.test', 'manual suppression saved');
+  const list = await listMailSuppressions();
+  assert(list.some((r) => r.suppressionId === created.suppressionId), 'list includes record');
+  assert(!JSON.stringify(list).includes('rawToken'), 'no raw token in list json');
+
+  const token = 'verify-phase432-token';
+  const hash = hashUnsubscribeToken(token);
+  assert(!hash.includes(token), 'hash differs from raw token');
+  setSuppressionStoreOverrideForTests(null);
+  ok('Phase 43.2 suppression store checks passed');
+}
+
+async function verifyPhase432SuppressionChecks(): Promise<void> {
+  const {
+    setSuppressionStoreOverrideForTests,
+    addManualSuppression,
+    clearMockUnsubscribeTokenRegistryForTests,
+  } = await import('../mail-operations/suppressionStore.js');
+  const { checkNotSuppressed, assertNotSuppressed, SuppressionBlockedError } = await import(
+    '../mail-operations/suppressionPolicy.js'
+  );
+
+  setSuppressionStoreOverrideForTests({ version: 1, records: [], updatedAt: new Date().toISOString() });
+  clearMockUnsubscribeTokenRegistryForTests();
+  await addManualSuppression({ emailAddress: 'stop@verify.test', reason: '本人による配信停止' });
+
+  const blocked = checkNotSuppressed({
+    emailAddress: 'stop@verify.test',
+    operation: 'create_gmail_draft',
+  });
+  assert(!blocked.allowed, 'blocked email disallowed');
+  assert(blocked.allowed === false && blocked.blockedReason.includes('配信禁止'), 'blocked reason shown');
+
+  let threw = false;
+  try {
+    assertNotSuppressed({ emailAddress: 'stop@verify.test', operation: 'generate_sales_copy' });
+  } catch (err) {
+    threw = err instanceof SuppressionBlockedError;
+  }
+  assert(threw, 'assertNotSuppressed throws');
+
+  const generateCopy = await readFile(join(SRC_ROOT, 'candidates/generateDaily30SalesCopy.ts'), 'utf-8');
+  assert(generateCopy.includes('assertNotSuppressed'), 'daily30 copy checks suppression');
+  assert(
+    (await readFile(join(SRC_ROOT, 'generation/applyFullGeneration.ts'), 'utf-8')).includes('assertNotSuppressed'),
+    'applyFullGeneration checks suppression'
+  );
+  assert(
+    (await readFile(join(SRC_ROOT, 'workflow/createGmailDraftForLead.ts'), 'utf-8')).includes('assertNotSuppressed'),
+    'createGmailDraft checks suppression'
+  );
+
+  setSuppressionStoreOverrideForTests(null);
+  ok('Phase 43.2 suppression checks passed');
+}
+
+async function verifyPhase432LegacyCompatibility(): Promise<void> {
+  const { setSuppressionStoreOverrideForTests } = await import('../mail-operations/suppressionStore.js');
+  const { checkNotSuppressed } = await import('../mail-operations/suppressionPolicy.js');
+  setSuppressionStoreOverrideForTests({ version: 1, records: [], updatedAt: new Date().toISOString() });
+
+  const legacyLead = createEmptyLead({
+    companyName: 'Legacy DNC',
+    area: '仙台',
+    industry: '工務店',
+    websiteUrl: 'https://legacy-dnc.test',
+    emailCandidates: ['info@legacy-dnc.test'],
+    doNotContact: true,
+  });
+
+  const result = checkNotSuppressed({
+    lead: legacyLead,
+    leadId: legacyLead.id,
+    emailAddress: 'info@legacy-dnc.test',
+    operation: 'follow_up',
+  });
+  assert(!result.allowed, 'legacy doNotContact blocks');
+  assert(result.allowed === false && result.legacySource === 'do_not_contact', 'legacy source tagged');
+
+  setSuppressionStoreOverrideForTests(null);
+  ok('Phase 43.2 legacy compatibility checks passed');
+}
+
+async function verifyPhase432SuppressionUi(): Promise<void> {
+  const settings = await readFile(join(SRC_ROOT, 'ui/SettingsView.tsx'), 'utf-8');
+  assert(settings.includes('MailSuppressionListPanel'), 'settings has suppression list');
+  const panel = await readFile(join(SRC_ROOT, 'ui/MailSuppressionListPanel.tsx'), 'utf-8');
+  assert(panel.includes('配信禁止リスト'), 'suppression panel title');
+  assert(panel.includes('SUPPRESSION_REACTIVATE'), 'reactivate human approval token');
+  const server = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
+  assert(server.includes('/api/mail-suppressions'), 'suppressions API');
+  ok('Phase 43.2 suppression UI checks passed');
+}
+
+async function verifyPhase432MockUnsubscribe(): Promise<void> {
+  const {
+    setSuppressionStoreOverrideForTests,
+    registerMockUnsubscribeToken,
+    confirmMockUnsubscribe,
+    listMailSuppressions,
+    clearMockUnsubscribeTokenRegistryForTests,
+  } = await import('../mail-operations/suppressionStore.js');
+  const server = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
+  assert(server.includes('/api/mock/unsubscribe/'), 'mock unsubscribe route');
+
+  setSuppressionStoreOverrideForTests({ version: 1, records: [], updatedAt: new Date().toISOString() });
+  clearMockUnsubscribeTokenRegistryForTests();
+  const { token } = registerMockUnsubscribeToken({ emailAddress: 'unsub@verify.test' });
+  const first = await confirmMockUnsubscribe(token);
+  assert(first.ok && first.status === 'success', 'first unsubscribe succeeds');
+  const second = await confirmMockUnsubscribe(token);
+  assert(!second.ok && second.status === 'invalid_token', 'token consumed not reused');
+
+  const { token: token2 } = registerMockUnsubscribeToken({ emailAddress: 'unsub@verify.test' });
+  await confirmMockUnsubscribe(token2);
+  const { token: token3 } = registerMockUnsubscribeToken({ emailAddress: 'unsub@verify.test' });
+  const idempotent = await confirmMockUnsubscribe(token3);
+  assert(idempotent.ok, 'repeat unsubscribe idempotent success');
+  const records = await listMailSuppressions();
+  const active = records.filter((r) => r.normalizedEmail === 'unsub@verify.test' && !r.reactivatedAt);
+  assert(active.length === 1, 'no duplicate active suppressions');
+
+  setSuppressionStoreOverrideForTests(null);
+  clearMockUnsubscribeTokenRegistryForTests();
+  ok('Phase 43.2 mock unsubscribe checks passed');
+}
+
+async function verifyPhase432NoLiveMailChanges(): Promise<void> {
+  const gmailAdapter = await readFile(join(SRC_ROOT, 'integrations/gmail/gmailDraftAdapter.ts'), 'utf-8');
+  assert(!gmailAdapter.includes('messages.send'), 'no gmail send');
+  assert(!gmailAdapter.includes('drafts.send'), 'no drafts send');
+  const server = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
+  assert(!server.includes('PUBLIC_BASE_URL/u/'), 'no live public unsubscribe url in server');
+  assert(server.includes('mock: true'), 'mock unsubscribe flagged');
+  const generateEmail = await readFile(join(SRC_ROOT, 'generation/generateSalesEmail.ts'), 'utf-8');
+  assert(!generateEmail.includes('/api/mock/unsubscribe'), 'sales email body not auto-injecting mock link');
+  ok('Phase 43.2 no live mail changes checks passed');
+}
+
+async function verifyPhase432OperationsLoggingPreserved(): Promise<void> {
+  const workLog = await readFile(join(PROJECT_ROOT, 'WORK_LOG.md'), 'utf-8');
+  assert(workLog.includes('## 通常営業運用'), 'routine ops section preserved');
+  assert(workLog.includes('## Phase 43開発'), 'phase 43 dev section preserved');
+  const nextTasks = await readFile(join(PROJECT_ROOT, 'NEXT_TASKS.md'), 'utf-8');
+  assert(nextTasks.includes('Phase 43'), 'next tasks tracks phase 43');
+  ok('Phase 43.2 operations logging preserved checks passed');
+}
+
 function verifyPhase20LiteEmailImprovement(): void {
   assert(MAX_ADDITIONAL_CONTACT_PAGES === 4, 'additional page limit is 4');
 
@@ -8028,6 +8208,14 @@ async function main(): Promise<void> {
   await verifyPhase432SuppressionDesign();
   await verifyPhase433CustomTemplateDesign();
   await verifyPhase434OpenTrackingDesign();
+  await verifyPhase432SuppressionTypes();
+  await verifyPhase432SuppressionStore();
+  await verifyPhase432SuppressionChecks();
+  await verifyPhase432LegacyCompatibility();
+  await verifyPhase432SuppressionUi();
+  await verifyPhase432MockUnsubscribe();
+  await verifyPhase432NoLiveMailChanges();
+  await verifyPhase432OperationsLoggingPreserved();
   verifyPhase20LiteEmailImprovement();
   await verifyPhase20LiteEmailImprovementAsync();
   await verifyPhaseBLeadInventory();

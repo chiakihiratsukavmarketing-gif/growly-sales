@@ -43,6 +43,24 @@
 
 **禁止遵守:** Gmail送信なし / DDLなし / envなし / commit・pushなし
 
+### 2026-07-06 — Phase 43.2 配信停止・配信禁止 mock ✅
+
+| 項目 | 内容 |
+|------|------|
+| 進行 | Phase 43 **2 / 4** |
+| suppression型 | `mail-operations/suppressionTypes.ts` |
+| mock store | `mail-suppressions.json`（空初期・gitignore） |
+| フック | 営業文生成・下書き候補・下書き作成・フォローアップ・再送候補 |
+| UI | 設定「配信禁止リスト」・各画面ブロック表示 |
+| mock unsubscribe | `/api/mock/unsubscribe/:token`（ローカルのみ） |
+| build / verify | `ui:build` ✅ / Phase 43.2 verify 8件 ✅ / 全体は既存失敗あり |
+| live | **未接続**（公開URL・GCS・env なし） |
+| 人間作業待ち | 公開 unsubscribe URL・Cloud Run・live 配信停止 |
+
+## 通常営業運用
+
+今回未取得（設計・mock実装セッション。件数は推測記録しない）
+
 ---
 
 ## 2026-07-03 — Phase 42 通常運用UI改善 **完了** ✅
