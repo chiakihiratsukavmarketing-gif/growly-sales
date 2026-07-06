@@ -6,7 +6,8 @@ import type {
   MailSuppression,
   MailSuppressionSource,
   MailSuppressionStatus,
-  MailSuppressionStore,
+  MailSuppressionStoreDocument,
+  SuppressionScope,
 } from './suppressionTypes.js';
 import {
   createMockUnsubscribeTokenRecord,
@@ -15,17 +16,18 @@ import {
   isMockTokenExpired,
   type MockUnsubscribeTokenRecord,
 } from './suppressionToken.js';
+import { getDefaultMailOperationsTenantId } from './tenantResolver.js';
 
-const EMPTY_STORE: MailSuppressionStore = {
+const EMPTY_STORE: MailSuppressionStoreDocument = {
   version: 1,
   records: [],
   updatedAt: new Date().toISOString(),
 };
 
-let storeOverride: MailSuppressionStore | null = null;
+let storeOverride: MailSuppressionStoreDocument | null = null;
 const mockTokenRegistry = new Map<string, MockUnsubscribeTokenRecord>();
 
-export function setSuppressionStoreOverrideForTests(store: MailSuppressionStore | null): void {
+export function setSuppressionStoreOverrideForTests(store: MailSuppressionStoreDocument | null): void {
   storeOverride = store;
 }
 
@@ -45,31 +47,52 @@ async function ensureStoreFile(): Promise<void> {
   await writeFile(path, `${JSON.stringify(EMPTY_STORE, null, 2)}\n`, 'utf-8');
 }
 
-export async function loadMailSuppressionStore(): Promise<MailSuppressionStore> {
+function hydrateSuppressionRecord(
+  record: MailSuppression
+): MailSuppression {
+  const tenantId = record.tenantId?.trim() || getDefaultMailOperationsTenantId();
+  const scope: SuppressionScope = record.scope ?? 'tenant';
+  return { ...record, tenantId, scope };
+}
+
+function hydrateStore(doc: MailSuppressionStoreDocument): MailSuppressionStoreDocument {
+  return {
+    ...doc,
+    records: (doc.records ?? []).map(hydrateSuppressionRecord),
+  };
+}
+
+export async function loadMailSuppressionStore(): Promise<MailSuppressionStoreDocument> {
   if (storeOverride) return structuredClone(storeOverride);
   await ensureStoreFile();
   const raw = await readFile(getMailSuppressionsPath(), 'utf-8');
-  const parsed = JSON.parse(raw) as MailSuppressionStore;
+  const parsed = JSON.parse(raw) as MailSuppressionStoreDocument;
   if (!parsed.records || !Array.isArray(parsed.records)) {
     return { ...EMPTY_STORE };
   }
-  return parsed;
+  return hydrateStore(parsed);
 }
 
-export function loadMailSuppressionStoreSync(): MailSuppressionStore {
+export function loadMailSuppressionStoreSync(): MailSuppressionStoreDocument {
   if (storeOverride) return structuredClone(storeOverride);
   const path = getMailSuppressionsPath();
   if (!existsSync(path)) return { ...EMPTY_STORE };
   const raw = readFileSync(path, 'utf-8');
-  const parsed = JSON.parse(raw) as MailSuppressionStore;
+  const parsed = JSON.parse(raw) as MailSuppressionStoreDocument;
   if (!parsed.records || !Array.isArray(parsed.records)) {
     return { ...EMPTY_STORE };
   }
-  return parsed;
+  return hydrateStore(parsed);
 }
 
-async function saveStore(store: MailSuppressionStore): Promise<void> {
-  const next: MailSuppressionStore = {
+export async function persistMailSuppressionStoreDocument(
+  store: MailSuppressionStoreDocument
+): Promise<void> {
+  await saveStore(store);
+}
+
+async function saveStore(store: MailSuppressionStoreDocument): Promise<void> {
+  const next: MailSuppressionStoreDocument = {
     ...store,
     updatedAt: new Date().toISOString(),
   };
@@ -82,49 +105,72 @@ async function saveStore(store: MailSuppressionStore): Promise<void> {
 }
 
 export function findActiveSuppressionByEmail(
-  store: MailSuppressionStore,
-  emailAddress: string
+  store: MailSuppressionStoreDocument,
+  input: { tenantId: string; normalizedEmail: string }
 ): MailSuppression | null {
-  const normalized = normalizeEmailAddress(emailAddress);
-  if (!normalized) return null;
-  const active = store.records.filter(
-    (r) => r.normalizedEmail === normalized && !r.reactivatedAt
-  );
+  const tenantId = input.tenantId.trim();
+  const normalized = input.normalizedEmail.trim();
+  if (!tenantId || !normalized) return null;
+
+  const active = store.records.filter((r) => {
+    const record = hydrateSuppressionRecord(r);
+    if (record.reactivatedAt) return false;
+    if (record.scope === 'platform') {
+      return record.normalizedEmail === normalized;
+    }
+    return record.tenantId === tenantId && record.normalizedEmail === normalized;
+  });
   if (active.length === 0) return null;
   return active.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ?? null;
 }
 
 export function findActiveSuppressionByLeadId(
-  store: MailSuppressionStore,
-  leadId: string
+  store: MailSuppressionStoreDocument,
+  input: { tenantId: string; leadId: string }
 ): MailSuppression | null {
-  const active = store.records.filter((r) => r.leadId === leadId && !r.reactivatedAt);
+  const tenantId = input.tenantId.trim();
+  const leadId = input.leadId.trim();
+  if (!tenantId || !leadId) return null;
+  const active = store.records.filter((r) => {
+    const record = hydrateSuppressionRecord(r);
+    return record.tenantId === tenantId && record.leadId === leadId && !record.reactivatedAt;
+  });
   if (active.length === 0) return null;
   return active.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ?? null;
 }
 
-export async function listMailSuppressions(): Promise<MailSuppression[]> {
+export async function listMailSuppressions(tenantId: string): Promise<MailSuppression[]> {
   const store = await loadMailSuppressionStore();
-  return [...store.records].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const scoped = store.records.filter((r) => {
+    const record = hydrateSuppressionRecord(r);
+    return record.scope === 'platform' || record.tenantId === tenantId;
+  });
+  return [...scoped].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 export async function addManualSuppression(input: {
+  tenantId: string;
   emailAddress: string;
   leadId?: string;
   companyId?: string;
   companyName?: string;
   reason: string;
   status?: MailSuppressionStatus;
+  scope?: SuppressionScope;
 }): Promise<MailSuppression> {
   const store = await loadMailSuppressionStore();
+  const tenantId = input.tenantId.trim();
   const normalizedEmail = normalizeEmailAddress(input.emailAddress);
-  const existing = findActiveSuppressionByEmail(store, input.emailAddress);
+  const scope: SuppressionScope = input.scope ?? 'tenant';
+  const existing = findActiveSuppressionByEmail(store, { tenantId, normalizedEmail });
   if (existing) {
     return existing;
   }
   const now = new Date().toISOString();
   const record: MailSuppression = {
     suppressionId: randomUUID(),
+    tenantId,
+    scope,
     companyId: input.companyId,
     leadId: input.leadId,
     emailAddress: input.emailAddress.trim(),
@@ -162,14 +208,18 @@ export async function reactivateSuppression(input: {
 }
 
 export async function recordSuppressionFromUnsubscribe(input: {
+  tenantId: string;
   emailAddress: string;
   leadId?: string;
   companyId?: string;
   tokenHash: string;
+  scope?: SuppressionScope;
 }): Promise<{ record: MailSuppression; created: boolean }> {
   const store = await loadMailSuppressionStore();
+  const tenantId = input.tenantId.trim();
   const normalizedEmail = normalizeEmailAddress(input.emailAddress);
-  const existing = findActiveSuppressionByEmail(store, input.emailAddress);
+  const scope: SuppressionScope = input.scope ?? 'tenant';
+  const existing = findActiveSuppressionByEmail(store, { tenantId, normalizedEmail });
   const now = new Date().toISOString();
   if (existing) {
     const idx = store.records.findIndex((r) => r.suppressionId === existing.suppressionId);
@@ -183,6 +233,8 @@ export async function recordSuppressionFromUnsubscribe(input: {
   }
   const record: MailSuppression = {
     suppressionId: randomUUID(),
+    tenantId,
+    scope,
     companyId: input.companyId,
     leadId: input.leadId,
     emailAddress: input.emailAddress.trim(),
@@ -201,6 +253,7 @@ export async function recordSuppressionFromUnsubscribe(input: {
 }
 
 export function registerMockUnsubscribeToken(input: {
+  tenantId: string;
   leadId?: string;
   companyId?: string;
   emailAddress: string;
@@ -233,6 +286,7 @@ export async function confirmMockUnsubscribe(token: string): Promise<MockUnsubsc
     return { ok: false, status: 'expired_token', message: 'リンクの有効期限が切れています' };
   }
   const { record: suppression, created } = await recordSuppressionFromUnsubscribe({
+    tenantId: record.tenantId,
     emailAddress: record.emailAddress,
     leadId: record.leadId,
     companyId: record.companyId,

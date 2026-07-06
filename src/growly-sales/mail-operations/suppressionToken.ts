@@ -4,6 +4,7 @@ const MOCK_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 export interface MockUnsubscribeTokenRecord {
   tokenHash: string;
+  tenantId: string;
   leadId?: string;
   companyId?: string;
   emailAddress: string;
@@ -25,6 +26,7 @@ export function generateUnsubscribeToken(): string {
 }
 
 export function createMockUnsubscribeTokenRecord(input: {
+  tenantId: string;
   leadId?: string;
   companyId?: string;
   emailAddress: string;
@@ -38,6 +40,7 @@ export function createMockUnsubscribeTokenRecord(input: {
     token,
     record: {
       tokenHash: hashUnsubscribeToken(token),
+      tenantId: input.tenantId.trim(),
       leadId: input.leadId,
       companyId: input.companyId,
       emailAddress: input.emailAddress.trim(),

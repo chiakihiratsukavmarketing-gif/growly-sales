@@ -47,11 +47,12 @@ export function MailSuppressionListPanel({ onError, refreshKey = 0 }: MailSuppre
   const [mockTokenInput, setMockTokenInput] = useState('');
   const [mockPreview, setMockPreview] = useState<string | null>(null);
   const [mockResult, setMockResult] = useState<string | null>(null);
+  const tenantId = 'want-reach';
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await fetchMailSuppressions();
+      const data = await fetchMailSuppressions(tenantId);
       setRecords(data.records);
       setMode(data.mode);
     } catch (err) {
@@ -59,7 +60,7 @@ export function MailSuppressionListPanel({ onError, refreshKey = 0 }: MailSuppre
     } finally {
       setLoading(false);
     }
-  }, [onError]);
+  }, [onError, tenantId]);
 
   useEffect(() => {
     void load();
@@ -102,6 +103,7 @@ export function MailSuppressionListPanel({ onError, refreshKey = 0 }: MailSuppre
     }
     try {
       await addManualSuppressionApi({
+        tenantId: 'want-reach',
         emailAddress: manualEmail.trim(),
         reason: manualReason.trim(),
         confirmToken: manualConfirm.trim(),

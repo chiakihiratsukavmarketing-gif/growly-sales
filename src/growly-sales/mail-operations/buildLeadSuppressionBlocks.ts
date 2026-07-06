@@ -5,6 +5,7 @@ export function buildSuppressionBlocksForLeads(leads: Lead[]): Record<string, st
   const blocks: Record<string, string> = {};
   for (const lead of leads) {
     const result = checkNotSuppressed({
+      tenantId: 'want-reach',
       lead,
       leadId: lead.id,
       emailAddress: lead.emailCandidates[0] ?? null,

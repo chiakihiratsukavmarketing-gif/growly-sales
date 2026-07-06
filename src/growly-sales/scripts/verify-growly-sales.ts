@@ -7642,11 +7642,12 @@ async function verifyPhase432SuppressionStore(): Promise<void> {
   setSuppressionStoreOverrideForTests({ version: 1, records: [], updatedAt: new Date().toISOString() });
   clearMockUnsubscribeTokenRegistryForTests();
   const created = await addManualSuppression({
+    tenantId: 'want-reach',
     emailAddress: 'blocked@verify-phase432.test',
     reason: 'verify manual',
   });
   assert(created.normalizedEmail === 'blocked@verify-phase432.test', 'manual suppression saved');
-  const list = await listMailSuppressions();
+  const list = await listMailSuppressions('want-reach');
   assert(list.some((r) => r.suppressionId === created.suppressionId), 'list includes record');
   assert(!JSON.stringify(list).includes('rawToken'), 'no raw token in list json');
 
@@ -7669,9 +7670,10 @@ async function verifyPhase432SuppressionChecks(): Promise<void> {
 
   setSuppressionStoreOverrideForTests({ version: 1, records: [], updatedAt: new Date().toISOString() });
   clearMockUnsubscribeTokenRegistryForTests();
-  await addManualSuppression({ emailAddress: 'stop@verify.test', reason: '本人による配信停止' });
+  await addManualSuppression({ tenantId: 'want-reach', emailAddress: 'stop@verify.test', reason: '本人による配信停止' });
 
   const blocked = checkNotSuppressed({
+    tenantId: 'want-reach',
     emailAddress: 'stop@verify.test',
     operation: 'create_gmail_draft',
   });
@@ -7680,7 +7682,7 @@ async function verifyPhase432SuppressionChecks(): Promise<void> {
 
   let threw = false;
   try {
-    assertNotSuppressed({ emailAddress: 'stop@verify.test', operation: 'generate_sales_copy' });
+    assertNotSuppressed({ tenantId: 'want-reach', emailAddress: 'stop@verify.test', operation: 'generate_sales_copy' });
   } catch (err) {
     threw = err instanceof SuppressionBlockedError;
   }
@@ -7716,6 +7718,7 @@ async function verifyPhase432LegacyCompatibility(): Promise<void> {
   });
 
   const result = checkNotSuppressed({
+    tenantId: 'want-reach',
     lead: legacyLead,
     leadId: legacyLead.id,
     emailAddress: 'info@legacy-dnc.test',
@@ -7752,18 +7755,18 @@ async function verifyPhase432MockUnsubscribe(): Promise<void> {
 
   setSuppressionStoreOverrideForTests({ version: 1, records: [], updatedAt: new Date().toISOString() });
   clearMockUnsubscribeTokenRegistryForTests();
-  const { token } = registerMockUnsubscribeToken({ emailAddress: 'unsub@verify.test' });
+  const { token } = registerMockUnsubscribeToken({ tenantId: 'want-reach', emailAddress: 'unsub@verify.test' });
   const first = await confirmMockUnsubscribe(token);
   assert(first.ok && first.status === 'success', 'first unsubscribe succeeds');
   const second = await confirmMockUnsubscribe(token);
   assert(!second.ok && second.status === 'invalid_token', 'token consumed not reused');
 
-  const { token: token2 } = registerMockUnsubscribeToken({ emailAddress: 'unsub@verify.test' });
+  const { token: token2 } = registerMockUnsubscribeToken({ tenantId: 'want-reach', emailAddress: 'unsub@verify.test' });
   await confirmMockUnsubscribe(token2);
-  const { token: token3 } = registerMockUnsubscribeToken({ emailAddress: 'unsub@verify.test' });
+  const { token: token3 } = registerMockUnsubscribeToken({ tenantId: 'want-reach', emailAddress: 'unsub@verify.test' });
   const idempotent = await confirmMockUnsubscribe(token3);
   assert(idempotent.ok, 'repeat unsubscribe idempotent success');
-  const records = await listMailSuppressions();
+  const records = await listMailSuppressions('want-reach');
   const active = records.filter((r) => r.normalizedEmail === 'unsub@verify.test' && !r.reactivatedAt);
   assert(active.length === 1, 'no duplicate active suppressions');
 
@@ -8059,6 +8062,82 @@ async function verifyPhase434NoLiveMailChanges(): Promise<void> {
   const createDraft = await readFile(join(SRC_ROOT, 'workflow/createGmailDraftForLead.ts'), 'utf-8');
   assert(!createDraft.includes('open-tracking'), 'draft creation unchanged for open tracking live');
   ok('Phase 43.4 no live mail changes checks passed');
+}
+
+async function verifyPhase441DefaultTenant(): Promise<void> {
+  const resolver = await readFile(join(SRC_ROOT, 'mail-operations/tenantResolver.ts'), 'utf-8');
+  assert(resolver.includes("DEFAULT_TENANT_ID = 'want-reach'"), 'default tenant want-reach');
+  assert(resolver.includes('mailops.wantreach.jp'), 'public base url candidate recorded');
+  ok('Phase 44.1 default tenant checks passed');
+}
+
+async function verifyPhase441TenantScopedSuppression(): Promise<void> {
+  const types = await readFile(join(SRC_ROOT, 'mail-operations/suppressionTypes.ts'), 'utf-8');
+  assert(types.includes("export type SuppressionScope = 'tenant' | 'platform'"), 'scope type exists');
+  assert(types.includes('tenantId'), 'MailSuppression has tenantId');
+  const policy = await readFile(join(SRC_ROOT, 'mail-operations/suppressionPolicy.ts'), 'utf-8');
+  assert(policy.includes('tenantId:'), 'suppression policy requires tenantId');
+  ok('Phase 44.1 tenant-scoped suppression checks passed');
+}
+
+async function verifyPhase441PlatformSuppressionScope(): Promise<void> {
+  const store = await readFile(join(SRC_ROOT, 'mail-operations/suppressionStore.ts'), 'utf-8');
+  assert(store.includes("record.scope === 'platform'"), 'platform scope supported');
+  ok('Phase 44.1 platform scope checks passed');
+}
+
+async function verifyPhase441TenantAwareToken(): Promise<void> {
+  const token = await readFile(join(SRC_ROOT, 'mail-operations/suppressionToken.ts'), 'utf-8');
+  assert(token.includes('tenantId: string'), 'mock unsubscribe token record has tenantId');
+  const server = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
+  assert(server.includes('/api/mock/unsubscribe/register'), 'mock unsubscribe token register exists');
+  assert(!server.includes('tenant='), 'tenantId not trusted via query in unsubscribe flows');
+  ok('Phase 44.1 tenant-aware token checks passed');
+}
+
+async function verifyPhase441TenantResolvedBranding(): Promise<void> {
+  const branding = await readFile(join(SRC_ROOT, 'mail-operations/unsubscribeBranding.ts'), 'utf-8');
+  assert(branding.includes('buildUnsubscribeScreenCopy'), 'unsubscribe branding builder exists');
+  const publicUrl = await readFile(join(SRC_ROOT, 'mail-operations/publicUrlResolver.ts'), 'utf-8');
+  assert(publicUrl.includes('resolveMailOperationsPublicBaseUrl'), 'public base url resolver exists');
+  const server = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
+  assert(server.includes('buildUnsubscribeScreenCopy'), 'mock unsubscribe uses tenant branding');
+  ok('Phase 44.1 tenant branding resolver checks passed');
+}
+
+async function verifyPhase441PublicUrlResolver(): Promise<void> {
+  const publicUrl = await readFile(join(SRC_ROOT, 'mail-operations/publicUrlResolver.ts'), 'utf-8');
+  assert(publicUrl.includes('buildUnsubscribeUrl'), 'unsubscribe url builder exists');
+  assert(!publicUrl.includes('tenantId='), 'unsubscribe url does not expose tenantId in query');
+  ok('Phase 44.1 public url resolver checks passed');
+}
+
+async function verifyPhase441ReplaceableSuppressionStore(): Promise<void> {
+  const types = await readFile(join(SRC_ROOT, 'mail-operations/suppressionTypes.ts'), 'utf-8');
+  assert(types.includes('interface MailSuppressionStore {'), 'replaceable store interface exists');
+  const impl = await readFile(join(SRC_ROOT, 'mail-operations/suppressionStoreInterface.ts'), 'utf-8');
+  assert(impl.includes('LocalJsonMailSuppressionStore'), 'local json store implementation exists');
+  assert(impl.includes('GcsJsonMailSuppressionStore'), 'gcs json store placeholder exists');
+  ok('Phase 44.1 replaceable suppression store checks passed');
+}
+
+async function verifyPhase441TenantIsolation(): Promise<void> {
+  const server = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
+  assert(server.includes('tenantId が必要です'), 'tenantId required on suppression APIs');
+  ok('Phase 44.1 tenant isolation checks passed');
+}
+
+async function verifyPhase441NoPrematureSaasFeatures(): Promise<void> {
+  const next = await readFile(join(PROJECT_ROOT, 'NEXT_TASKS.md'), 'utf-8');
+  assert(!next.includes('課金'), 'no billing features introduced');
+  ok('Phase 44.1 no premature SaaS features checks passed');
+}
+
+async function verifyPhase441OperationsLoggingPreserved(): Promise<void> {
+  const workLog = await readFile(join(PROJECT_ROOT, 'WORK_LOG.md'), 'utf-8');
+  assert(workLog.includes('## 通常営業運用'), 'routine ops section preserved');
+  assert(workLog.includes('## Phase 43開発'), 'phase 43 section preserved');
+  ok('Phase 44.1 operations logging preserved checks passed');
 }
 
 function verifyPhase20LiteEmailImprovement(): void {
@@ -8499,6 +8578,16 @@ async function main(): Promise<void> {
   await verifyPhase434DashboardReferenceRate();
   await verifyPhase434NoRetroactiveTracking();
   await verifyPhase434NoLiveMailChanges();
+  await verifyPhase441DefaultTenant();
+  await verifyPhase441TenantScopedSuppression();
+  await verifyPhase441PlatformSuppressionScope();
+  await verifyPhase441TenantAwareToken();
+  await verifyPhase441TenantResolvedBranding();
+  await verifyPhase441PublicUrlResolver();
+  await verifyPhase441ReplaceableSuppressionStore();
+  await verifyPhase441TenantIsolation();
+  await verifyPhase441NoPrematureSaasFeatures();
+  await verifyPhase441OperationsLoggingPreserved();
   verifyPhase20LiteEmailImprovement();
   await verifyPhase20LiteEmailImprovementAsync();
   await verifyPhaseBLeadInventory();

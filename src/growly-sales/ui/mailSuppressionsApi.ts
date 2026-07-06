@@ -17,8 +17,8 @@ export interface SuppressionCheckResponse {
   blockedAt: string | null;
 }
 
-export async function fetchMailSuppressions(): Promise<MailSuppressionsResponse> {
-  const res = await fetch(`${API_BASE}/api/mail-suppressions`);
+export async function fetchMailSuppressions(tenantId: string): Promise<MailSuppressionsResponse> {
+  const res = await fetch(`${API_BASE}/api/mail-suppressions?tenantId=${encodeURIComponent(tenantId)}`);
   if (!res.ok) {
     throw new Error(await readApiError(res, 'GET /api/mail-suppressions', '配信禁止リストの取得に失敗しました'));
   }
@@ -26,6 +26,7 @@ export async function fetchMailSuppressions(): Promise<MailSuppressionsResponse>
 }
 
 export async function addManualSuppressionApi(input: {
+  tenantId: string;
   emailAddress: string;
   leadId?: string;
   companyId?: string;
@@ -60,10 +61,12 @@ export async function reactivateSuppressionApi(input: {
 }
 
 export async function checkSuppressionApi(input: {
+  tenantId: string;
   leadId?: string;
   emailAddress?: string;
 }): Promise<SuppressionCheckResponse> {
   const params = new URLSearchParams();
+  params.set('tenantId', input.tenantId);
   if (input.leadId) params.set('leadId', input.leadId);
   if (input.emailAddress) params.set('emailAddress', input.emailAddress);
   const res = await fetch(`${API_BASE}/api/mail-suppressions/check?${params.toString()}`);

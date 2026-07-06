@@ -22,6 +22,15 @@
 
 ## 1. 現状
 
+### 1.0 テナント方針（現時点: single tenant / 将来: SaaS）
+
+- **現在:** single tenant deployment（自社運用）
+  - `tenantId = want-reach`
+  - 公開サブドメイン候補: `mailops.wantreach.jp`
+- **将来:** multi-tenant SaaS へ移行可能な境界を保持
+  - 公開 URL は `resolveMailOperationsPublicBaseUrl(tenantId)` で解決
+  - 共通 Growly ドメイン / 顧客独自ドメインへ交換可能
+
 ### 1.1 固定する通常営業ルート
 
 ```

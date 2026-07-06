@@ -24,6 +24,7 @@ export function generateDaily30SalesCopyForCandidate(
   const targetEmail = pickDaily30TargetEmail(candidate.emailCandidates ?? []);
   if (targetEmail) {
     assertNotSuppressed({
+      tenantId: 'want-reach',
       emailAddress: targetEmail,
       leadId: candidate.externalCandidateId,
       operation: 'generate_sales_copy',

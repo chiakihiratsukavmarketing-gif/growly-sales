@@ -2,9 +2,11 @@ export type {
   MailSuppression,
   MailSuppressionSource,
   MailSuppressionStatus,
+  MailSuppressionStoreDocument,
   MailSuppressionStore,
   SuppressionCheckResult,
   SuppressionOperation,
+  SuppressionScope,
 } from './suppressionTypes.js';
 export {
   ACTIVE_SUPPRESSION_STATUSES,
@@ -27,6 +29,20 @@ export {
   setSuppressionStoreOverrideForTests,
   clearMockUnsubscribeTokenRegistryForTests,
 } from './suppressionStore.js';
+export type { MailOperationsTenant } from './tenantTypes.js';
+export {
+  DEFAULT_TENANT_ID,
+  getDefaultMailOperationsTenantId,
+  resolveMailOperationsTenant,
+  requireMailOperationsTenant,
+} from './tenantResolver.js';
+export { resolveMailOperationsPublicBaseUrl, buildUnsubscribeUrl } from './publicUrlResolver.js';
+export { buildUnsubscribeScreenCopy } from './unsubscribeBranding.js';
+export type { UnsubscribeScreenCopy } from './unsubscribeBranding.js';
+export {
+  LocalJsonMailSuppressionStore,
+  GcsJsonMailSuppressionStore,
+} from './suppressionStoreInterface.js';
 export {
   SuppressionBlockedError,
   checkNotSuppressed,

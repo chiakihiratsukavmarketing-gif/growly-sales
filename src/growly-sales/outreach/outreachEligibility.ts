@@ -16,12 +16,15 @@ export function isFollowUpOnlyLead(lead: Lead): boolean {
 
 /** 無料診断の初回営業メール生成・Gmail下書き作成の対象か */
 export function isInitialOutreachEligible(lead: Lead): boolean {
-  if (!checkNotSuppressed({
-    lead,
-    leadId: lead.id,
-    emailAddress: lead.emailCandidates[0] ?? null,
-    operation: 'generate_sales_copy',
-  }).allowed) {
+  if (
+    !checkNotSuppressed({
+      tenantId: 'want-reach',
+      lead,
+      leadId: lead.id,
+      emailAddress: lead.emailCandidates[0] ?? null,
+      operation: 'generate_sales_copy',
+    }).allowed
+  ) {
     return false;
   }
   if (lead.doNotContact) return false;

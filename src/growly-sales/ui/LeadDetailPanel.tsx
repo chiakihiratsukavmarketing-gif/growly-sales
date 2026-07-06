@@ -67,6 +67,7 @@ export function LeadDetailPanel({ lead, onUpdated, onError }: LeadDetailPanelPro
       return;
     }
     void checkSuppressionApi({
+      tenantId: 'want-reach',
       leadId: lead.id,
       emailAddress: lead.emailCandidates[0] ?? undefined,
     })

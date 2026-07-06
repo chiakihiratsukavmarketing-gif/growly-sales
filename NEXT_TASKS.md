@@ -10,7 +10,7 @@
 | サブフェーズ | 内容 | 状態 |
 |-------------|------|------|
 | **44.0** | live 化前安全確認 | ✅ 監査完了（未 commit） |
-| 44.1 | 配信停止 live | **No-Go** — 条件未達 |
+| **44.1** | 配信停止 live 準備（tenant境界・保存境界） | 進行中 |
 | 44.2 | カスタムテンプレート live | 未着手 |
 | 44.3 | 開封計測 live | 未着手 |
 
@@ -28,6 +28,13 @@
 - [ ] suppression 保存先承認（推奨: GCS JSON + generation-match）
 - [ ] 法務・配信停止画面文案確認
 - [ ] fail-closed 実装フェーズへの着手承認
+
+### 44.1 実装原則（自社優先 + SaaS拡張余地）
+
+- [ ] `DEFAULT_TENANT_ID = want-reach`（single tenant）
+- [ ] 公開候補: `mailops.wantreach.jp`
+- [ ] tenant resolver / public URL resolver / store interface 経由（文字列の散在禁止）
+- [ ] suppression: `scope=platform|tenant`（platform UI は作らない）
 
 ### Phase 43 完了（mock・参照）
 

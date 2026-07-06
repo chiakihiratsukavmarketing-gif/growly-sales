@@ -16,6 +16,7 @@ export function buildDaily30CopySuppressionHints(
     const email = pickDaily30TargetEmail(candidate.emailCandidates ?? []);
     if (!email) continue;
     const result = checkNotSuppressed({
+      tenantId: 'want-reach',
       emailAddress: email,
       leadId: candidate.externalCandidateId,
       operation: 'generate_sales_copy',

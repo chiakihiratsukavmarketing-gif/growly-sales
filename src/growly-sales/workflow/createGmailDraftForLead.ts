@@ -112,6 +112,7 @@ async function loadLeadById(leadId: string): Promise<Lead> {
 
 function assertEligibleForGmailDraftCreate(lead: Lead, offer?: OfferProfile): void {
   assertNotSuppressed({
+    tenantId: 'want-reach',
     lead,
     leadId: lead.id,
     emailAddress: lead.emailCandidates[0] ?? null,

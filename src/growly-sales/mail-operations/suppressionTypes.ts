@@ -20,8 +20,13 @@ export type SuppressionOperation =
   | 'follow_up'
   | 'resend';
 
+export type SuppressionScope = 'tenant' | 'platform';
+
 export interface MailSuppression {
   suppressionId: string;
+  /** SaaS 向け境界（現時点は default tenant のみ） */
+  tenantId?: string;
+  scope?: SuppressionScope;
   companyId?: string;
   leadId?: string;
   emailAddress: string;
@@ -39,10 +44,19 @@ export interface MailSuppression {
   reactivationMemo?: string | null;
 }
 
-export interface MailSuppressionStore {
+/** JSON ドキュメント（runtime） */
+export interface MailSuppressionStoreDocument {
   version: 1;
   records: MailSuppression[];
   updatedAt: string;
+}
+
+/** 交換可能な suppression store（将来: GCS/DB） */
+export interface MailSuppressionStore {
+  listByTenant(tenantId: string): Promise<MailSuppression[]>;
+  findActive(input: { tenantId: string; normalizedEmail: string }): Promise<MailSuppression | null>;
+  add(input: MailSuppression): Promise<MailSuppression>;
+  update(input: MailSuppression): Promise<MailSuppression>;
 }
 
 export type SuppressionCheckResult =

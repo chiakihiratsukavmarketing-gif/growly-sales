@@ -282,7 +282,12 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
 
     if (req.method === 'GET' && pathname === '/api/mail-suppressions') {
       const { listMailSuppressions, getMailOpsMode } = await import('../mail-operations/index.js');
-      const records = await listMailSuppressions();
+      const tenantId = url.searchParams.get('tenantId')?.trim();
+      if (!tenantId) {
+        sendApiError(res, 400, pathname, 'tenantId が必要です');
+        return;
+      }
+      const records = await listMailSuppressions(tenantId);
       sendJson(res, 200, {
         records,
         generatedAt: new Date().toISOString(),
@@ -294,9 +299,15 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
 
     if (req.method === 'GET' && pathname === '/api/mail-suppressions/check') {
       const { checkNotSuppressed } = await import('../mail-operations/index.js');
+      const tenantId = url.searchParams.get('tenantId')?.trim();
+      if (!tenantId) {
+        sendApiError(res, 400, pathname, 'tenantId が必要です');
+        return;
+      }
       const leadId = url.searchParams.get('leadId')?.trim() || undefined;
       const emailAddress = url.searchParams.get('emailAddress')?.trim() || undefined;
       const result = checkNotSuppressed({
+        tenantId,
         leadId,
         emailAddress,
         operation: 'select_draft_candidate',
@@ -322,12 +333,18 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
 
     if (req.method === 'POST' && pathname === '/api/mail-suppressions/manual') {
       const body = await readJsonBody<{
+        tenantId?: string;
         emailAddress?: string;
         leadId?: string;
         companyId?: string;
         reason?: string;
         confirmToken?: string;
       }>(req);
+      const tenantId = body.tenantId?.trim();
+      if (!tenantId) {
+        sendApiError(res, 400, pathname, 'tenantId が必要です');
+        return;
+      }
       if (body.confirmToken?.trim() !== 'SUPPRESSION_MANUAL') {
         sendApiError(res, 403, pathname, '確認トークン SUPPRESSION_MANUAL が必要です');
         return;
@@ -340,6 +357,7 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
       }
       const { addManualSuppression } = await import('../mail-operations/index.js');
       const record = await addManualSuppression({
+        tenantId,
         emailAddress,
         leadId: body.leadId?.trim(),
         companyId: body.companyId?.trim(),
@@ -388,6 +406,8 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
         '../mail-operations/suppressionStore.js'
       );
       const { isMockTokenExpired } = await import('../mail-operations/suppressionToken.js');
+      const { requireMailOperationsTenant } = await import('../mail-operations/tenantResolver.js');
+      const { buildUnsubscribeScreenCopy } = await import('../mail-operations/unsubscribeBranding.js');
       if (req.method === 'GET') {
         const record = resolveMockUnsubscribeToken(token);
         if (!record) {
@@ -398,11 +418,17 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
           sendJson(res, 200, { status: 'expired_token', message: 'リンクの有効期限が切れています', mock: true });
           return;
         }
+        const tenant = requireMailOperationsTenant(record.tenantId);
+        const branding = buildUnsubscribeScreenCopy(tenant);
         const masked = record.emailAddress.replace(/^(.).+(@.+)$/, '$1***$2');
         sendJson(res, 200, {
           status: 'ready',
-          message: '配信を停止しますか？（mock）',
+          title: branding.title,
+          message: branding.confirmMessage,
           emailMasked: masked,
+          privacyNote: branding.privacyNote,
+          contactEmail: branding.contactEmail,
+          privacyPolicyUrl: branding.privacyPolicyUrl,
           mock: true,
         });
         return;
@@ -418,12 +444,12 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
           });
           return;
         }
+        const tenant = requireMailOperationsTenant(result.suppression.tenantId ?? 'want-reach');
+        const branding = buildUnsubscribeScreenCopy(tenant);
         sendJson(res, 200, {
           ok: true,
           status: 'success',
-          message: result.alreadySuppressed
-            ? '既に配信停止済みです（冪等）'
-            : '配信を停止しました（mock）',
+          message: result.alreadySuppressed ? '既に配信停止済みです（冪等）' : branding.successMessage,
           alreadySuppressed: result.alreadySuppressed,
           mock: true,
         });
@@ -587,7 +613,12 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
     }
 
     if (req.method === 'POST' && pathname === '/api/mock/unsubscribe/register') {
-      const body = await readJsonBody<{ emailAddress?: string; leadId?: string; companyId?: string }>(req);
+      const body = await readJsonBody<{
+        tenantId?: string;
+        emailAddress?: string;
+        leadId?: string;
+        companyId?: string;
+      }>(req);
       const emailAddress = body.emailAddress?.trim();
       if (!emailAddress) {
         sendApiError(res, 400, pathname, 'emailAddress が必要です');
@@ -595,6 +626,7 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
       }
       const { registerMockUnsubscribeToken } = await import('../mail-operations/index.js');
       const { token, previewPath } = registerMockUnsubscribeToken({
+        tenantId: body.tenantId?.trim() || 'want-reach',
         emailAddress,
         leadId: body.leadId?.trim(),
         companyId: body.companyId?.trim(),

@@ -60,6 +60,7 @@ function preserveWorkflowState(before: Lead, after: Lead): Lead {
 export function applyFullGenerationToLead(lead: Lead, profiles: GenerationProfiles): Lead {
   const primaryEmail = lead.emailCandidates[0] ?? null;
   assertNotSuppressed({
+    tenantId: 'want-reach',
     lead,
     leadId: lead.id,
     emailAddress: primaryEmail,

@@ -7,6 +7,7 @@ import {
   touchLastAttemptBlocked,
 } from './suppressionStore.js';
 import { normalizeEmailAddress } from './suppressionToken.js';
+import { getDefaultMailOperationsTenantId } from './tenantResolver.js';
 
 export class SuppressionBlockedError extends Error {
   readonly check: Extract<SuppressionCheckResult, { allowed: false }>;
@@ -111,16 +112,18 @@ function legacyBlockedCheck(lead?: Lead | null): Extract<SuppressionCheckResult,
 }
 
 export function checkNotSuppressed(input: {
+  tenantId: string;
   emailAddress?: string | null;
   companyId?: string | null;
   leadId?: string | null;
   lead?: Lead | null;
   operation: SuppressionOperation;
 }): SuppressionCheckResult {
+  const tenantId = input.tenantId?.trim() || getDefaultMailOperationsTenantId();
   const store = loadMailSuppressionStoreSync();
 
   if (input.leadId) {
-    const byLead = findActiveSuppressionByLeadId(store, input.leadId);
+    const byLead = findActiveSuppressionByLeadId(store, { tenantId, leadId: input.leadId });
     if (byLead) {
       return {
         allowed: false,
@@ -133,7 +136,8 @@ export function checkNotSuppressed(input: {
 
   const email = input.emailAddress?.trim() || input.lead?.emailCandidates?.[0]?.trim() || '';
   if (email) {
-    const byEmail = findActiveSuppressionByEmail(store, email);
+    const normalizedEmail = normalizeEmailAddress(email);
+    const byEmail = findActiveSuppressionByEmail(store, { tenantId, normalizedEmail });
     if (byEmail) {
       return {
         allowed: false,
@@ -153,6 +157,7 @@ export function checkNotSuppressed(input: {
 }
 
 export function assertNotSuppressed(input: {
+  tenantId: string;
   emailAddress?: string | null;
   companyId?: string | null;
   leadId?: string | null;
@@ -168,6 +173,7 @@ export function assertNotSuppressed(input: {
 
 export function getSuppressionExclusionReasonForLead(lead: Lead): string | null {
   const result = checkNotSuppressed({
+    tenantId: getDefaultMailOperationsTenantId(),
     lead,
     leadId: lead.id,
     emailAddress: lead.emailCandidates[0] ?? null,
@@ -181,6 +187,7 @@ export function getSuppressionExclusionReasonForLead(lead: Lead): string | null 
 
 export function isFollowUpSuppressed(lead: Lead): boolean {
   return !checkNotSuppressed({
+    tenantId: getDefaultMailOperationsTenantId(),
     lead,
     leadId: lead.id,
     emailAddress: lead.emailCandidates[0] ?? null,
@@ -190,6 +197,7 @@ export function isFollowUpSuppressed(lead: Lead): boolean {
 
 export function isResendSuppressed(lead: Lead): boolean {
   return !checkNotSuppressed({
+    tenantId: getDefaultMailOperationsTenantId(),
     lead,
     leadId: lead.id,
     emailAddress: lead.emailCandidates[0] ?? null,

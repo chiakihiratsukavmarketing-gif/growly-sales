@@ -153,6 +153,7 @@ export async function createMockSendTrackingForManualGmailSend(
   sentAt: string
 ): Promise<{ tracking: EmailSendTracking | null; mockToken: string }> {
   const suppressed = checkNotSuppressed({
+    tenantId: 'want-reach',
     emailAddress: preview.to,
     leadId: lead.id,
     lead,

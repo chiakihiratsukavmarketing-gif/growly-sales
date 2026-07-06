@@ -115,6 +115,16 @@
 | 実装・変更 | **未実施**（endpoint・Cloud・env・GCS live・Gmail 変更なし） |
 | commit / push | **未実施** |
 
+### 2026-07-06 — Phase 44.1 配信停止 live 化準備（tenant 境界・interface 追加）⏳
+
+| 項目 | 内容 |
+|------|------|
+| 方針 | **自社（Want Reach）優先** + 将来 SaaS 化できる境界を先に整備 |
+| 既定 tenant | `want-reach` |
+| 公開候補 | `mailops.wantreach.jp`（**まだ live メールへ適用しない**） |
+| 追加 | tenant model / public URL resolver / suppression scope（tenant/platform）/ store interface |
+| 変更禁止 | 公開 endpoint 作成 / Cloud / env / GCS live 書き込み / Gmail 本文変更 / commit・push |
+
 
 ## 2026-07-03 — Phase 42 通常運用UI改善 **完了** ✅
 
