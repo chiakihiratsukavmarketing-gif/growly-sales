@@ -306,6 +306,22 @@
 | 通常営業運用 | **影響なし** |
 | Phase 44.1 判定 | **No-Go 維持** |
 
+### 2026-07-08 — Phase 44.1 Step 13: 公開スモーク + HTTPS/DNS 接続調査
+
+| 項目 | 内容 |
+|------|------|
+| 進行 | Phase 44.1 **13 / 15**（公開スモーク完了・DNS 前で停止） |
+| allUsers invoker | `growly-sales-mail-ops` のみ `roles/run.invoker`（Daily30 は変更なし） |
+| 公開 `/health` | HTTP **200** — `ok:true` / `mode:live` / **`liveConnected:false`** / `storageReady:true` |
+| 無効 token GET | `/u/invalid-test-token` → HTTP **503** / `screenState:temporary_error`（`liveConnected:false` のため fail-closed） |
+| 管理 API | `/api/*` → **404** |
+| アプリログ | `route=GET /u/:token` テンプレートのみ。raw token・email・Secret・bucket なし |
+| GCS 実書込 | **なし** |
+| DNS / LB / SSL | **未作成**（接続方式は §7.21 調査のみ） |
+| 未実施 | POST `/u/:token`・`MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true`・Gmail・mixhost DNS |
+| 通常営業運用 | **影響なし** |
+| Phase 44.1 判定 | **No-Go 維持** |
+
 ## 2026-07-03 — Phase 42 通常運用UI改善 **完了** ✅
 
 **進行:** 通常運用UI改善 **7 / 7 フェーズ完了**

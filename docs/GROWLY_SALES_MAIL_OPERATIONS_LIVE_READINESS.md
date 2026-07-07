@@ -723,6 +723,109 @@ gcloud run deploy growly-sales-mail-ops \
 3. mixhost DNS → `mailops.wantreach.jp`（別承認）
 4. 最後に `MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true` + suppression スモーク 1 件
 
+### 7.21 Phase 44.1 Step 13 — 公開スモーク + HTTPS/DNS 接続調査（2026-07-08）
+
+> **実施範囲:** `allUsers` invoker 付与・公開 `/health`・無効 token GET スモーク・ログ確認。**DNS / LB / SSL / live 外部接続は未実施。**
+
+#### 7.21.1 公開前最終確認
+
+| 項目 | 結果 |
+|------|------|
+| サービス | `growly-sales-mail-ops` |
+| region | `asia-northeast1` |
+| revision | `growly-sales-mail-ops-00001-tff` |
+| 専用 SA | `growly-mail-ops-runner@growly-scheduler.iam.gserviceaccount.com` |
+| 公開 route | `/health`・`/u/:token`（GET/POST）のみ。他は **404** |
+| 管理 API | Lead / Gmail / Daily30 API **なし**（`mailOpsServer.ts` 監査） |
+| `MAIL_OPS_LIVE_EXTERNAL_CONNECTED` | **`false`** |
+
+#### 7.21.2 allUsers invoker（適用済み）
+
+| 項目 | 結果 |
+|------|------|
+| 対象 | `growly-sales-mail-ops` のみ |
+| binding | `allUsers` → `roles/run.invoker` |
+| 他サービス | `growly-sales-daily30` IAM **変更なし**（既存 binding 維持） |
+| project 全体 | allUsers への追加権限 **なし** |
+
+#### 7.21.3 公開 `/health` 結果
+
+| 項目 | 結果 |
+|------|------|
+| HTTP status | **200** |
+| `ok` | `true` |
+| `mode` | `live` |
+| `liveConnected` | **`false`** |
+| `storageReady` | `true` |
+| 漏洩なし | Secret・token・email・bucket/prefix 実値・project ID・stack trace なし |
+
+#### 7.21.4 無効 token GET スモーク
+
+| 項目 | 結果 |
+|------|------|
+| path | `GET /u/invalid-test-token`（テスト用無効値・高エントロピー実 token 不使用） |
+| HTTP status | **503** |
+| `screenState` | **`temporary_error`** |
+| `liveConnected` | **`false`** |
+| suppression 登録 | **なし**（`liveConnected=false` で GCS 未接続） |
+| 漏洩なし | 完全メール・tenantId・leadId・sendRecordId・raw token なし |
+| POST | **未実施**（意図どおり） |
+
+> `MAIL_OPS_LIVE_EXTERNAL_CONNECTED=false` のため unsubscribe 処理は fail-closed で `temporary_error`。live 接続後は無効 token で `invalid_or_expired` を期待。
+
+#### 7.21.5 アプリログ確認
+
+| 項目 | 結果 |
+|------|------|
+| 記録形式 | `route=GET /health` / `route=GET /u/:token`（テンプレート） |
+| 漏洩なし | raw token・完全 path・email・maskedEmail・Secret・bucket/prefix・stack trace なし |
+| プラットフォーム request log | path が残る可能性あり（§7.6）。今回は無効テスト token のみ使用 |
+
+**次段階の未決事項:** ログ閲覧 IAM 最小化・保持期間・除外設定（HTTPS/DNS 適用前に最終確認）。
+
+#### 7.21.6 HTTPS/DNS 接続方式（調査のみ・リソース未作成）
+
+`PUBLIC_BASE_URL=https://mailops.wantreach.jp` を mixhost で Cloud Run に接続する方式の整理。
+
+| 方式 | 概要 | メリット | デメリット / 未決 |
+|------|------|----------|-------------------|
+| **A. External HTTPS LB + serverless NEG** | Global LB → regional serverless NEG → `growly-sales-mail-ops` | Google 管理 SSL・**Cloud Armor**（rate limit §7.5）・固定 IP 可 | 構成・コストが高い。LB + 証明書 + NEG の Human Approval 要 |
+| **B. Cloud Run ドメインマッピング** | `gcloud run domain-mappings` で `mailops.wantreach.jp` を直接マッピング | シンプル・LB 不要 | Cloud Armor 不可。mixhost 側は **CNAME**（`ghs.googlehosted.com` 等・マッピング時に GCP が指示） |
+| **C. 現状維持（run.app のみ）** | 標準 URL でスモーク継続 | 追加リソースなし | `PUBLIC_BASE_URL` と実 URL 不一致。本番メール URL には **未使用** |
+
+**推奨（設計正本 §7.13 整合）:** 本番は **方式 A（LB + マネージド証明書）** を第一候補。Cloud Armor 60 req/min/IP 案（§7.5）を使うなら LB 必須。小規模パイロットで Armor 不要なら **方式 B** も可。
+
+| 項目 | 方針 |
+|------|------|
+| DNS レコード（方式 A） | mixhost に **A レコード**（LB 固定 IP）またはプロバイダ指示に従う |
+| DNS レコード（方式 B） | **CNAME** を GCP ドメインマッピング手順どおり |
+| SSL | Google 管理証明書（LB またはドメインマッピング） |
+| 固定 IP | 方式 A のみ必要。方式 B は不要 |
+| Cloud Armor | 方式 A のみ。`/u/*` rate limit 案は Human Approval 要 |
+| rollback | DNS レコード削除または旧値復元 → LB/マッピング削除 → `PUBLIC_BASE_URL` は維持しても実アクセス不可（fail-closed） |
+
+**今回:** mixhost DNS・LB・SSL 証明書・実リソース **すべて未作成**。
+
+#### 7.21.7 停止線（今回遵守）
+
+| 項目 | 状態 |
+|------|------|
+| DNS / mixhost | **未変更** |
+| Load Balancer / SSL | **未作成** |
+| `MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true` | **未設定** |
+| POST `/u/:token` | **未実施** |
+| GCS suppression 実書込 | **なし** |
+| Gmail | **未変更** |
+| live Go/No-Go | **No-Go 維持** |
+
+#### 7.21.8 次の Human Approval
+
+1. **HTTPS/DNS 方式の確定**（A: LB+NEG vs B: ドメインマッピング）
+2. **mixhost DNS レコード追加**（`mailops.wantreach.jp`）
+3. 独自ドメインで公開 `/health` 再スモーク
+4. **`MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true`**（最後）
+5. POST `/u/:token` + GCS suppression スモーク 1 件
+
 ### 7.3 公開 endpoint（live 時）
 
 | Method | Path | 用途 | 認証 |
