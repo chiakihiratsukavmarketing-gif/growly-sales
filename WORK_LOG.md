@@ -249,6 +249,18 @@
 | 未実施 | 実 GCS / Cloud デプロイ / IAM / Secret / `MAIL_OPS_MODE=live` |
 | Phase 44.1 判定 | **No-Go 維持** |
 
+### 2026-07-07 — Phase 44.1 調査: mail-ops IAM・Secret 構成（設計案・未適用）
+
+| 項目 | 内容 |
+|------|------|
+| 既存参照 | `04-service-account.sh` / `GROWLY_SALES_CLOUD_SCHEDULER_DEPLOY.md` §3–4 |
+| SA 案 | `growly-mail-ops-runner`（Daily30 SA 非共有） |
+| GCS | `objectUser` + IAM Condition `mail-operations/**`、delete なし |
+| Invoker | サービス全体 `allUsers`（path 単位公開は不可） |
+| Secret 案 | `unsubscribe-token-pepper` のみ（Places/Daily30 token 不要） |
+| 未実施 | SA 作成 / IAM / Secret 作成 / Cloud Run デプロイ |
+| Phase 44.1 判定 | **No-Go 維持** |
+
 ## 2026-07-03 — Phase 42 通常運用UI改善 **完了** ✅
 
 **進行:** 通常運用UI改善 **7 / 7 フェーズ完了**

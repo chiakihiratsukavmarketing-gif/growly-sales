@@ -618,6 +618,14 @@ GET  /t/{token}.gif  # 44.3 将来
 | `Dockerfile` | ✅ `scripts/cloud/growly-mail-ops/Dockerfile` |
 | 実 GCS / Cloud / IAM / Secret | **未接続** |
 
+## 9.4 Phase 44.1 — mail-ops IAM・Secret 構成（調査済み・未適用）
+
+- **SA:** `growly-mail-ops-runner`（Daily30 SA と分離）
+- **GCS:** `roles/storage.objectUser` + IAM Condition `mail-operations/**`、delete なし
+- **Invoker:** `growly-sales-mail-ops` サービス全体を `allUsers`（path IAM 不可）
+- **Secret:** `unsubscribe-token-pepper` → `UNSUBSCRIBE_TOKEN_PEPPER`（未作成）
+- **除外:** Places / Daily30 token / Gmail 権限
+
 ## 10. DDL / env / Cloud 変更候補（実行しない・候補のみ）
 
 現行は **ローカル JSON + オプション GCS** のため RDB DDL は **Phase 43 では必須ではない**。将来 Supabase 等に移行する場合:

@@ -324,6 +324,71 @@ Cloud Run の **プラットフォーム request log** には実 URL path（`/u/
 
 **今回:** Cloud 設定変更なし。live 前に Human Approval で方針選択。
 
+### 7.16 IAM・Secret 構成案（調査済み・未適用）
+
+> **2026-07-07 読み取り調査:** 既存 Daily30 IAM（`04-service-account.sh` / `GROWLY_SALES_CLOUD_SCHEDULER_DEPLOY.md` §4）を監査。**IAM・Secret の実変更は未実施。**
+
+#### サービスアカウント（新規）
+
+| 項目 | 値 |
+|------|-----|
+| SA ID | `growly-mail-ops-runner` |
+| Email | `growly-mail-ops-runner@growly-scheduler.iam.gserviceaccount.com` |
+| Cloud Run バインド | `growly-sales-mail-ops` のみ |
+| Daily30 SA との共有 | **禁止** |
+
+#### GCS IAM（mail-ops SA）
+
+| 権限 | 範囲 | 備考 |
+|------|------|------|
+| `roles/storage.objectUser` | `prod/growly-sales/mail-operations/**` | **IAM Conditions で prefix 限定** |
+| `roles/storage.objectAdmin` | — | **付与しない**（delete 不可） |
+| Daily30 用 prefix | — | mail-ops SA から **アクセス不可** |
+
+既存 Daily30 SA（`growly-daily30-runner`）の bucket バインディングは **変更しない**。
+
+#### Cloud Run Invoker（公開）
+
+| サービス | invoker | 備考 |
+|----------|---------|------|
+| `growly-sales-mail-ops` | `allUsers` → `roles/run.invoker` | **サービス全体**（path 単位 IAM は GCP 非対応） |
+| `growly-sales-daily30` | 非公開維持 | Scheduler OIDC + token のみ |
+
+公開してよい route は **アプリ実装で限定**（`/health`, `/u/*`, 将来 `/t/*`）。管理 API は実装しない。
+
+#### Secret Manager（名前のみ）
+
+| Secret 名 | Cloud Run env | 用途 | 状態 |
+|-----------|---------------|------|------|
+| `unsubscribe-token-pepper` | `UNSUBSCRIBE_TOKEN_PEPPER` | token hash | **未作成** |
+| `open-tracking-token-pepper` | `OPEN_TRACKING_TOKEN_PEPPER` | 44.3 将来 | 未作成 |
+| `daily30-cloud-run-token` | — | mail-ops では **不要** | 既存（Daily30 のみ） |
+| `google-places-api-key` | — | mail-ops では **不要** | 既存（Daily30 のみ） |
+
+Secret 値は Console / CLI で人間が設定。docs・ログ・image に含めない。
+
+#### Cloud Run env（名前のみ・live 時）
+
+| 変数 | 値の例 | 備考 |
+|------|--------|------|
+| `MAIL_OPS_MODE` | `live` | Human Approval 後のみ |
+| `GROWLY_STORAGE_BACKEND` | `gcs` | |
+| `GROWLY_GCS_BUCKET` | 既存バケット名 | Daily30 と共有可 |
+| `GROWLY_GCS_PREFIX` | `prod/growly-sales` | |
+| `PUBLIC_BASE_URL` | 承認済みドメイン | 未決定 |
+| `NODE_ENV` | `production` | |
+
+**設定しない:** `GROWLY_CLOUD_RUN_API_ONLY`, Places / Daily30 token 系。
+
+#### 人間作業チェックリスト（IAM/Secret）
+
+1. SA `growly-mail-ops-runner` 作成
+2. GCS prefix 限定 `objectUser`（Condition 付き）
+3. Secret `unsubscribe-token-pepper` 作成 + SA に accessor
+4. Cloud Run デプロイ + `allUsers` invoker（サービス単位）
+5. env / `--set-secrets` 設定（値は Secret Manager 経由）
+6. **Daily30 サービス・SA・Secret は非接触**
+
 ### 7.3 公開 endpoint（live 時）
 
 | Method | Path | 用途 | 認証 |
