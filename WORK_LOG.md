@@ -261,6 +261,19 @@
 | 未実施 | SA 作成 / IAM / Secret 作成 / Cloud Run デプロイ |
 | Phase 44.1 判定 | **No-Go 維持** |
 
+### 2026-07-07 — Phase 44.1 統合: live readiness guards ✅
+
+| 項目 | 内容 |
+|------|------|
+| Runtime config | `mailOpsRuntimeConfig.ts` — mock 既定・値非表示 |
+| Readiness | `validateMailOpsLiveReadiness` — HTTPS / GCS / pepper / localhost 拒否 |
+| Server | `mailOpsServerContext` + health 503 / live guard / store factory |
+| Validate CLI | `npm run growly-sales:mail-ops:validate` |
+| チェックリスト | §7.18 適用前手順（実行なし） |
+| verify | Phase 44.1 +14件 / 2902 passed（既存失敗あり） |
+| 未実施 | MAIL_OPS_MODE=live 実環境 / GCS / IAM / Secret / Cloud |
+| Phase 44.1 判定 | **No-Go 維持** |
+
 ## 2026-07-03 — Phase 42 通常運用UI改善 **完了** ✅
 
 **進行:** 通常運用UI改善 **7 / 7 フェーズ完了**

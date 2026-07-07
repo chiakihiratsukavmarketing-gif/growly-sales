@@ -1,7 +1,7 @@
 # Growly Sales — NEXT_TASKS
 
 **更新日:** 2026-07-07
-**進行:** Phase 43 **4 / 4** 完了 / Phase 44 **0 / 3**（44.1 準備 **9 / 15**・No-Go 維持）
+**進行:** Phase 43 **4 / 4** 完了 / Phase 44 **0 / 3**（44.1 準備 **11 / 15**・No-Go 維持）
 
 ---
 
@@ -53,8 +53,10 @@
 | 6 | GCS 保存設計承認・commit | ✅ `be9d026` |
 | 7 | mail-ops Cloud Run 設計調査 | ✅ `84739d1` |
 | 8 | GCS store 土台 + mail-ops slim コンテナ | ✅ `cf5deed` |
-| 9 | IAM・Secret 構成調査 | ✅ 本セッション（docs のみ） |
-| 10–15 | live 接続・デプロイ準備等 | 未 |
+| 9 | IAM・Secret 構成調査 | ✅ `33e6895` |
+| 10 | live readiness 統合・起動安全性 | ✅ 本セッション |
+| 11 | Cloud・Secret・IAM 適用前チェックリスト | ✅ §7.18（実行なし） |
+| 12–15 | 実適用・live 接続・Go 再評価等 | 未 |
 
 ### Phase 43 完了（mock・参照）
 

@@ -1,13 +1,11 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { randomUUID } from 'node:crypto';
-import { getMailOpsMode } from './suppressionPolicy.js';
+import { logMailOpsRequest } from '../mailOpsRequestLogging.js';
 import {
-  getMockUnsubscribeScreen,
-  postMockUnsubscribeScreen,
-} from './mockUnsubscribeScreen.js';
-import { isMailOpsStorageReady } from './createMailSuppressionStore.js';
-import { MAIL_OPS_SERVICE_NAME } from './mailOpsRequestLogging.js';
-import { logMailOpsRequest, tokenHashPrefixFromRawToken } from './mailOpsRequestLogging.js';
+  createMailOpsServerContext,
+  getMailOpsServerContext,
+  type MailOpsServerContext,
+} from './mailOpsServerContext.js';
 
 const PORT = Number(process.env.PORT ?? process.env.GROWLY_UI_PORT ?? 8080);
 
@@ -26,56 +24,54 @@ function parsePathname(req: IncomingMessage): string {
   return q === -1 ? url : url.slice(0, q);
 }
 
-async function handleHealth(res: ServerResponse): Promise<void> {
-  const mode = getMailOpsMode();
-  const storageReady = isMailOpsStorageReady(mode);
-  const ok = mode === 'mock' ? true : storageReady;
-  const status = ok ? 200 : 503;
-  sendJson(res, status, {
-    ok,
-    service: MAIL_OPS_SERVICE_NAME,
-    mode,
-    storageReady,
-  });
+function buildTemporaryErrorResponse(liveConnected: boolean) {
+  return {
+    ok: false,
+    screenState: 'temporary_error' as const,
+    isMock: false,
+    liveConnected,
+  };
+}
+
+async function handleHealth(res: ServerResponse, ctx: MailOpsServerContext): Promise<void> {
+  const health = ctx.buildHealth();
+  sendJson(res, ctx.healthHttpStatus(health), health);
 }
 
 async function handleUnsubscribe(
-  req: IncomingMessage,
   res: ServerResponse,
   token: string,
-  method: 'GET' | 'POST'
-): Promise<void> {
-  const mode = getMailOpsMode();
-  if (mode === 'live' && !isMailOpsStorageReady('live')) {
-    sendJson(res, 503, {
-      ok: false,
-      screenState: 'temporary_error',
-      isMock: false,
-      liveConnected: false,
-    });
-    return;
-  }
+  method: 'GET' | 'POST',
+  ctx: MailOpsServerContext
+): Promise<{ status: number; screenState?: string }> {
+  const config = ctx.loadConfig();
+  const readiness = ctx.validateReadiness(config);
 
-  if (mode === 'mock') {
+  if (config.mode === 'mock') {
     const payload =
       method === 'GET'
-        ? await getMockUnsubscribeScreen(token)
-        : await postMockUnsubscribeScreen(token);
-    sendJson(res, payload.ok ? 200 : method === 'GET' && payload.screenState === 'invalid_or_expired' ? 404 : 200, payload);
-    return;
+        ? await ctx.getMockUnsubscribeScreen(token)
+        : await ctx.postMockUnsubscribeScreen(token);
+    const status =
+      payload.ok ? 200 : method === 'GET' && payload.screenState === 'invalid_or_expired' ? 404 : 200;
+    sendJson(res, status, payload);
+    return { status, screenState: payload.screenState };
   }
 
-  sendJson(res, 503, {
-    ok: false,
-    screenState: 'temporary_error',
-    isMock: false,
-    liveConnected: false,
-  });
+  if (!ctx.canProcessUnsubscribe(config, readiness)) {
+    const liveConnected = ctx.isLiveConnected(config, readiness);
+    sendJson(res, 503, buildTemporaryErrorResponse(liveConnected));
+    return { status: 503, screenState: 'temporary_error' };
+  }
+
+  sendJson(res, 503, buildTemporaryErrorResponse(false));
+  return { status: 503, screenState: 'temporary_error' };
 }
 
 export async function handleMailOpsRequest(
   req: IncomingMessage,
-  res: ServerResponse
+  res: ServerResponse,
+  ctx: MailOpsServerContext = getMailOpsServerContext()
 ): Promise<void> {
   const started = Date.now();
   const correlationId = randomUUID();
@@ -84,7 +80,7 @@ export async function handleMailOpsRequest(
 
   try {
     if (method === 'GET' && pathname === '/health') {
-      await handleHealth(res);
+      await handleHealth(res, ctx);
       logMailOpsRequest({
         method,
         pathname,
@@ -97,16 +93,16 @@ export async function handleMailOpsRequest(
 
     const tokenMatch = pathname.match(/^\/u\/([^/]+)$/);
     if (tokenMatch) {
-      const token = decodeURIComponent(tokenMatch[1]);
       if (method === 'GET' || method === 'POST') {
-        await handleUnsubscribe(req, res, token, method);
+        const token = decodeURIComponent(tokenMatch[1]);
+        const result = await handleUnsubscribe(res, token, method, ctx);
         logMailOpsRequest({
           method,
           pathname,
-          status: res.statusCode || 200,
+          status: result.status,
           durationMs: Date.now() - started,
           correlationId,
-          tokenHashPrefix: tokenHashPrefixFromRawToken(token),
+          screenState: result.screenState,
         });
         return;
       }
@@ -132,11 +128,15 @@ export async function handleMailOpsRequest(
   }
 }
 
-export function startMailOpsServer(): void {
+export function startMailOpsServer(ctx?: MailOpsServerContext): void {
+  const context = ctx ?? createMailOpsServerContext();
   const server = createServer((req, res) => {
-    void handleMailOpsRequest(req, res);
+    void handleMailOpsRequest(req, res, context);
   });
   server.listen(PORT, () => {
-    console.info(`[mail-ops] listening on port ${PORT} mode=${getMailOpsMode()}`);
+    const health = context.buildHealth();
+    console.info(
+      `[mail-ops] listening on port ${PORT} mode=${health.mode} liveConnected=${health.liveConnected}`
+    );
   });
 }

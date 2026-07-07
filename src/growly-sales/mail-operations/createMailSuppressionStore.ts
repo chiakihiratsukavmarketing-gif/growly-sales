@@ -1,17 +1,18 @@
 import type { GrowlyStorageBackend } from '../config/storageBackend.js';
-import {
-  GcsStorageNotConfiguredError,
-  InvalidStorageBackendError,
-  getGcsBucketName,
-  getStorageBackend,
-} from '../config/storageBackend.js';
+import { InvalidStorageBackendError } from '../config/storageBackend.js';
 import type { MailSuppressionStore } from './suppressionTypes.js';
 import { LocalJsonMailSuppressionStore } from './suppressionStoreInterface.js';
 import { GcsJsonMailSuppressionStore } from './gcsJsonMailSuppressionStore.js';
 import type { GcsJsonStoragePort } from './gcsJsonStoragePort.js';
-import { getMailOpsMode } from './suppressionPolicy.js';
+import {
+  loadMailOpsRuntimeConfig,
+  type MailOpsMode,
+  type MailOpsRuntimeConfig,
+} from './config/mailOpsRuntimeConfig.js';
+import { validateMailOpsLiveReadiness } from './validateMailOpsLiveReadiness.js';
+import { assertUnsubscribeTokenPepperForLive } from './resolveUnsubscribeTokenPepper.js';
 
-export type MailSuppressionStoreMode = 'mock' | 'live';
+export type MailSuppressionStoreMode = MailOpsMode;
 
 export class MailOpsConfigurationError extends Error {
   constructor(message: string) {
@@ -24,37 +25,51 @@ export interface CreateMailSuppressionStoreInput {
   mode?: MailSuppressionStoreMode;
   storageBackend?: GrowlyStorageBackend;
   gcsStorage?: GcsJsonStoragePort;
+  env?: NodeJS.ProcessEnv;
+  config?: MailOpsRuntimeConfig;
 }
 
 export function createMailSuppressionStore(
   input: CreateMailSuppressionStoreInput = {}
 ): MailSuppressionStore {
-  const mode = input.mode ?? getMailOpsMode();
-  let backend: GrowlyStorageBackend;
-  try {
-    backend = input.storageBackend ?? getStorageBackend();
-  } catch (err) {
-    if (err instanceof InvalidStorageBackendError) {
-      throw new MailOpsConfigurationError(err.message);
-    }
-    throw err;
-  }
+  const env = input.env ?? process.env;
+  const config = input.config ?? loadMailOpsRuntimeConfig(env);
+  const mode = input.mode ?? config.mode;
+  const backend = input.storageBackend ?? config.storageBackend;
 
   if (mode !== 'live') {
     return new LocalJsonMailSuppressionStore();
   }
 
-  if (backend === 'local') {
+  const readiness = validateMailOpsLiveReadiness({ ...config, mode: 'live' });
+  if (!readiness.ready) {
+    throw new MailOpsConfigurationError(
+      `mail-ops live 設定が不足しています: ${readiness.missing.join(', ')}`
+    );
+  }
+
+  if (backend === 'local' || backend === null) {
     throw new MailOpsConfigurationError(
       'MAIL_OPS_MODE=live では GROWLY_STORAGE_BACKEND=gcs が必須です'
     );
+  }
+
+  if (backend === 'unknown') {
+    throw new MailOpsConfigurationError('不明なストレージ backend です');
   }
 
   if (backend !== 'gcs') {
     throw new MailOpsConfigurationError('不明なストレージ backend です');
   }
 
-  if (!getGcsBucketName()) {
+  try {
+    assertUnsubscribeTokenPepperForLive('live', env);
+  } catch (err) {
+    if (err instanceof MailOpsConfigurationError) throw err;
+    throw new MailOpsConfigurationError('UNSUBSCRIBE_TOKEN_PEPPER が未設定です');
+  }
+
+  if (!config.gcsBucketConfigured) {
     throw new MailOpsConfigurationError('GCS バケットが未設定です');
   }
 
@@ -63,24 +78,29 @@ export function createMailSuppressionStore(
   });
 }
 
-export function assertMailOpsLiveStorageConfigured(): void {
-  createMailSuppressionStore({ mode: 'live' });
+export function tryCreateMailSuppressionStore(
+  input: CreateMailSuppressionStoreInput = {}
+): MailSuppressionStore | null {
+  try {
+    return createMailSuppressionStore(input);
+  } catch (err) {
+    if (err instanceof MailOpsConfigurationError) return null;
+    if (err instanceof InvalidStorageBackendError) return null;
+    throw err;
+  }
 }
 
-export function isMailOpsStorageReady(mode: MailSuppressionStoreMode = getMailOpsMode()): boolean {
-  try {
-    if (mode === 'mock') {
-      createMailSuppressionStore({ mode: 'mock', storageBackend: 'local' });
-      return true;
-    }
-    if (!process.env.UNSUBSCRIBE_TOKEN_PEPPER?.trim()) {
-      return false;
-    }
-    createMailSuppressionStore({ mode: 'live', storageBackend: 'gcs' });
+export function isMailOpsStorageReady(
+  mode: MailSuppressionStoreMode = loadMailOpsRuntimeConfig().mode,
+  env: NodeJS.ProcessEnv = process.env
+): boolean {
+  const config = loadMailOpsRuntimeConfig(env);
+  if (mode === 'mock' || config.mode === 'mock') {
     return true;
-  } catch (err) {
-    if (err instanceof GcsStorageNotConfiguredError) return false;
-    if (err instanceof MailOpsConfigurationError) return false;
+  }
+  const readiness = validateMailOpsLiveReadiness({ ...config, mode: 'live' });
+  if (!readiness.ready) {
     return false;
   }
+  return tryCreateMailSuppressionStore({ mode: 'live', env, config }) !== null;
 }

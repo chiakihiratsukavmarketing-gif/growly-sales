@@ -8781,20 +8781,26 @@ async function verifyPhase441MailOpsOnlyRoutes(): Promise<void> {
 }
 
 async function verifyPhase441MailOpsHealthFailClosed(): Promise<void> {
-  const { isMailOpsStorageReady } = await import('../mail-operations/createMailSuppressionStore.js');
-  const prevMode = process.env.MAIL_OPS_MODE;
-  const prevPepper = process.env.UNSUBSCRIBE_TOKEN_PEPPER;
-  process.env.MAIL_OPS_MODE = 'live';
-  delete process.env.UNSUBSCRIBE_TOKEN_PEPPER;
-  assert(!isMailOpsStorageReady('live'), 'live health not ready without pepper');
-  process.env.UNSUBSCRIBE_TOKEN_PEPPER = 'test-pepper-not-for-production';
-  process.env.GROWLY_STORAGE_BACKEND = 'gcs';
-  process.env.GROWLY_GCS_BUCKET = 'test-bucket-name';
-  assert(isMailOpsStorageReady('live'), 'live health ready with gcs config and pepper name set');
-  if (prevMode === undefined) delete process.env.MAIL_OPS_MODE;
-  else process.env.MAIL_OPS_MODE = prevMode;
-  if (prevPepper === undefined) delete process.env.UNSUBSCRIBE_TOKEN_PEPPER;
-  else process.env.UNSUBSCRIBE_TOKEN_PEPPER = prevPepper;
+  const { createMailOpsServerContext } = await import('../mail-operations/server/mailOpsServerContext.js');
+  const ctx = createMailOpsServerContext({
+    env: { ...process.env, MAIL_OPS_MODE: 'live' },
+  });
+  const health = ctx.buildHealth();
+  assert(!health.ok, 'live health not ok without full config');
+  const readyCtx = createMailOpsServerContext({
+    env: {
+      ...process.env,
+      MAIL_OPS_MODE: 'live',
+      PUBLIC_BASE_URL: 'https://mailops.wantreach.jp',
+      GROWLY_STORAGE_BACKEND: 'gcs',
+      GROWLY_GCS_BUCKET: 'configured',
+      GROWLY_GCS_PREFIX: 'configured',
+      UNSUBSCRIBE_TOKEN_PEPPER: 'configured',
+    },
+  });
+  const readyHealth = readyCtx.buildHealth();
+  assert(readyHealth.ok, 'live health ok when config complete');
+  assert(readyHealth.liveConnected === false, 'liveConnected remains false without external flag');
   ok('Phase 44.1 mail-ops health fail closed checks passed');
 }
 
@@ -8834,6 +8840,209 @@ async function verifyPhase441NoLiveGcsOperation(): Promise<void> {
   if (prevBackend === undefined) delete process.env.GROWLY_STORAGE_BACKEND;
   else process.env.GROWLY_STORAGE_BACKEND = prevBackend;
   ok('Phase 44.1 no live gcs operation checks passed');
+}
+
+async function verifyPhase441MailOpsRuntimeConfig(): Promise<void> {
+  const { loadMailOpsRuntimeConfig } = await import('../mail-operations/config/mailOpsRuntimeConfig.js');
+  const prevMode = process.env.MAIL_OPS_MODE;
+  delete process.env.MAIL_OPS_MODE;
+  const mockConfig = loadMailOpsRuntimeConfig(process.env);
+  assert(mockConfig.mode === 'mock', 'default mode is mock');
+  process.env.MAIL_OPS_MODE = 'live';
+  const liveConfig = loadMailOpsRuntimeConfig(process.env);
+  assert(liveConfig.mode === 'live', 'live mode parsed');
+  if (prevMode === undefined) delete process.env.MAIL_OPS_MODE;
+  else process.env.MAIL_OPS_MODE = prevMode;
+  ok('Phase 44.1 mail-ops runtime config checks passed');
+}
+
+async function verifyPhase441LiveReadinessRejectsHttp(): Promise<void> {
+  const { loadMailOpsRuntimeConfig } = await import('../mail-operations/config/mailOpsRuntimeConfig.js');
+  const { validateMailOpsLiveReadiness } = await import('../mail-operations/validateMailOpsLiveReadiness.js');
+  const config = loadMailOpsRuntimeConfig({
+    ...process.env,
+    MAIL_OPS_MODE: 'live',
+    PUBLIC_BASE_URL: 'http://mailops.wantreach.jp',
+    GROWLY_STORAGE_BACKEND: 'gcs',
+    GROWLY_GCS_BUCKET: 'configured',
+    GROWLY_GCS_PREFIX: 'configured',
+    UNSUBSCRIBE_TOKEN_PEPPER: 'configured',
+  });
+  const result = validateMailOpsLiveReadiness(config);
+  assert(!result.ready, 'http public base url rejected');
+  assert(result.missing.includes('PUBLIC_BASE_URL_HTTPS'), 'missing https flag');
+  ok('Phase 44.1 live readiness rejects http checks passed');
+}
+
+async function verifyPhase441LiveReadinessRejectsLocalhost(): Promise<void> {
+  const { loadMailOpsRuntimeConfig } = await import('../mail-operations/config/mailOpsRuntimeConfig.js');
+  const { validateMailOpsLiveReadiness } = await import('../mail-operations/validateMailOpsLiveReadiness.js');
+  const config = loadMailOpsRuntimeConfig({
+    ...process.env,
+    MAIL_OPS_MODE: 'live',
+    PUBLIC_BASE_URL: 'https://localhost/u',
+    GROWLY_STORAGE_BACKEND: 'gcs',
+    GROWLY_GCS_BUCKET: 'configured',
+    GROWLY_GCS_PREFIX: 'configured',
+    UNSUBSCRIBE_TOKEN_PEPPER: 'configured',
+  });
+  const result = validateMailOpsLiveReadiness(config);
+  assert(!result.ready, 'localhost public base url rejected');
+  assert(result.missing.includes('PUBLIC_BASE_URL_NOT_LOCALHOST'), 'missing localhost flag');
+  ok('Phase 44.1 live readiness rejects localhost checks passed');
+}
+
+async function verifyPhase441LiveReadinessRequiresGcs(): Promise<void> {
+  const { loadMailOpsRuntimeConfig } = await import('../mail-operations/config/mailOpsRuntimeConfig.js');
+  const { validateMailOpsLiveReadiness } = await import('../mail-operations/validateMailOpsLiveReadiness.js');
+  const config = loadMailOpsRuntimeConfig({
+    ...process.env,
+    MAIL_OPS_MODE: 'live',
+    PUBLIC_BASE_URL: 'https://mailops.wantreach.jp',
+    GROWLY_STORAGE_BACKEND: 'local',
+    UNSUBSCRIBE_TOKEN_PEPPER: 'configured',
+  });
+  const result = validateMailOpsLiveReadiness(config);
+  assert(!result.ready, 'local backend rejected for live');
+  assert(result.missing.includes('GROWLY_STORAGE_BACKEND'), 'missing gcs backend');
+  ok('Phase 44.1 live readiness requires gcs checks passed');
+}
+
+async function verifyPhase441LiveReadinessRequiresPepper(): Promise<void> {
+  const { loadMailOpsRuntimeConfig } = await import('../mail-operations/config/mailOpsRuntimeConfig.js');
+  const { validateMailOpsLiveReadiness } = await import('../mail-operations/validateMailOpsLiveReadiness.js');
+  const config = loadMailOpsRuntimeConfig({
+    ...process.env,
+    MAIL_OPS_MODE: 'live',
+    PUBLIC_BASE_URL: 'https://mailops.wantreach.jp',
+    GROWLY_STORAGE_BACKEND: 'gcs',
+    GROWLY_GCS_BUCKET: 'configured',
+    GROWLY_GCS_PREFIX: 'configured',
+  });
+  const result = validateMailOpsLiveReadiness(config);
+  assert(!result.ready, 'missing pepper rejected');
+  assert(result.missing.includes('UNSUBSCRIBE_TOKEN_PEPPER'), 'missing pepper name');
+  ok('Phase 44.1 live readiness requires pepper checks passed');
+}
+
+async function verifyPhase441StoreFactoryIntegrated(): Promise<void> {
+  const server = await readFile(join(SRC_ROOT, 'mail-operations/server/mailOpsServer.ts'), 'utf-8');
+  assert(server.includes('createMailOpsServerContext'), 'server uses mail-ops context');
+  assert(server.includes('tryCreateStore') || server.includes('canProcessUnsubscribe'), 'server gates unsubscribe');
+  const ctxModule = await readFile(join(SRC_ROOT, 'mail-operations/server/mailOpsServerContext.ts'), 'utf-8');
+  assert(ctxModule.includes('createMailSuppressionStore'), 'context integrates store factory');
+  ok('Phase 44.1 store factory integrated checks passed');
+}
+
+async function verifyPhase441HealthMockSafe(): Promise<void> {
+  const { createMailOpsServerContext } = await import('../mail-operations/server/mailOpsServerContext.js');
+  const ctx = createMailOpsServerContext({
+    env: { ...process.env, MAIL_OPS_MODE: 'mock' },
+  });
+  const health = ctx.buildHealth();
+  assert(health.ok && health.mode === 'mock', 'mock health ok');
+  assert(health.liveConnected === false, 'mock liveConnected false');
+  assert(health.storageReady === true, 'mock storage ready');
+  ok('Phase 44.1 health mock safe checks passed');
+}
+
+async function verifyPhase441HealthLiveMissingReturns503(): Promise<void> {
+  const { createMailOpsServerContext } = await import('../mail-operations/server/mailOpsServerContext.js');
+  const ctx = createMailOpsServerContext({
+    env: { ...process.env, MAIL_OPS_MODE: 'live' },
+  });
+  const health = ctx.buildHealth();
+  assert(!health.ok, 'live missing config health not ok');
+  assert(health.mode === 'live', 'live mode reported');
+  assert(health.liveConnected === false, 'liveConnected false without external connection');
+  assert(Array.isArray(health.missingConfiguration), 'missing configuration names returned');
+  assert(ctx.healthHttpStatus(health) === 503, 'health status 503 when not ready');
+  ok('Phase 44.1 health live missing returns 503 checks passed');
+}
+
+async function verifyPhase441LiveGuardReturnsTemporaryError(): Promise<void> {
+  const { createMailOpsServerContext } = await import('../mail-operations/server/mailOpsServerContext.js');
+  const ctx = createMailOpsServerContext({
+    env: { ...process.env, MAIL_OPS_MODE: 'live' },
+  });
+  const config = ctx.loadConfig();
+  const readiness = ctx.validateReadiness(config);
+  assert(!ctx.canProcessUnsubscribe(config, readiness), 'live guard blocks unsubscribe when not ready');
+  ok('Phase 44.1 live guard returns temporary error checks passed');
+}
+
+async function verifyPhase441NoConfigurationValuesInHealth(): Promise<void> {
+  const { createMailOpsServerContext } = await import('../mail-operations/server/mailOpsServerContext.js');
+  const ctx = createMailOpsServerContext({
+    env: {
+      ...process.env,
+      MAIL_OPS_MODE: 'live',
+      PUBLIC_BASE_URL: 'https://mailops.wantreach.jp',
+      GROWLY_GCS_BUCKET: 'secret-bucket-name',
+      GROWLY_GCS_PREFIX: 'secret-prefix',
+      UNSUBSCRIBE_TOKEN_PEPPER: 'secret-pepper-value',
+    },
+  });
+  const health = ctx.buildHealth();
+  const serialized = JSON.stringify(health);
+  assert(!serialized.includes('secret-bucket-name'), 'health hides bucket value');
+  assert(!serialized.includes('secret-prefix'), 'health hides prefix value');
+  assert(!serialized.includes('secret-pepper-value'), 'health hides pepper value');
+  ok('Phase 44.1 no configuration values in health checks passed');
+}
+
+async function verifyPhase441NoRawPathApplicationLogging(): Promise<void> {
+  const logging = await readFile(join(SRC_ROOT, 'mail-operations/mailOpsRequestLogging.ts'), 'utf-8');
+  assert(!logging.includes('tokenHashPrefix'), 'token hash prefix not logged');
+  assert(!logging.includes('tokenPrefix'), 'raw token prefix not logged');
+  const server = await readFile(join(SRC_ROOT, 'mail-operations/server/mailOpsServer.ts'), 'utf-8');
+  assert(!server.includes('tokenHashPrefixFromRawToken'), 'server does not pass token prefix to logs');
+  ok('Phase 44.1 no raw path application logging checks passed');
+}
+
+async function verifyPhase441StartupValidationCommand(): Promise<void> {
+  const pkg = await readFile(join(PROJECT_ROOT, 'package.json'), 'utf-8');
+  assert(pkg.includes('growly-sales:mail-ops:validate'), 'validate npm script exists');
+  const script = await readFile(
+    join(SRC_ROOT, 'scripts/run-growly-sales-mail-ops-validate.ts'),
+    'utf-8'
+  );
+  assert(script.includes('missing:'), 'validate prints missing names only');
+  assert(!script.includes('process.env.GROWLY_GCS_BUCKET'), 'validate does not print bucket env value');
+  ok('Phase 44.1 startup validation command checks passed');
+}
+
+async function verifyPhase441ContainerEntrypointIsolation(): Promise<void> {
+  const dockerfile = await readFile(
+    join(PROJECT_ROOT, 'scripts/cloud/growly-mail-ops/Dockerfile'),
+    'utf-8'
+  );
+  assert(dockerfile.includes('run-growly-sales-mail-ops.ts'), 'mail-ops entrypoint only');
+  assert(!dockerfile.includes('run-growly-sales-ui.ts'), 'ui server not in mail-ops image');
+  assert(!dockerfile.includes('data/growly-sales'), 'runtime data not copied');
+  const mailOps = await readFile(join(SRC_ROOT, 'mail-operations/server/mailOpsServer.ts'), 'utf-8');
+  assert(!mailOps.includes('uiServer'), 'mail-ops server isolated from ui server');
+  ok('Phase 44.1 container entrypoint isolation checks passed');
+}
+
+async function verifyPhase441NoLiveExternalConnection(): Promise<void> {
+  const { createMailOpsServerContext } = await import('../mail-operations/server/mailOpsServerContext.js');
+  const { isMailOpsLiveExternallyConnected } = await import('../mail-operations/config/mailOpsRuntimeConfig.js');
+  assert(!isMailOpsLiveExternallyConnected({}), 'external connection disabled by default');
+  const ctx = createMailOpsServerContext({
+    env: {
+      ...process.env,
+      MAIL_OPS_MODE: 'live',
+      PUBLIC_BASE_URL: 'https://mailops.wantreach.jp',
+      GROWLY_STORAGE_BACKEND: 'gcs',
+      GROWLY_GCS_BUCKET: 'configured',
+      GROWLY_GCS_PREFIX: 'configured',
+      UNSUBSCRIBE_TOKEN_PEPPER: 'configured',
+    },
+  });
+  const health = ctx.buildHealth();
+  assert(health.liveConnected === false, 'liveConnected false without external flag');
+  ok('Phase 44.1 no live external connection checks passed');
 }
 
 function verifyPhase20LiteEmailImprovement(): void {
@@ -9316,6 +9525,20 @@ async function main(): Promise<void> {
   await verifyPhase441NoRawTokenLogging();
   await verifyPhase441MailOpsDockerfile();
   await verifyPhase441NoLiveGcsOperation();
+  await verifyPhase441MailOpsRuntimeConfig();
+  await verifyPhase441LiveReadinessRejectsHttp();
+  await verifyPhase441LiveReadinessRejectsLocalhost();
+  await verifyPhase441LiveReadinessRequiresGcs();
+  await verifyPhase441LiveReadinessRequiresPepper();
+  await verifyPhase441StoreFactoryIntegrated();
+  await verifyPhase441HealthMockSafe();
+  await verifyPhase441HealthLiveMissingReturns503();
+  await verifyPhase441LiveGuardReturnsTemporaryError();
+  await verifyPhase441NoConfigurationValuesInHealth();
+  await verifyPhase441NoRawPathApplicationLogging();
+  await verifyPhase441StartupValidationCommand();
+  await verifyPhase441ContainerEntrypointIsolation();
+  await verifyPhase441NoLiveExternalConnection();
   verifyPhase20LiteEmailImprovement();
   await verifyPhase20LiteEmailImprovementAsync();
   await verifyPhaseBLeadInventory();

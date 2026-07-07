@@ -13,12 +13,6 @@ export function normalizeMailOpsRouteTemplate(method: string, pathname: string):
   return null;
 }
 
-export function tokenHashPrefixFromRawToken(token: string): string | undefined {
-  const trimmed = token.trim();
-  if (!trimmed) return undefined;
-  return trimmed.slice(0, 4);
-}
-
 export function logMailOpsRequest(input: {
   method: string;
   pathname: string;
@@ -26,7 +20,6 @@ export function logMailOpsRequest(input: {
   durationMs: number;
   correlationId: string;
   screenState?: string;
-  tokenHashPrefix?: string;
 }): void {
   const routeTemplate = normalizeMailOpsRouteTemplate(input.method, input.pathname);
   const parts = [
@@ -36,7 +29,6 @@ export function logMailOpsRequest(input: {
     `status=${input.status}`,
     `durationMs=${input.durationMs}`,
     input.screenState ? `screenState=${input.screenState}` : null,
-    input.tokenHashPrefix ? `tokenPrefix=${input.tokenHashPrefix}` : null,
   ].filter(Boolean);
   console.info(parts.join(' '));
 }

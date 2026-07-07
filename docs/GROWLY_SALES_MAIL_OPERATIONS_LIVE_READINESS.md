@@ -324,6 +324,21 @@ Cloud Run の **プラットフォーム request log** には実 URL path（`/u/
 
 **今回:** Cloud 設定変更なし。live 前に Human Approval で方針選択。
 
+**アプリケーションログ方針（step 10 実装）:**
+
+- 記録: `method`, `routeTemplate`, `status`, `durationMs`, `correlationId`, `screenState`
+- **記録しない:** raw URL / raw path / raw token / query / email / maskedEmail / contactEmail / bucket / prefix / Secret
+- **tokenHashPrefix も原則記録しない**
+
+**本番デプロイ前の追加確認:**
+
+- Cloud Run 等プラットフォーム request log に path が残る可能性がある（完全防止はアプリログのみでは不可）
+- ログ閲覧 IAM を最小化する
+- 保持期間・除外設定をデプロイ前に確認する
+- token は期限付き・失効可能・高エントロピー
+- 将来、URL へ秘密値を載せない方式を検討する
+- Load Balancer rewrite 単独を完全対策とみなさない
+
 ### 7.16 IAM・Secret 構成案（調査済み・未適用）
 
 > **2026-07-07 読み取り調査:** 既存 Daily30 IAM（`04-service-account.sh` / `GROWLY_SALES_CLOUD_SCHEDULER_DEPLOY.md` §4）を監査。**IAM・Secret の実変更は未実施。**
@@ -388,6 +403,77 @@ Secret 値は Console / CLI で人間が設定。docs・ログ・image に含め
 4. Cloud Run デプロイ + `allUsers` invoker（サービス単位）
 5. env / `--set-secrets` 設定（値は Secret Manager 経由）
 6. **Daily30 サービス・SA・Secret は非接触**
+
+### 7.17 Live readiness 統合（step 10・live 未接続）
+
+| コンポーネント | パス | 状態 |
+|----------------|------|------|
+| Runtime config | `config/mailOpsRuntimeConfig.ts` | ✅ mode / 設定有無のみ（値は health 非表示） |
+| Readiness validator | `validateMailOpsLiveReadiness.ts` | ✅ HTTPS / localhost 拒否 / GCS / pepper |
+| Pepper resolver | `resolveUnsubscribeTokenPepper.ts` | ✅ DI 可・ログ非表示 |
+| Server context | `server/mailOpsServerContext.ts` | ✅ store factory 統合・`liveConnected` 制御 |
+| Startup validate | `npm run growly-sales:mail-ops:validate` | ✅ mock=0 / live 不足=1 |
+
+**`liveConnected` ルール:** `MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true` かつ readiness 成功時のみ `true`。本フェーズでは **常に false**（実 GCS 未接続）。
+
+**公開ドメイン:** `mailops.wantreach.jp` は tenant 既定で承認済み。`PUBLIC_BASE_URL` **実 env 設定は未実施**。
+
+### 7.18 Cloud・Secret・IAM 適用前チェックリスト（step 11・実行しない）
+
+> **ここまでで停止。** 以下は人間作業の順序案のみ。コマンドは DRY-RUN または placeholder。実操作は Human Approval 後。
+
+#### 事前確認（すべて必須）
+
+| # | 確認 | 状態 |
+|---|------|------|
+| 1 | `npm run growly-sales:mail-ops:validate` が mock で exit 0 | コード済み |
+| 2 | `npm run growly-sales:verify` Phase 44.1 全件 pass | コード済み |
+| 3 | GCS / IAM / Secret 設計 Human Approval | 設計済み・実適用なし |
+| 4 | `PUBLIC_BASE_URL=https://mailops.wantreach.jp` 決定 | **未設定** |
+| 5 | DNS / HTTPS 証明書準備 | 未 |
+| 6 | rollback 手順（§11）の確認 | 文書済み |
+
+#### 推奨適用順序（人間・停止線あり）
+
+```
+1. Secret Manager: unsubscribe-token-pepper 作成（値は人間のみ）
+2. SA growly-mail-ops-runner 作成
+3. GCS IAM: mail-operations/** prefix 限定 objectUser（delete なし）
+4. Secret accessor を mail-ops SA のみに付与
+5. Artifact Registry: growly-sales-mail-ops イメージ build/push（GROWLY_MAIL_OPS_CONFIRM=1）
+6. Cloud Run deploy growly-sales-mail-ops（env 名のみ・--set-secrets）
+7. allUsers invoker（サービス全体・path IAM 不可）
+8. DNS → PUBLIC_BASE_URL
+9. MAIL_OPS_MODE=live + MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true（最後・Human Approval）
+10. /health 200 + missing なしを確認
+11. GET/POST /u/:token スモーク（1件・本番 token）
+```
+
+#### 各ステップ後の確認
+
+| ステップ後 | 確認 |
+|-----------|------|
+| Secret 作成 | SA にのみ accessor。値が docs / git に無いこと |
+| IAM | Daily30 SA 変更なし。delete 権限なし |
+| Cloud Run デプロイ | UI / Daily30 route が無いこと。`/health` のみ公開情報 |
+| live 有効化 | `liveConnected: true` になること。suppression テスト 1 件 |
+
+#### Rollback（適用後に問題があれば）
+
+1. `MAIL_OPS_MODE=mock`（リンク生成停止）
+2. `MAIL_OPS_LIVE_EXTERNAL_CONNECTED` 削除または false
+3. Cloud Run リビジョン rollback（mail-ops のみ）
+4. DNS / LB から切り離し
+5. **suppression データは削除しない**
+
+#### 実行禁止（本チェックリストでは行わない）
+
+- Cloud Run 作成・更新
+- Secret 作成・値設定
+- IAM binding 実適用
+- `allUsers` invoker 付与
+- GCS live 書き込みテスト
+- DNS 変更
 
 ### 7.3 公開 endpoint（live 時）
 

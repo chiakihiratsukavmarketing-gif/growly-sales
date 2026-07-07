@@ -62,9 +62,24 @@ export { LocalJsonMailSuppressionStore } from './suppressionStoreInterface.js';
 export { GcsJsonMailSuppressionStore } from './gcsJsonMailSuppressionStore.js';
 export {
   createMailSuppressionStore,
+  tryCreateMailSuppressionStore,
   isMailOpsStorageReady,
   MailOpsConfigurationError,
 } from './createMailSuppressionStore.js';
+export { loadMailOpsRuntimeConfig, isMailOpsLiveExternallyConnected } from './config/mailOpsRuntimeConfig.js';
+export type { MailOpsRuntimeConfig, MailOpsMode } from './config/mailOpsRuntimeConfig.js';
+export { validateMailOpsLiveReadiness } from './validateMailOpsLiveReadiness.js';
+export type { MailOpsLiveReadinessResult } from './validateMailOpsLiveReadiness.js';
+export {
+  resolveUnsubscribeTokenPepper,
+  setUnsubscribeTokenPepperForTests,
+} from './resolveUnsubscribeTokenPepper.js';
+export {
+  createMailOpsServerContext,
+  getMailOpsServerContext,
+  setMailOpsServerContextForTests,
+} from './server/mailOpsServerContext.js';
+export type { MailOpsHealthResponse } from './server/mailOpsServerContext.js';
 export type { MailSuppressionsDocument, UnsubscribeTokensDocument } from './gcsDocumentTypes.js';
 export { parseMailSuppressionsDocument } from './gcsDocumentParser.js';
 export { withGenerationMatchRetry } from './withGenerationMatchRetry.js';

@@ -626,6 +626,20 @@ GET  /t/{token}.gif  # 44.3 将来
 - **Secret:** `unsubscribe-token-pepper` → `UNSUBSCRIBE_TOKEN_PEPPER`（未作成）
 - **除外:** Places / Daily30 token / Gmail 権限
 
+## 9.5 Phase 44.1 — live readiness 統合（未接続）
+
+| 項目 | 状態 |
+|------|------|
+| `mailOpsRuntimeConfig` | ✅ 設定名のみ報告 |
+| `validateMailOpsLiveReadiness` | ✅ missing 名リスト |
+| `mailOpsServerContext` | ✅ health / live guard / store factory |
+| `growly-sales:mail-ops:validate` | ✅ 起動前 dry 検証 |
+| `MAIL_OPS_LIVE_EXTERNAL_CONNECTED` | 未設定（`liveConnected` は false 維持） |
+
+## 9.6 Phase 44.1 — Cloud・Secret・IAM 適用前チェックリスト
+
+正本: `GROWLY_SALES_MAIL_OPERATIONS_LIVE_READINESS.md` §7.18 — **実行は Human Approval 後**
+
 ## 10. DDL / env / Cloud 変更候補（実行しない・候補のみ）
 
 現行は **ローカル JSON + オプション GCS** のため RDB DDL は **Phase 43 では必須ではない**。将来 Supabase 等に移行する場合:

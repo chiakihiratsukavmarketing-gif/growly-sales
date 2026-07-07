@@ -21,6 +21,10 @@ export function hashUnsubscribeToken(token: string): string {
   return createHash('sha256').update(token, 'utf8').digest('hex');
 }
 
+export function hashUnsubscribeTokenWithPepper(token: string, pepper: string): string {
+  return createHash('sha256').update(`${pepper}:${token}`, 'utf8').digest('hex');
+}
+
 export function generateUnsubscribeToken(): string {
   return randomBytes(32).toString('base64url');
 }
