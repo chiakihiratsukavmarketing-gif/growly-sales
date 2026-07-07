@@ -932,6 +932,30 @@ openssl s_client -connect mailops.wantreach.jp:443 -servername mailops.wantreach
 4. **`MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true`**（最後）
 5. POST `/u/:token` + GCS suppression スモーク 1 件
 
+4. 最後に `MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true` + suppression スモーク 1 件
+
+#### 7.22.9 DNS 解決確認 + 証明書待機（2026-07-08 継続）
+
+> **人間作業完了:** mixhost A レコード追加済み。**HTTPS スモークは証明書 ACTIVE 後に実施。**
+
+| 項目 | 結果 |
+|------|------|
+| DNS ホスト | `mailops.wantreach.jp` |
+| A レコード値 | **136.68.247.144** |
+| TTL | 600 |
+| 解決確認 | ✅ `Resolve-DnsName` / `nslookup` 一致 |
+| forwarding rule | ✅ 136.68.247.144:443 |
+| 証明書 domain | ✅ `mailops.wantreach.jp` のみ |
+| `managed.status` | **PROVISIONING**（ACTIVE 待ち — 失敗判定しない） |
+| HTTPS `/health` | **未実施**（ACTIVE 後） |
+| 無効 token GET | **未実施**（ACTIVE 後） |
+
+**インフラ整合:** DNS → 固定 IP → forwarding rule → proxy → url-map → NEG → Cloud Run。重複 A/CNAME は未検出（単一 A 136.68.247.144）。
+
+**待機方針:** 10〜15 分間隔で `managed.status` を確認。最大 24 時間を目安。証明書の削除・再作成・DNS 追加修正は **禁止**。
+
+**ACTIVE 後に実行（§7.22.5）:** HTTPS `/health`・`/u/invalid-test-token`・TLS ホスト名確認・ログ漏洩確認。
+
 **構成スクリプト（参照）:** `scripts/cloud/growly-mail-ops/04-load-balancer.sh`（DRY-RUN 既定）
 
 ### 7.3 公開 endpoint（live 時）

@@ -341,6 +341,22 @@
 | 通常営業運用 | **影響なし** |
 | Phase 44.1 判定 | **No-Go 維持** |
 
+### 2026-07-08 — Phase 44.1 Step 14（継続）: DNS 解決確認・証明書待機
+
+| 項目 | 内容 |
+|------|------|
+| 進行 | Phase 44.1 **14 / 15**（DNS ✅・証明書 ACTIVE 待ち） |
+| mixhost DNS | 人間作業完了 — A レコード `mailops` → **136.68.247.144**（既存 HP/mail/MX/TXT/NS 未変更） |
+| DNS 解決 | **136.68.247.144**（TTL 600・`Resolve-DnsName` / `nslookup` 一致） |
+| forwarding rule | **136.68.247.144:443** → `growly-mail-ops-https-proxy`（整合 OK） |
+| 証明書 | `growly-mail-ops-cert` — **PROVISIONING**（DNS 追加後 ~4 分時点・ACTIVE 待ち） |
+| HTTPS `/health` | **未実施**（証明書 ACTIVE 後に実行） |
+| 無効 token GET | **未実施**（同上） |
+| TLS / ログ | **未実施**（同上） |
+| 未実施 | 証明書削除・DNS 追加修正・`MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true` |
+| 通常営業運用 | **影響なし** |
+| Phase 44.1 判定 | **No-Go 維持** |
+
 ## 2026-07-03 — Phase 42 通常運用UI改善 **完了** ✅
 
 **進行:** 通常運用UI改善 **7 / 7 フェーズ完了**
