@@ -26,7 +26,7 @@
 - [ ] Cloud Run mail-ops サービス作成承認
 - [ ] HTTPS 確認
 - [ ] Secret Manager（`UNSUBSCRIBE_TOKEN_PEPPER` 等）
-- [ ] suppression 保存先承認（推奨: GCS JSON + generation-match）
+- [x] suppression 保存先承認（GCS設計 Human Approval 済み: `mail-operations/` prefix / generation-match / retry / backup / IAM / rollback / audit）
 - [x] **法務表示方針** — Human Approval 済み（2026-07-07・§8.4 / メール全体表示要件・フッター所在地重複なし・一般的運用確認）
 - [x] **配信停止画面文案** — Human Approval 済み（2026-07-07・`UnsubscribeScreenState` 5 状態・mock API のみ）
 - [x] **配信停止メール末尾文面** — Human Approval 済み（2026-07-07・`buildUnsubscribeEmailFooterCopy`・所在地なし・Gmail/live 未適用）

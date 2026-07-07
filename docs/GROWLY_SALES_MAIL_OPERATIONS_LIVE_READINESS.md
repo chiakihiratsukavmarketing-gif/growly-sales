@@ -149,6 +149,24 @@
 
 **リスク:** 高頻度同時 unsubscribe で競合増。multi-instance Cloud Run 時はリトライ設計必須。
 
+**Human Approval 済み（設計のみ / 実 GCS 操作なし・設定なし・デプロイなし）:**
+
+- **保存先**: `<existing-prefix>/mail-operations/`
+  - `mail-suppressions.json`
+  - `unsubscribe-tokens.json`
+  - `audit/YYYY/MM/DD/<timestamp>-<correlationId>.json`（event-per-object）
+  - `backups/mail-suppressions/<timestamp>-<generation>.json`
+- **競合制御**: generation-match（`ifGenerationMatch`）必須
+  - 最大 retry 5 回
+  - exponential backoff + jitter
+  - 新規 object は `ifGenerationMatch=0`
+- **fail-closed**: 読込/書込失敗時は fail-closed（completed 表示前に保存成功を確認）
+- **バックアップ**: 更新前 backup。backup 失敗時は本更新中止
+- **IAM 最小権限**: IAM Conditions で prefix 限定、Cloud Run に delete 権限を付与しない
+- **rollback**: Human Approval 付き手動復旧
+- **audit**: audit 失敗時は suppression 成功を優先（運営アラート対象）
+- **将来移行**: `MailSuppressionStore` interface のまま `DatabaseMailSuppressionStore` へ交換可能
+
 ### B. Supabase / RDB
 
 | 観点 | 評価 |
@@ -425,7 +443,7 @@
 | 2 | Cloud Run mail-ops サービス作成承認 | ☐ 未 |
 | 3 | HTTPS / 証明書確認 | ☐ 未 |
 | 4 | Secret Manager に pepper 設定 | ☐ 未 |
-| 5 | suppression 保存先決定（GCS 推奨） | ☐ 未承認 |
+| 5 | suppression 保存先決定（GCS 推奨） | ✅ **Human Approval 済み（GCS保存設計: layout / generation-match / retry / backup / IAM / rollback / audit）** |
 | 6 | 法務・特定電子メール法関連の表示確認 | ✅ **Human Approval 済み**（2026-07-07・§8.4 法務表示方針・一般的運用確認・個別法的保証なし） |
 | 7 | 配信停止メール末尾文面 | ✅ **Human Approval 済み**（2026-07-07・tenant 参照・所在地なし・Gmail/live 未適用） |
 | 7b | 配信停止画面文案 | ✅ **Human Approval 済み**（2026-07-07・5 状態モデル・tenant 参照・mock API のみ） |

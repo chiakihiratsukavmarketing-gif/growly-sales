@@ -189,6 +189,37 @@
 | Phase 44.1 判定 | **No-Go 維持** |
 | commit / push | **未実施** |
 
+### 2026-07-07 — Phase 44.1 調査: suppression の GCS 本番保存先（設計案作成・読み取りのみ）
+
+| 項目 | 内容 |
+|------|------|
+| 目的 | suppression の GCS 正本化（競合制御 / バックアップ / 復旧 / IAM 最小権限）を Human Approval 用に設計 |
+| 既存 helper | `storageBackend.ts`（backend/bucket/prefix）/ `storage/gcsJsonStorage.ts`（backup + ifGenerationMatch） |
+| 競合制御 | `gcsWriteJsonIfGenerationMatch` は既存あり（precondition 書き込み）。mail-ops 側は未接続 |
+| バックアップ | `gcsBackupBeforeWrite`（copy）パターンあり。mail-operations 用 prefix/命名は Human Approval 待ち |
+| 未実施 | 実 GCS read/write / Cloud / IAM / env / Secret 変更なし |
+| Phase 44.1 判定 | **No-Go 維持** |
+
+### 2026-07-07 — Phase 44.1 Human Approval: suppression GCS 保存設計 ✅（設計のみ）
+
+| 項目 | 内容 |
+|------|------|
+| 保存先 | `<existing-prefix>/mail-operations/` |
+| suppression 正本 | `mail-suppressions.json` |
+| token | `unsubscribe-tokens.json` |
+| audit | `audit/YYYY/MM/DD/<timestamp>-<correlationId>.json`（event-per-object） |
+| backup | `backups/mail-suppressions/<timestamp>-<generation>.json`（更新前） |
+| 競合制御 | generation-match 必須（最大 retry 5、exponential backoff + jitter、新規は `ifGenerationMatch=0`） |
+| fail-closed | 読込/書込失敗時は fail-closed。completed 表示前に保存成功を確認 |
+| backup 失敗 | 本更新中止 |
+| delete 権限 | Cloud Run に付与しない |
+| IAM | Conditions で prefix 限定 |
+| rollback | Human Approval 付き手動復旧 |
+| audit 失敗 | suppression 成功を優先（運営アラート対象） |
+| 将来移行 | `MailSuppressionStore` interface のまま `DatabaseMailSuppressionStore` へ交換 |
+| 未実施 | 実 GCS 書き込み / IAM 変更 / env 変更 / Secret 設定 / Cloud 変更なし |
+| Phase 44.1 判定 | **No-Go 維持** |
+
 
 ## 2026-07-03 — Phase 42 通常運用UI改善 **完了** ✅
 

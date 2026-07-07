@@ -506,6 +506,57 @@ src/growly-sales/mail-operations/
 
 ---
 
+## 9.1 Phase 44.1 — mail-operations GCS 保存設計（Human Approval 待ち）
+
+> **注意:** ここは **Human Approval 済みの設計**。実 GCS 操作（read/write）・IAM変更・Cloud変更・env/Secret設定はまだ行わない（No-Go 維持）。
+
+### 保存先（案）
+
+既存の GCS bucket を再利用しつつ、Daily30 データと分離する専用 prefix を置く:
+
+```text
+<existing-prefix>/mail-operations/mail-suppressions.json
+<existing-prefix>/mail-operations/unsubscribe-tokens.json
+<existing-prefix>/mail-operations/audit/YYYY/MM/DD/<timestamp>-<correlationId>.json
+<existing-prefix>/mail-operations/backups/
+```
+
+### JSON schema（案）
+
+単純配列ではなく、**schemaVersion + metadata** を持たせる（将来 DB へ移行しやすい形）:
+
+```ts
+interface MailSuppressionsDocument {
+  schemaVersion: 1;
+  updatedAt: string;
+  records: MailSuppression[];
+}
+```
+
+token / audit も同様に `schemaVersion` を持たせる。
+
+### 競合制御（案）
+
+- read object + generation
+- メモリ更新
+- `ifGenerationMatch=<read generation>` で保存
+- 競合時は再読込・再計算・再試行（最大 5 回）
+- exponential backoff + jitter
+- 新規 object は `ifGenerationMatch=0`
+- completed 表示前に保存成功を確認
+
+### バックアップ / 復旧（案）
+
+- 更新前に `mail-operations/backups/mail-suppressions/<timestamp>-<generation>.json` を作成
+- backup 失敗時は本更新を中止
+- 自動 rollback は行わず、Human Approval 付き手動復旧を基本
+
+### 禁止
+
+- 生 token / secret / pepper を JSON に含めない
+- UI 用コピーや本文を保存しない
+- Cloud / env / Secret / IAM の変更は Phase 44.1 では行わない（Go 前）
+
 ## 10. DDL / env / Cloud 変更候補（実行しない・候補のみ）
 
 現行は **ローカル JSON + オプション GCS** のため RDB DDL は **Phase 43 では必須ではない**。将来 Supabase 等に移行する場合:
