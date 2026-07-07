@@ -1,20 +1,43 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { MailSuppression, MailSuppressionStatus } from '../mail-operations/suppressionTypes.js';
+import type { UnsubscribeScreenState } from '../mail-operations/unsubscribeBranding.js';
 import { SectionCard } from './SectionCard.js';
 import {
   SuppressionListRowSummary,
-  SuppressionBlockBanner,
 } from './SuppressionBlockBanner.js';
 import {
   addManualSuppressionApi,
   fetchMailSuppressions,
   fetchUnsubscribeFooterPreview,
+  fetchUnsubscribeScreenPreview,
   reactivateSuppressionApi,
   SUPPRESSION_MANUAL_CONFIRM_TOKEN,
   SUPPRESSION_REACTIVATE_CONFIRM_TOKEN,
   previewMockUnsubscribe,
   confirmMockUnsubscribeApi,
+  type MockUnsubscribeScreenResponse,
 } from './mailSuppressionsApi.js';
+
+const SCREEN_STATE_OPTIONS: { value: UnsubscribeScreenState; label: string }[] = [
+  { value: 'confirm', label: 'confirm（停止確認）' },
+  { value: 'completed', label: 'completed（停止完了）' },
+  { value: 'already_unsubscribed', label: 'already_unsubscribed（停止済み）' },
+  { value: 'invalid_or_expired', label: 'invalid_or_expired（無効）' },
+  { value: 'temporary_error', label: 'temporary_error（一時エラー）' },
+];
+
+function formatScreenPreview(screen: MockUnsubscribeScreenResponse): string {
+  const lines = [
+    `screenState: ${screen.screenState}`,
+    `title: ${screen.title}`,
+    `message: ${screen.message}`,
+  ];
+  if (screen.actionLabel) lines.push(`actionLabel: ${screen.actionLabel}`);
+  if (screen.maskedEmail) lines.push(`maskedEmail: ${screen.maskedEmail}`);
+  if (screen.contactEmail) lines.push(`contactEmail: ${screen.contactEmail}`);
+  lines.push(`isMock: ${String(screen.isMock)}`, `liveConnected: ${String(screen.liveConnected)}`);
+  return lines.join('\n');
+}
 
 const STATUS_FILTER_OPTIONS: { value: string; label: string }[] = [
   { value: 'all', label: 'すべて' },
@@ -48,6 +71,9 @@ export function MailSuppressionListPanel({ onError, refreshKey = 0 }: MailSuppre
   const [mockTokenInput, setMockTokenInput] = useState('');
   const [mockPreview, setMockPreview] = useState<string | null>(null);
   const [mockResult, setMockResult] = useState<string | null>(null);
+  const [screenStatePreview, setScreenStatePreview] = useState<UnsubscribeScreenState>('confirm');
+  const [screenPreview, setScreenPreview] = useState<string | null>(null);
+  const [screenPreviewNote, setScreenPreviewNote] = useState<string | null>(null);
   const [footerPreview, setFooterPreview] = useState<string | null>(null);
   const tenantId = 'want-reach';
 
@@ -153,11 +179,25 @@ export function MailSuppressionListPanel({ onError, refreshKey = 0 }: MailSuppre
     }
   }
 
+  async function handleScreenStatePreview() {
+    setScreenPreview(null);
+    try {
+      const preview = await fetchUnsubscribeScreenPreview({
+        tenantId,
+        screenState: screenStatePreview,
+      });
+      setScreenPreview(formatScreenPreview(preview));
+      setScreenPreviewNote(preview.note);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : '画面プレビューに失敗しました');
+    }
+  }
+
   async function handleMockPreview() {
     setMockResult(null);
     try {
       const preview = await previewMockUnsubscribe(mockTokenInput.trim());
-      setMockPreview(preview.message);
+      setMockPreview(formatScreenPreview(preview));
     } catch (err) {
       onError(err instanceof Error ? err.message : 'mockプレビューに失敗しました');
     }
@@ -166,7 +206,7 @@ export function MailSuppressionListPanel({ onError, refreshKey = 0 }: MailSuppre
   async function handleMockConfirm() {
     try {
       const result = await confirmMockUnsubscribeApi(mockTokenInput.trim());
-      setMockResult(result.message);
+      setMockResult(formatScreenPreview(result));
       await load();
     } catch (err) {
       onError(err instanceof Error ? err.message : 'mock配信停止に失敗しました');
@@ -314,6 +354,30 @@ export function MailSuppressionListPanel({ onError, refreshKey = 0 }: MailSuppre
         </button>
       </SectionCard>
 
+      <SectionCard title="配信停止画面（mockプレビュー・5状態）">
+        <p className="hint warning-text">
+          mockプレビュー / live未接続 / Gmail下書きには未適用。実メールアドレス・生token・tenantIdは表示しません。
+        </p>
+        <label>
+          画面状態
+          <select
+            value={screenStatePreview}
+            onChange={(e) => setScreenStatePreview(e.target.value as UnsubscribeScreenState)}
+          >
+            {SCREEN_STATE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="button" className="btn" onClick={() => void handleScreenStatePreview()}>
+          画面プレビュー
+        </button>
+        {screenPreview ? <pre className="suppression-mock-preview">{screenPreview}</pre> : null}
+        {screenPreviewNote ? <p className="hint">{screenPreviewNote}</p> : null}
+      </SectionCard>
+
       {(
         <SectionCard title="配信停止案内（mockプレビュー）">
           <pre className="suppression-mock-preview">
@@ -323,8 +387,10 @@ export function MailSuppressionListPanel({ onError, refreshKey = 0 }: MailSuppre
         </SectionCard>
       )}
 
-      <SectionCard title="mock配信停止リンク（開発用）">
-        <p className="hint">公開endpointは未作成。ローカルAPIのみ。生トークンは保存しません。</p>
+      <SectionCard title="mock配信停止リンク（開発用・token検証）">
+        <p className="hint">
+          公開endpointは未作成。ローカルAPIのみ。tokenは画面に表示せず、GET/POSTの応答は maskedEmail のみです。
+        </p>
         <label>
           mockトークン
           <input type="text" value={mockTokenInput} onChange={(e) => setMockTokenInput(e.target.value)} />
@@ -337,8 +403,8 @@ export function MailSuppressionListPanel({ onError, refreshKey = 0 }: MailSuppre
             配信停止を確定（mock）
           </button>
         </div>
-        {mockPreview ? <p className="hint">{mockPreview}</p> : null}
-        {mockResult ? <SuppressionBlockBanner blockReason={mockResult} title="処理結果" /> : null}
+        {mockPreview ? <pre className="suppression-mock-preview">{mockPreview}</pre> : null}
+        {mockResult ? <pre className="suppression-mock-preview">{mockResult}</pre> : null}
       </SectionCard>
     </>
   );

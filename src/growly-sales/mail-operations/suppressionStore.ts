@@ -17,6 +17,7 @@ import {
   type MockUnsubscribeTokenRecord,
 } from './suppressionToken.js';
 import { getDefaultMailOperationsTenantId } from './tenantResolver.js';
+import { SuppressionStoreUnavailableError } from './suppressionTypes.js';
 
 const EMPTY_STORE: MailSuppressionStoreDocument = {
   version: 1,
@@ -25,7 +26,17 @@ const EMPTY_STORE: MailSuppressionStoreDocument = {
 };
 
 let storeOverride: MailSuppressionStoreDocument | null = null;
+let forceSuppressionStoreUnavailableForTests = false;
+let forceSuppressionStoreSaveFailureForTests = false;
 const mockTokenRegistry = new Map<string, MockUnsubscribeTokenRecord>();
+
+export function setSuppressionStoreUnavailableForTests(value: boolean): void {
+  forceSuppressionStoreUnavailableForTests = value;
+}
+
+export function setSuppressionStoreSaveFailureForTests(value: boolean): void {
+  forceSuppressionStoreSaveFailureForTests = value;
+}
 
 export function setSuppressionStoreOverrideForTests(store: MailSuppressionStoreDocument | null): void {
   storeOverride = store;
@@ -63,26 +74,42 @@ function hydrateStore(doc: MailSuppressionStoreDocument): MailSuppressionStoreDo
 }
 
 export async function loadMailSuppressionStore(): Promise<MailSuppressionStoreDocument> {
-  if (storeOverride) return structuredClone(storeOverride);
-  await ensureStoreFile();
-  const raw = await readFile(getMailSuppressionsPath(), 'utf-8');
-  const parsed = JSON.parse(raw) as MailSuppressionStoreDocument;
-  if (!parsed.records || !Array.isArray(parsed.records)) {
-    return { ...EMPTY_STORE };
+  if (forceSuppressionStoreUnavailableForTests) {
+    throw new SuppressionStoreUnavailableError();
   }
-  return hydrateStore(parsed);
+  if (storeOverride) return structuredClone(storeOverride);
+  try {
+    await ensureStoreFile();
+    const raw = await readFile(getMailSuppressionsPath(), 'utf-8');
+    const parsed = JSON.parse(raw) as MailSuppressionStoreDocument;
+    if (!parsed.records || !Array.isArray(parsed.records)) {
+      return { ...EMPTY_STORE };
+    }
+    return hydrateStore(parsed);
+  } catch (err) {
+    if (err instanceof SuppressionStoreUnavailableError) throw err;
+    throw new SuppressionStoreUnavailableError();
+  }
 }
 
 export function loadMailSuppressionStoreSync(): MailSuppressionStoreDocument {
-  if (storeOverride) return structuredClone(storeOverride);
-  const path = getMailSuppressionsPath();
-  if (!existsSync(path)) return { ...EMPTY_STORE };
-  const raw = readFileSync(path, 'utf-8');
-  const parsed = JSON.parse(raw) as MailSuppressionStoreDocument;
-  if (!parsed.records || !Array.isArray(parsed.records)) {
-    return { ...EMPTY_STORE };
+  if (forceSuppressionStoreUnavailableForTests) {
+    throw new SuppressionStoreUnavailableError();
   }
-  return hydrateStore(parsed);
+  if (storeOverride) return structuredClone(storeOverride);
+  try {
+    const path = getMailSuppressionsPath();
+    if (!existsSync(path)) return { ...EMPTY_STORE };
+    const raw = readFileSync(path, 'utf-8');
+    const parsed = JSON.parse(raw) as MailSuppressionStoreDocument;
+    if (!parsed.records || !Array.isArray(parsed.records)) {
+      return { ...EMPTY_STORE };
+    }
+    return hydrateStore(parsed);
+  } catch (err) {
+    if (err instanceof SuppressionStoreUnavailableError) throw err;
+    throw new SuppressionStoreUnavailableError();
+  }
 }
 
 export async function persistMailSuppressionStoreDocument(
@@ -92,6 +119,9 @@ export async function persistMailSuppressionStoreDocument(
 }
 
 async function saveStore(store: MailSuppressionStoreDocument): Promise<void> {
+  if (forceSuppressionStoreSaveFailureForTests) {
+    throw new SuppressionStoreUnavailableError('配信禁止リストへの保存に失敗しました');
+  }
   const next: MailSuppressionStoreDocument = {
     ...store,
     updatedAt: new Date().toISOString(),
@@ -272,10 +302,16 @@ export function resolveMockUnsubscribeToken(token: string): MockUnsubscribeToken
   return mockTokenRegistry.get(hash) ?? null;
 }
 
+export function consumeMockUnsubscribeToken(token: string): void {
+  const hash = hashUnsubscribeToken(token);
+  mockTokenRegistry.delete(hash);
+}
+
 export type MockUnsubscribeResult =
   | { ok: true; status: 'success'; alreadySuppressed: boolean; suppression: MailSuppression }
   | { ok: false; status: 'invalid_token' | 'expired_token'; message: string };
 
+/** @deprecated Use postMockUnsubscribeScreen for screen-shaped responses. */
 export async function confirmMockUnsubscribe(token: string): Promise<MockUnsubscribeResult> {
   const record = resolveMockUnsubscribeToken(token);
   if (!record) {
@@ -285,15 +321,22 @@ export async function confirmMockUnsubscribe(token: string): Promise<MockUnsubsc
     mockTokenRegistry.delete(record.tokenHash);
     return { ok: false, status: 'expired_token', message: 'リンクの有効期限が切れています' };
   }
-  const { record: suppression, created } = await recordSuppressionFromUnsubscribe({
-    tenantId: record.tenantId,
-    emailAddress: record.emailAddress,
-    leadId: record.leadId,
-    companyId: record.companyId,
-    tokenHash: record.tokenHash,
-  });
-  mockTokenRegistry.delete(record.tokenHash);
-  return { ok: true, status: 'success', alreadySuppressed: !created, suppression };
+  try {
+    const { record: suppression, created } = await recordSuppressionFromUnsubscribe({
+      tenantId: record.tenantId,
+      emailAddress: record.emailAddress,
+      leadId: record.leadId,
+      companyId: record.companyId,
+      tokenHash: record.tokenHash,
+    });
+    consumeMockUnsubscribeToken(token);
+    return { ok: true, status: 'success', alreadySuppressed: !created, suppression };
+  } catch (err) {
+    if (err instanceof SuppressionStoreUnavailableError) {
+      throw err;
+    }
+    throw new SuppressionStoreUnavailableError();
+  }
 }
 
 export async function touchLastAttemptBlocked(suppressionId: string): Promise<void> {

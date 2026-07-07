@@ -1,5 +1,6 @@
 import { readApiError } from './apiError.js';
 import type { MailSuppression } from '../mail-operations/suppressionTypes.js';
+import type { UnsubscribeScreenState } from '../mail-operations/unsubscribeBranding.js';
 
 const API_BASE = '';
 
@@ -92,24 +93,45 @@ export async function checkSuppressionApi(input: {
   return (await res.json()) as SuppressionCheckResponse;
 }
 
-export interface MockUnsubscribePreviewResponse {
-  status: 'ready' | 'invalid_token' | 'expired_token';
+export interface MockUnsubscribeScreenResponse {
+  ok: boolean;
+  screenState: UnsubscribeScreenState;
+  title: string;
   message: string;
-  emailMasked?: string;
-  mock: true;
+  actionLabel?: string;
+  contactEmail: string | null;
+  maskedEmail?: string;
+  isMock: true;
+  liveConnected: false;
+  note?: string;
 }
 
-export async function previewMockUnsubscribe(token: string): Promise<MockUnsubscribePreviewResponse> {
+export async function fetchUnsubscribeScreenPreview(input: {
+  tenantId: string;
+  screenState: UnsubscribeScreenState;
+}): Promise<MockUnsubscribeScreenResponse & { note: string }> {
+  const params = new URLSearchParams({
+    tenantId: input.tenantId,
+    screenState: input.screenState,
+  });
+  const res = await fetch(`${API_BASE}/api/mail-suppressions/unsubscribe-screen-preview?${params.toString()}`);
+  if (!res.ok) {
+    throw new Error(
+      await readApiError(res, 'GET /api/mail-suppressions/unsubscribe-screen-preview', '画面プレビューの取得に失敗しました')
+    );
+  }
+  return (await res.json()) as MockUnsubscribeScreenResponse & { note: string };
+}
+
+export async function previewMockUnsubscribe(token: string): Promise<MockUnsubscribeScreenResponse> {
   const res = await fetch(`${API_BASE}/api/mock/unsubscribe/${encodeURIComponent(token)}`);
   if (!res.ok) {
     throw new Error(await readApiError(res, 'GET /api/mock/unsubscribe', '配信停止プレビューに失敗しました'));
   }
-  return (await res.json()) as MockUnsubscribePreviewResponse;
+  return (await res.json()) as MockUnsubscribeScreenResponse;
 }
 
-export async function confirmMockUnsubscribeApi(
-  token: string
-): Promise<{ ok: boolean; status: string; message: string; alreadySuppressed?: boolean }> {
+export async function confirmMockUnsubscribeApi(token: string): Promise<MockUnsubscribeScreenResponse> {
   const res = await fetch(`${API_BASE}/api/mock/unsubscribe/${encodeURIComponent(token)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -118,7 +140,7 @@ export async function confirmMockUnsubscribeApi(
   if (!res.ok) {
     throw new Error(await readApiError(res, 'POST /api/mock/unsubscribe', '配信停止の確定に失敗しました'));
   }
-  return (await res.json()) as { ok: boolean; status: string; message: string; alreadySuppressed?: boolean };
+  return (await res.json()) as MockUnsubscribeScreenResponse;
 }
 
 export const SUPPRESSION_MANUAL_CONFIRM_TOKEN = 'SUPPRESSION_MANUAL';

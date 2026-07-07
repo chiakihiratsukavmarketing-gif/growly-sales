@@ -27,7 +27,8 @@
 - [ ] HTTPS 確認
 - [ ] Secret Manager（`UNSUBSCRIBE_TOKEN_PEPPER` 等）
 - [ ] suppression 保存先承認（推奨: GCS JSON + generation-match）
-- [ ] 法務・配信停止画面文案確認
+- [x] **法務表示方針** — Human Approval 済み（2026-07-07・§8.4 / メール全体表示要件・フッター所在地重複なし・一般的運用確認）
+- [x] **配信停止画面文案** — Human Approval 済み（2026-07-07・`UnsubscribeScreenState` 5 状態・mock API のみ）
 - [x] **配信停止メール末尾文面** — Human Approval 済み（2026-07-07・`buildUnsubscribeEmailFooterCopy`・所在地なし・Gmail/live 未適用）
 - [ ] fail-closed 実装フェーズへの着手承認
 
@@ -38,6 +39,8 @@
 - [x] tenant resolver / public URL resolver / store interface 経由（文字列の散在禁止）
 - [x] suppression: `scope=platform|tenant`（platform UI は作らない）
 - [x] contactEmail: `info@wantreach.jp`（tenant 設定のみ・Gmail/live 未適用）
+- [x] 法務表示方針・配信停止画面文案（tenant 経由・mock のみ）
+- [x] mock GET/POST 配信停止画面（maskedEmail のみ・冪等・fail-closed 準備）
 
 ### Phase 43 完了（mock・参照）
 

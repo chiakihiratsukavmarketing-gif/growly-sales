@@ -79,3 +79,10 @@ export const ACTIVE_SUPPRESSION_STATUSES: readonly MailSuppressionStatus[] = [
 export function isActiveSuppressionStatus(status: MailSuppressionStatus): boolean {
   return (ACTIVE_SUPPRESSION_STATUSES as readonly string[]).includes(status);
 }
+
+export class SuppressionStoreUnavailableError extends Error {
+  constructor(message = '配信禁止リストを確認できませんでした') {
+    super(message);
+    this.name = 'SuppressionStoreUnavailableError';
+  }
+}

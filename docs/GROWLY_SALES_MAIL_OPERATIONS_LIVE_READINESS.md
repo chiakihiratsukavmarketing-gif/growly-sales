@@ -34,7 +34,10 @@
   - **配信停止メール末尾（Human Approval 済み 2026-07-07）:** `buildUnsubscribeEmailFooterCopy(tenant)` — displayName / legalName / contactEmail / `buildUnsubscribeUrl` 経由。所在地は表示しない
     - mock プレビュー: `GET /api/mail-suppressions/unsubscribe-footer-preview`
     - **未適用:** Gmail 下書き本文 / live endpoint / 既存送信済みメール
-    - **法務表示の最終確認:** 別項目（§12 #6）— 未完了
+  - **法務表示方針（Human Approval 済み 2026-07-07）:** §8.4 参照。メール全体で送信者名・所在地・問い合わせ先・配信停止方法を表示。所在地は本文内のみ（フッター重複なし）
+  - **配信停止画面文案（Human Approval 済み 2026-07-07）:** `buildUnsubscribeScreenStateCopy(tenant, state)` — 5 状態（confirm / completed / already_unsubscribed / invalid_or_expired / temporary_error）
+    - mock API: `/api/mock/unsubscribe/:token` が `screenState` を返す
+    - **未適用:** 公開 `/u/{token}` / Gmail 下書き / live endpoint
 - **将来:** multi-tenant SaaS へ移行可能な境界を保持
   - 公開 URL は `resolveMailOperationsPublicBaseUrl(tenantId)` で解決
   - 共通 Growly ドメイン / 顧客独自ドメインへ交換可能
@@ -180,6 +183,26 @@
 | GET | `/u/{token}` | 停止確認画面（メールアドレスはマスク表示） |
 | POST | `/u/{token}` または `/u/{token}/confirm` | 停止確定（冪等） |
 
+**mock（ローカル UI・2026-07-07 完成）:**
+
+| Method | Path | 用途 |
+|--------|------|------|
+| GET | `/api/mock/unsubscribe/:token` | 確認画面状態のみ（**停止処理しない**） |
+| POST | `/api/mock/unsubscribe/:token` | 停止確定（冪等・mock/local store のみ） |
+| GET | `/api/mail-suppressions/unsubscribe-screen-preview` | 開発者向け 5 状態プレビュー |
+
+**mock GET 状態:** `confirm` / `already_unsubscribed` / `invalid_or_expired` / `temporary_error`
+**mock POST 状態:** `completed` / `already_unsubscribed` / `invalid_or_expired` / `temporary_error`
+**画面 response:** `maskedEmail` のみ（完全メール非表示）。`tenantId` / `leadId` / `normalizedEmail` / 生 token は返さない。`isMock: true` / `liveConnected: false` を明示。
+
+**token 保護（mock / live 設計共通）:**
+
+- 生 token は永続化しない（`tokenHash` のみ）
+- 画面 response・通常ログに生 token を出さない
+- invalid / expired の内部差は外部に出さない（一律 `invalid_or_expired`）
+- `tenantId` は token record から解決（query parameter を信用しない）
+- live 運用時は URL path 全体を通常ログに残さない方針（pepper / Secret は未設定）
+
 **セキュリティ要件:**
 
 - 生 token をログ・レスポンスヘッダに出さない
@@ -258,6 +281,39 @@
 | 表示 | 「開封率は画像読み込みに基づく参考値です」 |
 | 禁止表現 | 「必ず読んだ」「開封＝既読」等の断定 |
 
+### 8.4 法務表示方針（Human Approval 済み 2026-07-07）
+
+> **免責:** 以下は一般的な運用確認であり、**個別案件の法的保証ではない**。live 送信前に最終チェックリスト（§12）を実施する。
+
+| 項目 | 方針 |
+|------|------|
+| メール全体の表示要件 | 送信者名・**所在地**・問い合わせ先・配信停止方法を表示する |
+| 所在地の配置 | **メール本文内**（署名ブロック等）に表示済み |
+| 配信停止フッター | 所在地は**重複表示しない** |
+| フッターに含める項目 | 送信者名（例: 合同会社Want Reach）・配信停止 URL・問い合わせ先（例: `info@wantreach.jp`）— いずれも tenant 設定から生成 |
+| 送信可否と表示 | **別管理** — 表示要件を満たしても suppression / 送信拒否表示がある場合は送信対象外 |
+| 公表メールアドレス | 公表であっても、サイト等に送信拒否表示がある場合は送信対象外 |
+| suppression 登録済み宛先 | **全送信入口**で停止（`assertNotSuppressed`） |
+
+**現状:** フッター・画面文案は mock プレビューのみ。Gmail 下書きへの自動挿入・公開 endpoint は未接続。
+
+### 8.5 配信停止画面（Human Approval 済み 2026-07-07）
+
+| 状態 (`UnsubscribeScreenState`) | 用途 |
+|------|------|
+| `confirm` | 停止確認（メールアドレスはマスク表示） |
+| `completed` | 停止完了 |
+| `already_unsubscribed` | 既に停止済み（冪等） |
+| `invalid_or_expired` | 無効または期限切れ token |
+| `temporary_error` | 障害時（fail-closed 方針と整合） |
+
+| 項目 | 要件 |
+|------|------|
+| メール完全表示 | **禁止**（マスク例: `t***@example.com`） |
+| 解除リンク | **表示しない**（解除は UI + Human Approval のみ） |
+| 所在地 | **画面に表示しない**（本文内で表示済みのため重複しない） |
+| 文案生成 | `buildUnsubscribeScreenStateCopy(tenant, state)` — tenant 経由、ハードコード禁止 |
+
 ---
 
 ## 9. 機能別 live 化確認
@@ -266,9 +322,10 @@
 
 | 項目 | mock 状態 | live 要件 |
 |------|-----------|-----------|
-| 公開 endpoint | mock `/api/mock/unsubscribe/:token` のみ | `/u/{token}` on Cloud Run |
-| 冪等性 | ✅ `recordSuppressionFromUnsubscribe` | 本番 store でも維持 |
-| 全送信入口ブロック | ✅ `assertNotSuppressed` | GCS 読込失敗時 **fail-closed** 要実装 |
+| 公開 endpoint | mock `/api/mock/unsubscribe/:token` + 画面プレビュー API | `/u/{token}` on Cloud Run |
+| GET 挙動 | ✅ 確認のみ（停止しない）・`maskedEmail` のみ | 同上 |
+| POST 挙動 | ✅ 冪等・`completed` / `already_unsubscribed` | 本番 store でも維持 |
+| 全送信入口ブロック | ✅ `assertNotSuppressed` + 読込失敗時 `SuppressionStoreUnavailableError` | GCS 読込失敗時 **fail-closed** 維持 |
 | 下書き末尾リンク | ❌ 未挿入 | CREATE_DRAFTS 後・token 発行・hash 保存 |
 | token 有効期限 | mock TTL 30 日 | live 方針を人間承認（無期限 + rotate 案） |
 | `doNotContact` 互換 | ✅ legacy チェック維持 | suppression を正規ソースに |
@@ -369,9 +426,9 @@
 | 3 | HTTPS / 証明書確認 | ☐ 未 |
 | 4 | Secret Manager に pepper 設定 | ☐ 未 |
 | 5 | suppression 保存先決定（GCS 推奨） | ☐ 未承認 |
-| 6 | 法務・特定電子メール法関連の表示確認 | ☐ 人間確認待ち |
+| 6 | 法務・特定電子メール法関連の表示確認 | ✅ **Human Approval 済み**（2026-07-07・§8.4 法務表示方針・一般的運用確認・個別法的保証なし） |
 | 7 | 配信停止メール末尾文面 | ✅ **Human Approval 済み**（2026-07-07・tenant 参照・所在地なし・Gmail/live 未適用） |
-| 7b | 配信停止停止画面文案 | ☐ 未 |
+| 7b | 配信停止画面文案 | ✅ **Human Approval 済み**（2026-07-07・5 状態モデル・tenant 参照・mock API のみ） |
 | 8 | カスタムテンプレート本番内容確認 | ☐ 未 |
 | 9 | テンプレート active 化承認 | ☐ 未 |
 | 10 | 開封計測を利用するか最終判断 | ☐ 未 |
@@ -418,18 +475,18 @@
 | 5 | rate limit 方針 | ❌ 未 |
 | 6 | unsubscribe 冪等性（コード済・本番 store で検証要） | ⚠️ mock のみ |
 | 7 | 全送信入口 suppression ブロック + **fail-closed** | ⚠️ 入口は済、fail-closed 未 |
-| 8 | 配信停止文面・画面の人間確認 | ❌ 未 |
+| 8 | 配信停止文面・画面の人間確認 | ⚠️ 文案・法務方針は承認済み。live 送信前最終チェックリストは未 |
 | 9 | 障害時 fail-closed 実装 | ❌ 未 |
 | 10 | rollback 手順文書化 | ✅ 本ドキュメント §11 |
-| 11 | Human Approval 完了 | ❌ 未 |
+| 11 | Human Approval 完了 | ⚠️ 文案・法務方針は済。インフラ・fail-closed は未 |
 
 ### 現在の判定
 
 ## **No-Go** — Phase 44.1 配信停止 live 化は開始しない
 
-**理由:** 公開 URL・HTTPS・Secret・本番永続化・法務確認・fail-closed 実装が未達。mock 実装と設計は整備済み。
+**理由:** 公開 URL・HTTPS・Secret・本番永続化・fail-closed 実装が未達。mock 実装・文案・法務表示方針は整備済み。
 
-**次のアクション（人間）:** §12 チェックリスト 1〜7 を順に実施 → Go 再評価。
+**次のアクション（人間）:** §12 チェックリスト 1〜5・fail-closed を順に実施 → Go 再評価。live 送信前に最終チェックリストを実施。
 
 ---
 

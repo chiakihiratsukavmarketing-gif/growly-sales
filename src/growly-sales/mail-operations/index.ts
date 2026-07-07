@@ -26,9 +26,18 @@ export {
   recordSuppressionFromUnsubscribe,
   registerMockUnsubscribeToken,
   confirmMockUnsubscribe,
+  consumeMockUnsubscribeToken,
   setSuppressionStoreOverrideForTests,
+  setSuppressionStoreUnavailableForTests,
+  setSuppressionStoreSaveFailureForTests,
   clearMockUnsubscribeTokenRegistryForTests,
 } from './suppressionStore.js';
+export {
+  getMockUnsubscribeScreen,
+  postMockUnsubscribeScreen,
+  buildDeveloperUnsubscribeScreenPreview,
+} from './mockUnsubscribeScreen.js';
+export type { MockUnsubscribeScreenResponse } from './mockUnsubscribeScreen.js';
 export type { MailOperationsTenant } from './tenantTypes.js';
 export {
   DEFAULT_TENANT_ID,
@@ -37,8 +46,18 @@ export {
   requireMailOperationsTenant,
 } from './tenantResolver.js';
 export { resolveMailOperationsPublicBaseUrl, buildUnsubscribeUrl } from './publicUrlResolver.js';
-export { buildUnsubscribeScreenCopy, buildUnsubscribeEmailFooterCopy } from './unsubscribeBranding.js';
-export type { UnsubscribeScreenCopy, UnsubscribeEmailFooterCopy } from './unsubscribeBranding.js';
+export { maskEmailForDisplay, maskEmailForDisplayFixture, UNSUBSCRIBE_SCREEN_PREVIEW_FIXTURE_EMAIL } from './emailDisplayPrivacy.js';
+export {
+  buildUnsubscribeScreenCopy,
+  buildUnsubscribeScreenStateCopy,
+  buildUnsubscribeEmailFooterCopy,
+} from './unsubscribeBranding.js';
+export type {
+  UnsubscribeScreenState,
+  UnsubscribeScreenStateCopy,
+  UnsubscribeScreenCopy,
+  UnsubscribeEmailFooterCopy,
+} from './unsubscribeBranding.js';
 export {
   LocalJsonMailSuppressionStore,
   GcsJsonMailSuppressionStore,
@@ -57,6 +76,7 @@ export {
   getMailOpsMode,
   buildMockUnsubscribeNoticePreview,
   shouldShowMockUnsubscribePreview,
+  SuppressionStoreUnavailableError,
 } from './suppressionPolicy.js';
 export { logSuppressionBlock } from './suppressionAudit.js';
 export { buildSuppressionBlocksForLeads } from './buildLeadSuppressionBlocks.js';

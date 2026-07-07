@@ -168,7 +168,40 @@ type MailSuppressionSource =
 | GET | `/api/mock/unsubscribe/preview` | UI プレビュー用固定 HTML |
 | POST | `/api/mock/suppressions` | メモリ or `_verify_` JSON のみ（本番 GCS 非接触） |
 
-**画面:**
+**画面（Phase 44.1 Human Approval 済み 2026-07-07）:**
+
+`UnsubscribeScreenState` — 5 状態。文案は `buildUnsubscribeScreenStateCopy(tenant, state)` で tenant から生成。
+
+| 状態 | 用途 |
+|------|------|
+| `confirm` | 停止確認（メールアドレスはマスク） |
+| `completed` | 停止完了 |
+| `already_unsubscribed` | 既に停止済み（冪等） |
+| `invalid_or_expired` | 無効 / 期限切れ token |
+| `temporary_error` | 障害時 |
+
+mock API（`GET/POST /api/mock/unsubscribe/:token`）は `screenState` / `maskedEmail` / `isMock` / `liveConnected: false` を返す。公開 `/u/{token}` は未作成。
+
+**mock GET（確認のみ・停止しない）:** token 有効かつ未停止 → `confirm` / 停止済み → `already_unsubscribed` / 無効・期限切れ → `invalid_or_expired` / 読込失敗 → `temporary_error`
+
+**mock POST（冪等）:** 新規停止 → `completed` / 既に停止済み → `already_unsubscribed` / 無効・期限切れ → `invalid_or_expired` / 保存失敗 → `temporary_error`
+
+**token 保護:** 生 token 非永続化（`tokenHash` のみ）/ response・通常ログに生 token 非表示 / invalid・expired 内部差を外部に出さない / `tenantId` は token record から解決
+
+### 3.2.1 法務表示方針（Human Approval 済み 2026-07-07）
+
+> **免責:** 一般的な運用確認であり、個別案件の法的保証ではない。live 送信前に最終チェックリストを実施する。
+
+| 項目 | 方針 |
+|------|------|
+| メール全体 | 送信者名・所在地・問い合わせ先・配信停止方法を表示 |
+| 所在地 | メール本文内に表示済み。配信停止フッターでは**重複表示しない** |
+| 配信停止フッター | 送信者名・配信停止 URL・問い合わせ先（tenant から生成） |
+| 送信可否と表示 | **別管理** — 表示要件と送信可否判定は独立 |
+| 公表メール | 公表アドレスでも送信拒否表示がある場合は送信対象外 |
+| suppression 登録済み | 全送信入口で停止 |
+
+**旧画面状態（参考・廃止）:**
 
 | 状態 | 表示 |
 |------|------|

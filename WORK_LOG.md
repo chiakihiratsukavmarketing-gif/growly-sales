@@ -162,6 +162,33 @@
 | 未適用 | Gmail 下書き本文 / live endpoint / 既存送信済みメール |
 | Phase 44.1 判定 | **No-Go 維持** |
 
+### 2026-07-07 — Phase 44.1 Human Approval: 法務表示方針・配信停止画面文案 ✅
+
+| 項目 | 内容 |
+|------|------|
+| 法務表示方針 | メール全体で送信者名・所在地・問い合わせ先・配信停止方法を表示。所在地は本文内のみ（フッター重複なし） |
+| 配信停止画面 | `UnsubscribeScreenState` 5 状態 — `buildUnsubscribeScreenStateCopy(tenant, state)` |
+| 送信可否 | 表示要件と送信可否は別管理。suppression 登録済みは全入口で停止 |
+| 免責 | 一般的運用確認であり個別案件の法的保証ではない。live 送信前に最終チェックリスト実施 |
+| mock 反映 | `/api/mock/unsubscribe/:token` が `screenState` を返す |
+| 未適用 | Gmail 下書き / live endpoint / Cloud / DNS / Secret / GCS live |
+| Phase 44.1 判定 | **No-Go 維持** |
+| commit / push | **未実施** |
+
+### 2026-07-07 — Phase 44.1 mock 配信停止画面 GET/POST・maskedEmail ✅
+
+| 項目 | 内容 |
+|------|------|
+| maskedEmail | `maskEmailForDisplay` — `in***@example.jp` 形式。API は maskedEmail のみ |
+| mock GET | 確認のみ（停止しない）— confirm / already_unsubscribed / invalid_or_expired / temporary_error |
+| mock POST | 冪等 — completed / already_unsubscribed / invalid_or_expired / temporary_error |
+| token 保護 | tokenHash のみ保存。response に生 token / tenantId / leadId / normalizedEmail なし |
+| fail-closed | `SuppressionStoreUnavailableError` — 読込失敗時は全入口で処理停止 |
+| UI | 5 状態プレビュー + token 検証（mock 明示・live未接続・Gmail未適用） |
+| 未適用 | live endpoint / GCS live / Gmail 下書き自動挿入 / Cloud / DNS / Secret |
+| Phase 44.1 判定 | **No-Go 維持** |
+| commit / push | **未実施** |
+
 
 ## 2026-07-03 — Phase 42 通常運用UI改善 **完了** ✅
 

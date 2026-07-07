@@ -1,6 +1,81 @@
 import type { MailOperationsTenant } from './tenantTypes.js';
 import { buildUnsubscribeUrl } from './publicUrlResolver.js';
 
+export type UnsubscribeScreenState =
+  | 'confirm'
+  | 'completed'
+  | 'already_unsubscribed'
+  | 'invalid_or_expired'
+  | 'temporary_error';
+
+export interface UnsubscribeScreenStateCopy {
+  state: UnsubscribeScreenState;
+  title: string;
+  message: string;
+  confirmButtonLabel?: string;
+  privacyNote?: string;
+  contactLabel: string;
+  contactEmail: string | null;
+  privacyPolicyUrl: string | null;
+}
+
+export function buildUnsubscribeScreenStateCopy(
+  tenant: MailOperationsTenant,
+  state: UnsubscribeScreenState
+): UnsubscribeScreenStateCopy {
+  const displayName = tenant.displayName.trim() || tenant.legalName.trim();
+  const contactEmail = tenant.contactEmail.trim() || null;
+  const base = {
+    contactLabel: 'お問い合わせ',
+    contactEmail,
+    privacyPolicyUrl: tenant.privacyPolicyUrl?.trim() || null,
+  };
+
+  switch (state) {
+    case 'confirm':
+      return {
+        state,
+        title: `${displayName}からのメール配信停止`,
+        message: `今後、${displayName}からこのメールアドレス宛への営業・ご案内メールを停止します。`,
+        confirmButtonLabel: '配信を停止する',
+        privacyNote:
+          '停止対象のメールアドレスは画面に完全には表示しません。解除リンクは提供しません。',
+        ...base,
+      };
+    case 'completed':
+      return {
+        state,
+        title: '配信を停止しました',
+        message: '今後、このアドレス宛に営業・ご案内メールは送信しません。',
+        ...base,
+      };
+    case 'already_unsubscribed':
+      return {
+        state,
+        title: '既に配信停止済みです',
+        message: 'このメールアドレスは既に配信停止の対象となっています。',
+        ...base,
+      };
+    case 'invalid_or_expired':
+      return {
+        state,
+        title: 'リンクが無効です',
+        message:
+          'この配信停止リンクは無効であるか、有効期限が切れています。お手数ですがお問い合わせください。',
+        ...base,
+      };
+    case 'temporary_error':
+      return {
+        state,
+        title: '一時的に処理できません',
+        message:
+          '現在、配信停止のお手続きを完了できません。しばらくしてから再度お試しいただくか、お問い合わせください。',
+        ...base,
+      };
+  }
+}
+
+/** @deprecated Prefer buildUnsubscribeScreenStateCopy for state-specific copy. */
 export interface UnsubscribeScreenCopy {
   title: string;
   confirmMessage: string;
@@ -12,17 +87,16 @@ export interface UnsubscribeScreenCopy {
 }
 
 export function buildUnsubscribeScreenCopy(tenant: MailOperationsTenant): UnsubscribeScreenCopy {
-  const displayName = tenant.displayName.trim() || tenant.legalName.trim();
-  const contactEmail = tenant.contactEmail.trim() || null;
+  const confirm = buildUnsubscribeScreenStateCopy(tenant, 'confirm');
+  const completed = buildUnsubscribeScreenStateCopy(tenant, 'completed');
   return {
-    title: `${displayName}からのメール配信停止`,
-    confirmMessage: `今後、${displayName}からこのメールアドレス宛への営業・ご案内メールを停止します。`,
-    successMessage: '配信を停止しました。今後、このアドレス宛に営業・ご案内メールは送信しません。',
-    privacyNote:
-      '停止対象のメールアドレスは画面に完全には表示しません。解除リンクは提供しません。',
-    contactLabel: 'お問い合わせ',
-    contactEmail,
-    privacyPolicyUrl: tenant.privacyPolicyUrl?.trim() || null,
+    title: confirm.title,
+    confirmMessage: confirm.message,
+    successMessage: completed.message,
+    privacyNote: confirm.privacyNote ?? '',
+    contactLabel: confirm.contactLabel,
+    contactEmail: confirm.contactEmail,
+    privacyPolicyUrl: confirm.privacyPolicyUrl,
   };
 }
 

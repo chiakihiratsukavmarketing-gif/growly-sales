@@ -352,6 +352,38 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
       return;
     }
 
+    if (req.method === 'GET' && pathname === '/api/mail-suppressions/unsubscribe-screen-preview') {
+      const tenantId = url.searchParams.get('tenantId')?.trim();
+      const screenState = url.searchParams.get('screenState')?.trim();
+      if (!tenantId || !screenState) {
+        sendApiError(res, 400, pathname, 'tenantId と screenState が必要です');
+        return;
+      }
+      const allowed = new Set([
+        'confirm',
+        'completed',
+        'already_unsubscribed',
+        'invalid_or_expired',
+        'temporary_error',
+      ]);
+      if (!allowed.has(screenState)) {
+        sendApiError(res, 400, pathname, 'screenState が不正です');
+        return;
+      }
+      const { buildDeveloperUnsubscribeScreenPreview } = await import(
+        '../mail-operations/mockUnsubscribeScreen.js'
+      );
+      const payload = buildDeveloperUnsubscribeScreenPreview({
+        tenantId,
+        screenState: screenState as import('../mail-operations/unsubscribeBranding.js').UnsubscribeScreenState,
+      });
+      sendJson(res, 200, {
+        ...payload,
+        note: 'mockプレビュー。live未接続。Gmail下書きには未適用。',
+      });
+      return;
+    }
+
     if (req.method === 'POST' && pathname === '/api/mail-suppressions/manual') {
       const body = await readJsonBody<{
         tenantId?: string;
@@ -423,57 +455,17 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
     const mockUnsubscribeMatch = pathname.match(/^\/api\/mock\/unsubscribe\/([^/]+)$/);
     if (mockUnsubscribeMatch) {
       const token = decodeURIComponent(mockUnsubscribeMatch[1]);
-      const { resolveMockUnsubscribeToken, confirmMockUnsubscribe } = await import(
-        '../mail-operations/suppressionStore.js'
+      const { getMockUnsubscribeScreen, postMockUnsubscribeScreen } = await import(
+        '../mail-operations/mockUnsubscribeScreen.js'
       );
-      const { isMockTokenExpired } = await import('../mail-operations/suppressionToken.js');
-      const { requireMailOperationsTenant } = await import('../mail-operations/tenantResolver.js');
-      const { buildUnsubscribeScreenCopy } = await import('../mail-operations/unsubscribeBranding.js');
       if (req.method === 'GET') {
-        const record = resolveMockUnsubscribeToken(token);
-        if (!record) {
-          sendJson(res, 200, { status: 'invalid_token', message: 'リンクが無効です', mock: true });
-          return;
-        }
-        if (isMockTokenExpired(record)) {
-          sendJson(res, 200, { status: 'expired_token', message: 'リンクの有効期限が切れています', mock: true });
-          return;
-        }
-        const tenant = requireMailOperationsTenant(record.tenantId);
-        const branding = buildUnsubscribeScreenCopy(tenant);
-        const masked = record.emailAddress.replace(/^(.).+(@.+)$/, '$1***$2');
-        sendJson(res, 200, {
-          status: 'ready',
-          title: branding.title,
-          message: branding.confirmMessage,
-          emailMasked: masked,
-          privacyNote: branding.privacyNote,
-          contactEmail: branding.contactEmail,
-          privacyPolicyUrl: branding.privacyPolicyUrl,
-          mock: true,
-        });
+        const payload = await getMockUnsubscribeScreen(token);
+        sendJson(res, 200, payload);
         return;
       }
       if (req.method === 'POST') {
-        const result = await confirmMockUnsubscribe(token);
-        if (!result.ok) {
-          sendJson(res, 200, {
-            ok: false,
-            status: result.status,
-            message: result.message,
-            mock: true,
-          });
-          return;
-        }
-        const tenant = requireMailOperationsTenant(result.suppression.tenantId ?? 'want-reach');
-        const branding = buildUnsubscribeScreenCopy(tenant);
-        sendJson(res, 200, {
-          ok: true,
-          status: 'success',
-          message: result.alreadySuppressed ? '既に配信停止済みです（冪等）' : branding.successMessage,
-          alreadySuppressed: result.alreadySuppressed,
-          mock: true,
-        });
+        const payload = await postMockUnsubscribeScreen(token);
+        sendJson(res, 200, payload);
         return;
       }
     }

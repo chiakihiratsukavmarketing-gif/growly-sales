@@ -7781,7 +7781,7 @@ async function verifyPhase432NoLiveMailChanges(): Promise<void> {
   assert(!gmailAdapter.includes('drafts.send'), 'no drafts send');
   const server = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
   assert(!server.includes('PUBLIC_BASE_URL/u/'), 'no live public unsubscribe url in server');
-  assert(server.includes('mock: true'), 'mock unsubscribe flagged');
+  assert(server.includes('getMockUnsubscribeScreen'), 'mock unsubscribe handler');
   const generateEmail = await readFile(join(SRC_ROOT, 'generation/generateSalesEmail.ts'), 'utf-8');
   assert(!generateEmail.includes('/api/mock/unsubscribe'), 'sales email body not auto-injecting mock link');
   ok('Phase 43.2 no live mail changes checks passed');
@@ -8101,10 +8101,15 @@ async function verifyPhase441TenantAwareToken(): Promise<void> {
 async function verifyPhase441TenantResolvedBranding(): Promise<void> {
   const branding = await readFile(join(SRC_ROOT, 'mail-operations/unsubscribeBranding.ts'), 'utf-8');
   assert(branding.includes('buildUnsubscribeScreenCopy'), 'unsubscribe branding builder exists');
+  assert(branding.includes('buildUnsubscribeScreenStateCopy'), 'unsubscribe screen state builder exists');
+  assert(branding.includes('export type UnsubscribeScreenState'), 'unsubscribe screen state type exists');
   const publicUrl = await readFile(join(SRC_ROOT, 'mail-operations/publicUrlResolver.ts'), 'utf-8');
   assert(publicUrl.includes('resolveMailOperationsPublicBaseUrl'), 'public base url resolver exists');
+  const mockScreen = await readFile(join(SRC_ROOT, 'mail-operations/mockUnsubscribeScreen.ts'), 'utf-8');
+  assert(mockScreen.includes('buildUnsubscribeScreenStateCopy'), 'mock screen uses tenant screen state copy');
   const server = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
-  assert(server.includes('buildUnsubscribeScreenCopy'), 'mock unsubscribe uses tenant branding');
+  assert(server.includes('getMockUnsubscribeScreen'), 'mock unsubscribe GET handler');
+  assert(server.includes('postMockUnsubscribeScreen'), 'mock unsubscribe POST handler');
   ok('Phase 44.1 tenant branding resolver checks passed');
 }
 
@@ -8171,6 +8176,301 @@ async function verifyPhase441UnsubscribeEmailFooter(): Promise<void> {
   assert(server.includes('/api/mail-suppressions/unsubscribe-footer-preview'), 'footer preview API exists');
   assert(!server.includes('/u/{token}') || server.includes('unsubscribe-footer-preview'), 'no live public unsubscribe route');
   ok('Phase 44.1 unsubscribe email footer checks passed');
+}
+
+async function verifyPhase441UnsubscribeScreenState(): Promise<void> {
+  const branding = await readFile(join(SRC_ROOT, 'mail-operations/unsubscribeBranding.ts'), 'utf-8');
+  for (const state of [
+    'confirm',
+    'completed',
+    'already_unsubscribed',
+    'invalid_or_expired',
+    'temporary_error',
+  ]) {
+    assert(branding.includes(`'${state}'`), `screen state ${state} defined`);
+  }
+  assert(!branding.includes('所在地'), 'screen copy builder does not include address');
+  assert(!branding.includes('合同会社Want Reach'), 'screen copy builder does not hardcode company name');
+
+  const { requireMailOperationsTenant } = await import('../mail-operations/tenantResolver.js');
+  const { buildUnsubscribeScreenStateCopy } = await import('../mail-operations/unsubscribeBranding.js');
+  const tenant = requireMailOperationsTenant('want-reach');
+  const confirm = buildUnsubscribeScreenStateCopy(tenant, 'confirm');
+  assert(confirm.state === 'confirm', 'confirm state');
+  assert(confirm.title.includes('合同会社Want Reach'), 'confirm title from tenant');
+  assert(confirm.confirmButtonLabel === '配信を停止する', 'confirm button label');
+  const completed = buildUnsubscribeScreenStateCopy(tenant, 'completed');
+  assert(completed.message.includes('送信しません'), 'completed message approved');
+  const invalid = buildUnsubscribeScreenStateCopy(tenant, 'invalid_or_expired');
+  assert(invalid.title === 'リンクが無効です', 'invalid_or_expired title');
+  assert(confirm.contactEmail === 'info@wantreach.jp', 'contact from tenant');
+
+  const server = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
+  assert(server.includes('getMockUnsubscribeScreen'), 'mock GET uses screen handler');
+  assert(server.includes('postMockUnsubscribeScreen'), 'mock POST uses screen handler');
+
+  const readiness = await readFile(
+    join(PROJECT_ROOT, 'docs/GROWLY_SALES_MAIL_OPERATIONS_LIVE_READINESS.md'),
+    'utf-8'
+  );
+  assert(readiness.includes('法務表示方針'), 'legal display policy recorded in readiness doc');
+  assert(readiness.includes('所在地は**重複表示しない**') || readiness.includes('重複表示しない'), 'footer no duplicate address');
+  const upgrade = await readFile(join(PROJECT_ROOT, 'docs/GROWLY_SALES_MAIL_OPERATIONS_UPGRADE.md'), 'utf-8');
+  assert(upgrade.includes('UnsubscribeScreenState'), 'screen state in upgrade doc');
+
+  const createDraft = await readFile(join(SRC_ROOT, 'workflow/createGmailDraftForLead.ts'), 'utf-8');
+  assert(!createDraft.includes('buildUnsubscribeScreenStateCopy'), 'gmail draft unchanged for screen copy');
+  ok('Phase 44.1 unsubscribe screen state checks passed');
+}
+
+async function verifyPhase441MaskedEmailOnly(): Promise<void> {
+  const { maskEmailForDisplay } = await import('../mail-operations/emailDisplayPrivacy.js');
+  assert(maskEmailForDisplay('info@example.jp') === 'in***@example.jp', 'mask uses first two local chars');
+  assert(maskEmailForDisplay('a@example.jp') === 'a***@example.jp', 'single char local mask');
+  assert(maskEmailForDisplay('') === null, 'empty email returns null');
+  assert(maskEmailForDisplay('bad') === null, 'invalid email returns null');
+  ok('Phase 44.1 masked email only checks passed');
+}
+
+async function verifyPhase441NoFullEmailInScreenResponse(): Promise<void> {
+  const {
+    setSuppressionStoreOverrideForTests,
+    registerMockUnsubscribeToken,
+    clearMockUnsubscribeTokenRegistryForTests,
+  } = await import('../mail-operations/suppressionStore.js');
+  const { getMockUnsubscribeScreen } = await import('../mail-operations/mockUnsubscribeScreen.js');
+  setSuppressionStoreOverrideForTests({ version: 1, records: [], updatedAt: new Date().toISOString() });
+  clearMockUnsubscribeTokenRegistryForTests();
+  const { token } = registerMockUnsubscribeToken({
+    tenantId: 'want-reach',
+    emailAddress: 'screen@verify.test',
+  });
+  const screen = await getMockUnsubscribeScreen(token);
+  const json = JSON.stringify(screen);
+  assert(screen.maskedEmail === 'sc***@verify.test', 'maskedEmail in response');
+  assert(!json.includes('screen@verify.test'), 'full email not in screen response');
+  assert(!('emailAddress' in screen), 'emailAddress not exposed');
+  assert(!('normalizedEmail' in screen), 'normalizedEmail not exposed');
+  setSuppressionStoreOverrideForTests(null);
+  clearMockUnsubscribeTokenRegistryForTests();
+  ok('Phase 44.1 no full email in screen response checks passed');
+}
+
+async function verifyPhase441GetDoesNotUnsubscribe(): Promise<void> {
+  const {
+    setSuppressionStoreOverrideForTests,
+    registerMockUnsubscribeToken,
+    listMailSuppressions,
+    clearMockUnsubscribeTokenRegistryForTests,
+  } = await import('../mail-operations/suppressionStore.js');
+  const { getMockUnsubscribeScreen } = await import('../mail-operations/mockUnsubscribeScreen.js');
+  setSuppressionStoreOverrideForTests({ version: 1, records: [], updatedAt: new Date().toISOString() });
+  clearMockUnsubscribeTokenRegistryForTests();
+  const { token } = registerMockUnsubscribeToken({
+    tenantId: 'want-reach',
+    emailAddress: 'getonly@verify.test',
+  });
+  const screen = await getMockUnsubscribeScreen(token);
+  assert(screen.screenState === 'confirm', 'GET returns confirm for fresh token');
+  const recordsAfterGet = await listMailSuppressions('want-reach');
+  assert(recordsAfterGet.every((r) => r.normalizedEmail !== 'getonly@verify.test'), 'GET does not create suppression');
+
+  const { addManualSuppression } = await import('../mail-operations/suppressionStore.js');
+  await addManualSuppression({
+    tenantId: 'want-reach',
+    emailAddress: 'stopped@verify.test',
+    reason: 'verify fixture',
+  });
+  const { token: stoppedToken } = registerMockUnsubscribeToken({
+    tenantId: 'want-reach',
+    emailAddress: 'stopped@verify.test',
+  });
+  const stoppedScreen = await getMockUnsubscribeScreen(stoppedToken);
+  assert(stoppedScreen.screenState === 'already_unsubscribed', 'GET returns already_unsubscribed when suppressed');
+  setSuppressionStoreOverrideForTests(null);
+  clearMockUnsubscribeTokenRegistryForTests();
+  ok('Phase 44.1 GET does not unsubscribe checks passed');
+}
+
+async function verifyPhase441IdempotentUnsubscribePost(): Promise<void> {
+  const {
+    setSuppressionStoreOverrideForTests,
+    registerMockUnsubscribeToken,
+    postMockUnsubscribeScreen,
+    clearMockUnsubscribeTokenRegistryForTests,
+    listMailSuppressions,
+  } = await import('../mail-operations/index.js');
+  setSuppressionStoreOverrideForTests({ version: 1, records: [], updatedAt: new Date().toISOString() });
+  clearMockUnsubscribeTokenRegistryForTests();
+  const { token: token1 } = registerMockUnsubscribeToken({
+    tenantId: 'want-reach',
+    emailAddress: 'idem@verify.test',
+  });
+  const first = await postMockUnsubscribeScreen(token1);
+  assert(first.screenState === 'completed', 'first POST completes');
+  const { token: token2 } = registerMockUnsubscribeToken({
+    tenantId: 'want-reach',
+    emailAddress: 'idem@verify.test',
+  });
+  const second = await postMockUnsubscribeScreen(token2);
+  assert(second.screenState === 'already_unsubscribed', 'second POST is idempotent');
+  const active = (await listMailSuppressions('want-reach')).filter(
+    (r) => r.normalizedEmail === 'idem@verify.test' && !r.reactivatedAt
+  );
+  assert(active.length === 1, 'no duplicate suppressions');
+  setSuppressionStoreOverrideForTests(null);
+  clearMockUnsubscribeTokenRegistryForTests();
+  ok('Phase 44.1 idempotent unsubscribe POST checks passed');
+}
+
+async function verifyPhase441TemporaryErrorOnSaveFailure(): Promise<void> {
+  const {
+    setSuppressionStoreOverrideForTests,
+    setSuppressionStoreSaveFailureForTests,
+    registerMockUnsubscribeToken,
+    postMockUnsubscribeScreen,
+    clearMockUnsubscribeTokenRegistryForTests,
+  } = await import('../mail-operations/index.js');
+  setSuppressionStoreOverrideForTests({ version: 1, records: [], updatedAt: new Date().toISOString() });
+  clearMockUnsubscribeTokenRegistryForTests();
+  setSuppressionStoreSaveFailureForTests(true);
+  const { token } = registerMockUnsubscribeToken({
+    tenantId: 'want-reach',
+    emailAddress: 'savefail@verify.test',
+  });
+  const result = await postMockUnsubscribeScreen(token);
+  assert(result.screenState === 'temporary_error', 'save failure returns temporary_error');
+  assert(result.ok === false, 'save failure not ok');
+  setSuppressionStoreSaveFailureForTests(false);
+  setSuppressionStoreOverrideForTests(null);
+  clearMockUnsubscribeTokenRegistryForTests();
+  ok('Phase 44.1 temporary error on save failure checks passed');
+}
+
+async function verifyPhase441RawTokenNotPersisted(): Promise<void> {
+  const {
+    setSuppressionStoreOverrideForTests,
+    registerMockUnsubscribeToken,
+    postMockUnsubscribeScreen,
+    clearMockUnsubscribeTokenRegistryForTests,
+    loadMailSuppressionStore,
+  } = await import('../mail-operations/index.js');
+  setSuppressionStoreOverrideForTests({ version: 1, records: [], updatedAt: new Date().toISOString() });
+  clearMockUnsubscribeTokenRegistryForTests();
+  const { token } = registerMockUnsubscribeToken({
+    tenantId: 'want-reach',
+    emailAddress: 'hashonly@verify.test',
+  });
+  await postMockUnsubscribeScreen(token);
+  const store = await loadMailSuppressionStore();
+  const record = store.records.find((r) => r.normalizedEmail === 'hashonly@verify.test');
+  assert(record?.tokenHash, 'tokenHash stored');
+  const serialized = JSON.stringify(store);
+  assert(!serialized.includes(token), 'raw token not persisted in store');
+  setSuppressionStoreOverrideForTests(null);
+  clearMockUnsubscribeTokenRegistryForTests();
+  ok('Phase 44.1 raw token not persisted checks passed');
+}
+
+async function verifyPhase441NoSensitiveIdentifiersInScreen(): Promise<void> {
+  const { buildDeveloperUnsubscribeScreenPreview } = await import('../mail-operations/mockUnsubscribeScreen.js');
+  const screen = buildDeveloperUnsubscribeScreenPreview({ screenState: 'confirm', tenantId: 'want-reach' });
+  const json = JSON.stringify(screen);
+  assert(!json.includes('tenantId'), 'tenantId not in screen payload');
+  assert(!json.includes('leadId'), 'leadId not in screen payload');
+  assert(!json.includes('sendRecordId'), 'sendRecordId not in screen payload');
+  assert(!json.includes('normalizedEmail'), 'normalizedEmail not in screen payload');
+  assert(!json.includes('token'), 'token not in screen payload');
+  assert(screen.isMock === true && screen.liveConnected === false, 'mock flags explicit');
+  ok('Phase 44.1 no sensitive identifiers in screen checks passed');
+}
+
+async function verifyPhase441TenantBranding(): Promise<void> {
+  const { getMockUnsubscribeScreen, registerMockUnsubscribeToken, setSuppressionStoreOverrideForTests, clearMockUnsubscribeTokenRegistryForTests } =
+    await import('../mail-operations/index.js');
+  setSuppressionStoreOverrideForTests({ version: 1, records: [], updatedAt: new Date().toISOString() });
+  clearMockUnsubscribeTokenRegistryForTests();
+  const { token } = registerMockUnsubscribeToken({
+    tenantId: 'want-reach',
+    emailAddress: 'brand@verify.test',
+  });
+  const screen = await getMockUnsubscribeScreen(token);
+  assert(screen.title.includes('合同会社Want Reach'), 'title from tenant branding');
+  assert(screen.contactEmail === 'info@wantreach.jp', 'contactEmail from tenant');
+  setSuppressionStoreOverrideForTests(null);
+  clearMockUnsubscribeTokenRegistryForTests();
+  ok('Phase 44.1 tenant branding checks passed');
+}
+
+async function verifyPhase441MockOnlyScreen(): Promise<void> {
+  const panel = await readFile(join(SRC_ROOT, 'ui/MailSuppressionListPanel.tsx'), 'utf-8');
+  assert(panel.includes('fetchUnsubscribeScreenPreview'), 'developer screen preview in UI');
+  assert(panel.includes('live未接続'), 'UI states live not connected');
+  assert(panel.includes('Gmail下書きには未適用'), 'UI states gmail not applied');
+  const server = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
+  assert(server.includes('unsubscribe-screen-preview'), 'screen preview API exists');
+  assert(server.includes('getMockUnsubscribeScreen'), 'mock GET handler');
+  assert(server.includes('postMockUnsubscribeScreen'), 'mock POST handler');
+  ok('Phase 44.1 mock only screen checks passed');
+}
+
+async function verifyPhase441NoPrematureLiveEndpoint(): Promise<void> {
+  const server = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
+  assert(!server.includes('PUBLIC_BASE_URL/u/'), 'no live public unsubscribe route');
+  const gcs = await readFile(join(SRC_ROOT, 'mail-operations/suppressionStoreInterface.ts'), 'utf-8');
+  assert(gcs.includes('GcsJsonMailSuppressionStore'), 'gcs store stub exists');
+  assert(!gcs.includes('gcsWriteJson'), 'gcs suppression store not writing live');
+  ok('Phase 44.1 no premature live endpoint checks passed');
+}
+
+async function verifyPhase441FailClosedSuppressionError(): Promise<void> {
+  const {
+    assertNotSuppressed,
+    SuppressionStoreUnavailableError,
+    setSuppressionStoreUnavailableForTests,
+    setSuppressionStoreOverrideForTests,
+  } = await import('../mail-operations/index.js');
+  setSuppressionStoreOverrideForTests({ version: 1, records: [], updatedAt: new Date().toISOString() });
+  setSuppressionStoreUnavailableForTests(true);
+  let threw = false;
+  try {
+    assertNotSuppressed({
+      tenantId: 'want-reach',
+      emailAddress: 'failclosed@verify.test',
+      operation: 'generate_sales_copy',
+    });
+  } catch (err) {
+    threw = err instanceof SuppressionStoreUnavailableError;
+  }
+  assert(threw, 'assertNotSuppressed fails closed when store unavailable');
+  setSuppressionStoreUnavailableForTests(false);
+  setSuppressionStoreOverrideForTests(null);
+  const generateCopy = await readFile(join(SRC_ROOT, 'candidates/generateDaily30SalesCopy.ts'), 'utf-8');
+  assert(generateCopy.includes('assertNotSuppressed'), 'daily30 generation uses suppression gate');
+  const createDraft = await readFile(join(SRC_ROOT, 'workflow/createGmailDraftForLead.ts'), 'utf-8');
+  assert(createDraft.includes('assertNotSuppressed'), 'gmail draft uses suppression gate');
+  const outreach = await readFile(join(SRC_ROOT, 'outreach/outreachEligibility.ts'), 'utf-8');
+  assert(outreach.includes('checkNotSuppressed'), 'outreach eligibility uses suppression gate');
+  ok('Phase 44.1 fail-closed suppression error checks passed');
+}
+
+async function verifyPhase441NoGmailFooterAutoInsertion(): Promise<void> {
+  const createDraft = await readFile(join(SRC_ROOT, 'workflow/createGmailDraftForLead.ts'), 'utf-8');
+  assert(!createDraft.includes('buildUnsubscribeEmailFooterCopy'), 'gmail draft has no footer auto insert');
+  assert(!createDraft.includes('buildUnsubscribeScreenStateCopy'), 'gmail draft has no screen copy insert');
+  const gmailAdapter = await readFile(join(SRC_ROOT, 'integrations/gmail/gmailDraftAdapter.ts'), 'utf-8');
+  assert(!gmailAdapter.includes('unsubscribe'), 'gmail adapter unchanged for unsubscribe');
+  ok('Phase 44.1 no gmail footer auto insertion checks passed');
+}
+
+async function verifyPhase441MaskEmailForDisplay(): Promise<void> {
+  const privacy = await readFile(join(SRC_ROOT, 'mail-operations/emailDisplayPrivacy.ts'), 'utf-8');
+  assert(privacy.includes('maskEmailForDisplay'), 'maskEmailForDisplay utility exists');
+  const mockScreen = await readFile(join(SRC_ROOT, 'mail-operations/mockUnsubscribeScreen.ts'), 'utf-8');
+  assert(mockScreen.includes('maskEmailForDisplay'), 'mock screen uses maskEmailForDisplay');
+  const index = await readFile(join(SRC_ROOT, 'mail-operations/index.ts'), 'utf-8');
+  assert(index.includes('maskEmailForDisplay'), 'maskEmailForDisplay exported from mail-operations');
+  ok('Phase 44.1 mask email for display wiring checks passed');
 }
 
 async function verifyPhase441OperationsLoggingPreserved(): Promise<void> {
@@ -8627,6 +8927,20 @@ async function main(): Promise<void> {
   await verifyPhase441ReplaceableSuppressionStore();
   await verifyPhase441TenantIsolation();
   await verifyPhase441UnsubscribeEmailFooter();
+  await verifyPhase441UnsubscribeScreenState();
+  await verifyPhase441MaskedEmailOnly();
+  await verifyPhase441NoFullEmailInScreenResponse();
+  await verifyPhase441GetDoesNotUnsubscribe();
+  await verifyPhase441IdempotentUnsubscribePost();
+  await verifyPhase441TemporaryErrorOnSaveFailure();
+  await verifyPhase441RawTokenNotPersisted();
+  await verifyPhase441NoSensitiveIdentifiersInScreen();
+  await verifyPhase441TenantBranding();
+  await verifyPhase441MockOnlyScreen();
+  await verifyPhase441NoPrematureLiveEndpoint();
+  await verifyPhase441FailClosedSuppressionError();
+  await verifyPhase441NoGmailFooterAutoInsertion();
+  await verifyPhase441MaskEmailForDisplay();
   await verifyPhase441NoPrematureSaasFeatures();
   await verifyPhase441OperationsLoggingPreserved();
   verifyPhase20LiteEmailImprovement();

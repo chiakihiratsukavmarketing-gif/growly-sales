@@ -1,5 +1,6 @@
 import type { Lead } from '../types/lead.js';
 import type { MailSuppression, SuppressionCheckResult, SuppressionOperation } from './suppressionTypes.js';
+import { SuppressionStoreUnavailableError } from './suppressionTypes.js';
 import {
   findActiveSuppressionByEmail,
   findActiveSuppressionByLeadId,
@@ -9,6 +10,8 @@ import {
 import { normalizeEmailAddress } from './suppressionToken.js';
 import { getDefaultMailOperationsTenantId, requireMailOperationsTenant } from './tenantResolver.js';
 import { buildUnsubscribeEmailFooterCopy } from './unsubscribeBranding.js';
+
+export { SuppressionStoreUnavailableError } from './suppressionTypes.js';
 
 export class SuppressionBlockedError extends Error {
   readonly check: Extract<SuppressionCheckResult, { allowed: false }>;
