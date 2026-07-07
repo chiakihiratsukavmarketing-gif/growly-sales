@@ -322,6 +322,25 @@
 | 通常営業運用 | **影響なし** |
 | Phase 44.1 判定 | **No-Go 維持** |
 
+### 2026-07-08 — Phase 44.1 Step 14: HTTPS LB + serverless NEG 準備
+
+| 項目 | 内容 |
+|------|------|
+| 進行 | Phase 44.1 **14 / 15**（GCP LB 作成済み・**mixhost DNS 前で停止**） |
+| 方式 | グローバル外部 Application LB + serverless NEG + Google 管理 SSL + 固定 IPv4 |
+| 固定 IP | `growly-mail-ops-ip` → **136.68.247.144**（global / RESERVED） |
+| NEG | `growly-mail-ops-neg` → `growly-sales-mail-ops`（asia-northeast1） |
+| backend | `growly-mail-ops-backend`（EXTERNAL_MANAGED・timeout 30s・CDN/Armor なし） |
+| URL map | `growly-mail-ops-url-map`（host: `mailops.wantreach.jp`） |
+| 証明書 | `growly-mail-ops-cert` — **PROVISIONING**（DNS 前は正常） |
+| proxy / rule | `growly-mail-ops-https-proxy` / `growly-mail-ops-forwarding-rule`（443 のみ） |
+| Cloud Run | revision **変更なし**（`growly-sales-mail-ops-00001-tff`） |
+| `liveConnected` | **false** |
+| DNS | **mixhost 未変更**（人間作業: A レコード `mailops` → 136.68.247.144） |
+| 未実施 | `MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true`・GCS 書込・Gmail・Cloud Armor |
+| 通常営業運用 | **影響なし** |
+| Phase 44.1 判定 | **No-Go 維持** |
+
 ## 2026-07-03 — Phase 42 通常運用UI改善 **完了** ✅
 
 **進行:** 通常運用UI改善 **7 / 7 フェーズ完了**

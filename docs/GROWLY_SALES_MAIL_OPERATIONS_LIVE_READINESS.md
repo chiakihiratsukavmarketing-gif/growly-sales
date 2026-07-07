@@ -826,6 +826,114 @@ gcloud run deploy growly-sales-mail-ops \
 4. **`MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true`**（最後）
 5. POST `/u/:token` + GCS suppression スモーク 1 件
 
+### 7.22 Phase 44.1 Step 14 — HTTPS LB + serverless NEG（2026-07-08）
+
+> **実施範囲:** GCP 側 LB・NEG・固定 IP・Google 管理証明書の作成。**mixhost DNS は未変更**（人間作業直前で停止）。
+
+#### 7.22.1 採用方式（Human Approval 済み）
+
+| 項目 | 選択 |
+|------|------|
+| LB 種別 | グローバル外部 Application Load Balancer（EXTERNAL_MANAGED） |
+| backend | serverless NEG → `growly-sales-mail-ops` |
+| SSL | Google 管理証明書（`mailops.wantreach.jp` のみ） |
+| 固定 IP | グローバル IPv4（mixhost A レコード用） |
+| Cloud Armor | **未作成**（将来追加可・60 req/min/IP 案は別承認） |
+| 不採用 | Cloud Run 直接ドメインマッピング |
+
+#### 7.22.2 作成リソース
+
+| リソース | 名前 | 状態 |
+|----------|------|------|
+| 固定 IP | `growly-mail-ops-ip` | **136.68.247.144** / RESERVED / global |
+| serverless NEG | `growly-mail-ops-neg` | asia-northeast1 → `growly-sales-mail-ops` |
+| backend service | `growly-mail-ops-backend` | EXTERNAL_MANAGED / HTTP / timeout 30s / CDN 無効 |
+| URL map | `growly-mail-ops-url-map` | host: `mailops.wantreach.jp` → backend |
+| SSL 証明書 | `growly-mail-ops-cert` | Google-managed / **PROVISIONING** |
+| HTTPS proxy | `growly-mail-ops-https-proxy` | url-map + cert |
+| forwarding rule | `growly-mail-ops-forwarding-rule` | 136.68.247.144:443 |
+
+**routing:** `/health`・`/u/*` は backend 経由で Cloud Run へ。管理 API は実装なし（404）。
+
+**未変更:** `growly-sales-daily30`・既存 wantreach.jp / www / mail 関連リソース。
+
+#### 7.22.3 Cloud Run 状態（変更なし）
+
+| 項目 | 値 |
+|------|-----|
+| revision | `growly-sales-mail-ops-00001-tff` |
+| `MAIL_OPS_LIVE_EXTERNAL_CONNECTED` | **`false`** |
+| GCS 実書込 | **なし** |
+
+#### 7.22.4 mixhost DNS 入力値（人間作業 — 自動実行禁止）
+
+| 項目 | 値 |
+|------|-----|
+| レコード種類 | **A** |
+| ホスト名 | **mailops** |
+| 値 | **136.68.247.144** |
+| TTL | 300 または mixhost 既定 |
+
+**変更禁止:** `wantreach.jp` 本体・`www`・`mail`・MX・SPF・DKIM・DMARC・既存 TXT・ネームサーバー。
+
+DNS 追加後、人間から「DNS 追加済み」の報告を待つ。伝播・証明書 ACTIVE には **数十分〜数時間** かかる場合あり — 完了前に失敗判定しない。
+
+#### 7.22.5 DNS 追加後の確認コマンド（未実行・準備のみ）
+
+```bash
+# DNS 解決
+nslookup mailops.wantreach.jp
+
+# 証明書状態（ACTIVE まで待機）
+gcloud compute ssl-certificates describe growly-mail-ops-cert \
+  --global --project=growly-scheduler \
+  --format="yaml(managed.status,managed.domainStatus)"
+
+# HTTPS health（200・liveConnected:false・漏洩なし）
+curl -s -w "\nHTTP:%{http_code}" https://mailops.wantreach.jp/health
+
+# 無効 token（temporary_error 期待・liveConnected:false 時）
+curl -s -w "\nHTTP:%{http_code}" https://mailops.wantreach.jp/u/invalid-test-token
+
+# TLS ホスト名一致
+openssl s_client -connect mailops.wantreach.jp:443 -servername mailops.wantreach.jp </dev/null 2>/dev/null \
+  | openssl x509 -noout -subject -dates
+```
+
+#### 7.22.6 ログ・セキュリティ（次段階の確認項目）
+
+| 項目 | 方針 |
+|------|------|
+| LB request log | path 記録あり — raw token を production でログ確認テスト **しない** |
+| Cloud Run request log | path 記録の可能性（§7.6） |
+| アプリログ | `route=GET /u/:token` テンプレートのみ |
+| ログ閲覧 IAM | HTTPS 適用前に最小化・最終確認 |
+| retention | 保持期間・除外設定を確認 |
+| token 設計 | 高エントロピー・有効期限・失効可能 |
+| Cloud Armor | 将来追加（60 req/min/IP 案・**別 Human Approval**） |
+
+#### 7.22.7 停止線（今回遵守）
+
+| 項目 | 状態 |
+|------|------|
+| mixhost DNS | **未変更** |
+| 証明書 | PROVISIONING（DNS 前は正常） |
+| `MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true` | **未設定** |
+| POST `/u/:token` / GCS 書込 | **未実施** |
+| Gmail | **未変更** |
+| Cloud Armor | **未作成** |
+| live Go/No-Go | **No-Go 維持** |
+
+#### 7.22.8 次の Human Approval
+
+1. **mixhost A レコード追加**（上記 §7.22.4）
+2. DNS 伝播 + 証明書 **ACTIVE** 確認
+3. `https://mailops.wantreach.jp/health` スモーク
+4. **`MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true`**（最後）
+5. POST `/u/:token` + GCS suppression スモーク 1 件
+
+**構成スクリプト（参照）:** `scripts/cloud/growly-mail-ops/04-load-balancer.sh`（DRY-RUN 既定）
+
 ### 7.3 公開 endpoint（live 時）
 
 | Method | Path | 用途 | 認証 |
