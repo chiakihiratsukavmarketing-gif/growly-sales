@@ -1,7 +1,7 @@
 # Growly Sales — NEXT_TASKS
 
 **更新日:** 2026-07-07
-**進行:** Phase 43 **4 / 4** 完了 / Phase 44 **0 / 3**（44.1 準備完了・No-Go 維持）
+**進行:** Phase 43 **4 / 4** 完了 / Phase 44 **0 / 3**（44.1 準備 **7 / 15**・No-Go 維持）
 
 ---
 
@@ -23,10 +23,10 @@
 
 - [x] **contactEmail** — `info@wantreach.jp`（Want Reach 既定 tenant・tenant 設定一元管理・2026-07-07 Human Approval）
 - [ ] 公開ドメイン・`PUBLIC_BASE_URL` 決定
-- [ ] Cloud Run mail-ops サービス作成承認
+- [ ] Cloud Run mail-ops サービス作成・デプロイ承認（設計案は §LIVE_READINESS §7）
 - [ ] HTTPS 確認
 - [ ] Secret Manager（`UNSUBSCRIBE_TOKEN_PEPPER` 等）
-- [x] suppression 保存先承認（GCS設計 Human Approval 済み: `mail-operations/` prefix / generation-match / retry / backup / IAM / rollback / audit）
+- [x] suppression 保存先承認（GCS設計 Human Approval 済み: `be9d026` / `mail-operations/` prefix / generation-match / retry / backup / IAM / rollback / audit）
 - [x] **法務表示方針** — Human Approval 済み（2026-07-07・§8.4 / メール全体表示要件・フッター所在地重複なし・一般的運用確認）
 - [x] **配信停止画面文案** — Human Approval 済み（2026-07-07・`UnsubscribeScreenState` 5 状態・mock API のみ）
 - [x] **配信停止メール末尾文面** — Human Approval 済み（2026-07-07・`buildUnsubscribeEmailFooterCopy`・所在地なし・Gmail/live 未適用）
@@ -41,6 +41,17 @@
 - [x] contactEmail: `info@wantreach.jp`（tenant 設定のみ・Gmail/live 未適用）
 - [x] 法務表示方針・配信停止画面文案（tenant 経由・mock のみ）
 - [x] mock GET/POST 配信停止画面（maskedEmail のみ・冪等・fail-closed 準備）
+- [x] GCS 保存設計 Human Approval 記録（`be9d026`・実 GCS 操作なし）
+- [x] mail-ops Cloud Run 設計案（読み取り調査・§LIVE_READINESS §7・デプロイなし）
+
+### 44.1 内部進行（15 ステップ）
+
+| # | 内容 | 状態 |
+|---|------|------|
+| 1–5 | tenant / contactEmail / 法務 / footer / mock screen | ✅ |
+| 6 | GCS 保存設計承認・commit | ✅ `be9d026` |
+| 7 | mail-ops Cloud Run 設計調査 | ✅ 本セッション（docs のみ） |
+| 8–15 | live 接続・verify 拡張・デプロイ準備等 | 未 |
 
 ### Phase 43 完了（mock・参照）
 

@@ -255,15 +255,165 @@
 
 ---
 
-## 7. Cloud 構成候補（未デプロイ）
+## 7. mail-ops 専用 Cloud Run 構成案（調査済み・未デプロイ）
+
+> **2026-07-07 読み取り調査:** 既存 Daily30 デプロイ資産を監査し、mail-ops 専用サービスの設計案を作成。**Cloud Run 作成・更新・デプロイ・IAM 変更は未実施。**
+
+### 7.1 既存 Cloud 資産（読み取り調査結果）
+
+| 項目 | 現状（`growly-sales-daily30`） | mail-ops への示唆 |
+|------|-------------------------------|------------------|
+| GCP プロジェクト | `growly-scheduler` | **同一プロジェクト再利用** |
+| リージョン | `asia-northeast1` | **同一リージョン**（GCS バケットと同リージョンでレイテンシ最小） |
+| Node.js | `node:20-slim`（`Dockerfile`） | **同一 LTS** |
+| Artifact Registry | `asia-northeast1-docker.pkg.dev/growly-scheduler/growly-sales/` | **別イメージ名** `growly-sales-mail-ops` |
+| エントリポイント | `npx tsx src/growly-sales/scripts/run-growly-sales-ui.ts` | **専用 slim エントリ**（UI ビルド不要） |
+| ポート | `8080`（`PORT` / `CLOUD_RUN_PORT`） | 維持 |
+| SA | `growly-daily30-runner@growly-scheduler.iam.gserviceaccount.com` | **新規 SA 推奨**（Places / Scheduler 権限を載せない） |
+| min / max instances | `0` / `1` | mail-ops: **`0` / `2`**（公開 burst 用・コスト最小） |
+| concurrency | `1`（Daily30 は長時間バッチ） | mail-ops: **`5`**（GCS generation-match 競合を抑えつつ I/O 並列） |
+| timeout | `900`s（15 分・Places fetch） | mail-ops: **`30`s**（短い HTTP のみ） |
+| 認証 | `--no-allow-unauthenticated` + Scheduler OIDC + `x-growly-daily30-token` | mail-ops 公開 path: **`--allow-unauthenticated`** または LB 経由のみ公開 |
+| env フラグ | `GROWLY_CLOUD_RUN_API_ONLY=true` | mail-ops では **設定しない**（Daily30 専用） |
+| GCS | `growly-sales-daily30` / `prod/growly-sales/` | 同一バケット・**`mail-operations/` prefix のみ**（§4 承認済み） |
+| Secrets | `daily30-cloud-run-token`, `google-places-api-key` | mail-ops: **`unsubscribe-token-pepper`**（将来 `open-tracking-token-pepper`）のみ |
+
+**参照ファイル（変更なし）:** `Dockerfile`, `scripts/cloud/growly-daily30/05-deploy-cloud-run.sh`, `src/growly-sales/config/cloudDeployConfig.ts`, `docs/GROWLY_SALES_CLOUD_SCHEDULER_DEPLOY.md`
+
+### 7.2 推奨サービス仕様（`growly-sales-mail-ops`）
+
+| 項目 | 推奨値 | 理由 |
+|------|--------|------|
+| サービス名 | `growly-sales-mail-ops` | Daily30 と明確分離 |
+| SA ID | `growly-mail-ops-runner` | 最小権限・監査分離 |
+| イメージ | `.../growly-sales/growly-sales-mail-ops:latest` | Daily30 イメージと別ビルド |
+| min instances | `0` | コスト最小（コールドスタート許容） |
+| max instances | `2` | 小規模パイロットで十分。競合時は GCS retry |
+| concurrency | `5` | 低め（suppression 書込競合抑制） |
+| timeout | `30`s | unsubscribe / health のみ |
+| CPU / memory | 1 vCPU / 256Mi（既定） | 軽量 HTTP + GCS I/O |
+| ingress | all（または internal-and-cloud-load-balancing + LB） | カスタムドメイン時は LB 推奨 |
+| 公開 invoker | `allUsers` on `/health`, `/u/*`, `/t/*` のみ | 管理 API は載せない |
+
+### 7.3 公開 endpoint（live 時）
+
+| Method | Path | 用途 | 認証 |
+|--------|------|------|------|
+| GET | `/health` | 起動・依存確認（GCS read-only ping 可） | 公開 |
+| GET | `/u/{token}` | 停止確認画面（**停止しない**） | 公開 |
+| POST | `/u/{token}` | 停止確定（冪等） | 公開 |
+| GET | `/t/{token}.gif` | 開封 pixel（**44.3・将来**） | 公開 |
+
+**載せないもの（ローカル UI 継続）:** `/api/mail-suppressions/*`, Gmail OAuth, Daily30 fetch, 管理画面静的ファイル。
+
+### 7.4 公開 endpoint と管理処理の分離
+
+```
+[受信者] ──HTTPS──► [LB + 証明書] ──► [growly-sales-mail-ops]
+                                              │ GET/POST /u/{token}
+                                              │ GET /t/{token}.gif (将来)
+                                              ▼
+                                         [GCS mail-operations/]
+
+[運営者 localhost:3847] ──► [ローカル uiServer]
+                              │ suppression 一覧・解除ゲート
+                              │ mock プレビュー・CREATE_DRAFTS
+                              └── GCS 読み書き（将来・Human Approval 後）
+```
+
+- **公開サービス:** token 検証・画面 HTML/JSON・suppression 書込のみ
+- **管理 UI:** Human Approval・解除・テンプレート編集は **ローカル正本**（現行維持）
+- **Daily30:** `growly-sales-daily30` は **非接触**（Scheduler・Places・候補 JSON）
+
+### 7.5 セキュリティ設計
+
+| 項目 | 方針 |
+|------|------|
+| token in URL | path パラメータのみ。クエリに token を置かない |
+| ログ | **生 token をログ・Cloud Logging に出さない**。`tokenHash` 先頭 8 桁または `correlationId` のみ |
+| request URL マスク | アクセスログはルートテンプレート `/u/:token` として記録（ミドルウェアで path 正規化） |
+| 存在漏洩 | 無効 token は一律 `invalid_or_expired`（mock 同様） |
+| rate limit | Cloud Armor またはアプリ層: `/u/*` **60 req/min/IP** 案（Human Approval 要） |
+| bot / scanner | 404 統一・`User-Agent` 異常時は早期 reject（44.3 pixel と共通化可） |
+| CSRF | POST は same-site form または token 再送のみ（画面設計時に確定） |
+
+### 7.6 logging 設計
+
+| 項目 | 方針 |
+|------|------|
+| 構造化 prefix | `[mail-ops]`（Daily30 の `[daily30-cloud]` と分離） |
+| ログフィールド | `correlationId`, `screenState`, `httpStatus`, `durationMs`, `tokenHashPrefix` |
+| 禁止フィールド | 生 `token`, `normalizedEmail`, `leadId`, pepper |
+| Cloud Logging フィルタ例 | `resource.labels.service_name="growly-sales-mail-ops" textPayload:"[mail-ops]"` |
+| audit | GCS `audit/YYYY/MM/DD/...`（§4）。ログと audit の二重化 |
+
+### 7.7 IAM 方針（mail-ops SA）
+
+| 権限 | 対象 | 備考 |
+|------|------|------|
+| `roles/storage.objectUser` | `gs://growly-sales-daily30/prod/growly-sales/mail-operations/**` | **IAM Conditions で prefix 限定** |
+| delete | **付与しない** | §4 承認済み |
+| `roles/secretmanager.secretAccessor` | `unsubscribe-token-pepper` | Places / Daily30 token は **不要** |
+| `roles/run.invoker` | Daily30 サービス | **付与しない** |
+| Scheduler / Places | **非関連** | Daily30 SA との権限共有禁止 |
+
+### 7.8 fail-closed 起動条件（live 時）
+
+| 条件 | 動作 |
+|------|------|
+| `MAIL_OPS_MODE=live` かつ pepper 未設定 | プロセス起動失敗（または `/health` = 503） |
+| GCS 読込不可（起動時） | `/health` = 503、POST は `temporary_error` |
+| GCS 書込失敗（POST） | `temporary_error`、suppression 未登録（mock 同様） |
+| backup 失敗 | 本更新中止（§4） |
+
+`MAIL_OPS_MODE` 未設定 / `mock` 時は Cloud Run を **デプロイしない**（設計フェーズ）。
+
+### 7.9 cost 最小化
+
+| 施策 | 内容 |
+|------|------|
+| min instances `0` | アイドル課金なし |
+| slim イメージ | UI ビルド・Vite 成果物を含めない専用 Dockerfile / entrypoint |
+| max instances `2` | パイロット規模上限 |
+| timeout `30`s | 長時間リクエスト課金回避 |
+| 同一バケット | 新規バケット不要 |
+| LB | カスタムドメイン必須時のみ（追加コストは Human Approval） |
+
+### 7.10 rollback 方針
+
+1. `MAIL_OPS_MODE=mock`（リンク生成停止 — ローカル / 下書き側）
+2. Cloud Run **リビジョン rollback**（`growly-sales-mail-ops` のみ）
+3. LB から `/u/*` ルート削除（使用時）
+4. **suppression レコードは削除しない**（§11.1）
+5. GCS オブジェクト復旧は §4 backup から **Human Approval 付き手動**
+
+### 7.11 将来: open tracking endpoint 追加余地
+
+- 同一サービス `growly-sales-mail-ops` に `GET /t/{token}.gif` を追加
+- 1x1 GIF 静的応答 + 非同期 event 書込（送信は止めない設計は §10.3）
+- pixel path も token ログマスク・rate limit 対象
+- 44.1 安定後に 44.3 で有効化（`MAIL_OPEN_TRACKING_ENABLED`）
+
+### 7.12 実装時の Dockerfile 方針（案・未作成）
+
+| 案 | 内容 | 推奨 |
+|----|------|------|
+| A | 既存 `Dockerfile` + `GROWLY_MAIL_OPS_ONLY=true` で UI スキップ | 短期 |
+| B | `Dockerfile.mail-ops`（`node:20-slim`、mail handler のみ） | **推奨**（イメージサイズ・ビルド時間削減） |
+
+デプロイスクリプト案: `scripts/cloud/growly-mail-ops/05-deploy-cloud-run.sh`（Daily30 スクリプトを **コピーせず** 新規。今回は未作成）。
+
+### 7.13 関連リソース（未デプロイ）
 
 | リソース | 推奨 | 備考 |
 |----------|------|------|
-| Cloud Run `growly-sales-mail-ops` | **新規** | min 0 / max 2、concurrency 低め、公開 invoker |
-| Load Balancer + マネージド証明書 | 推奨 | カスタムドメイン + HTTPS |
-| Secret Manager | `unsubscribe-token-pepper`, `open-tracking-token-pepper` | SA に `secretAccessor` |
-| Cloud Armor（任意） | rate limit / geo | 総当たり・スキャナ対策 |
+| Cloud Run `growly-sales-mail-ops` | **新規** | 本節の仕様 |
+| Load Balancer + マネージド証明書 | カスタムドメイン時 | `PUBLIC_BASE_URL` 連動 |
+| Secret Manager | `unsubscribe-token-pepper` | SA に `secretAccessor` |
+| Cloud Armor（任意） | rate limit | §7.5 |
 | 既存 `growly-sales-daily30` | **変更しない** | Scheduler・Places・候補 JSON のみ |
+
+**Human Approval:** Cloud Run mail-ops サービス作成は **未承認**（設計のみ）。
 
 ---
 
@@ -488,9 +638,9 @@
 |---|------|------|
 | 1 | 公開 URL（ドメイン）決定 | ❌ 未 |
 | 2 | HTTPS 有効 | ❌ 未 |
-| 3 | suppression 本番永続化（GCS 等）設計承認 | ❌ 未 |
+| 3 | suppression 本番永続化（GCS 等）設計承認 | ✅ 承認済み（§4・実装未接続） |
 | 4 | `UNSUBSCRIBE_TOKEN_PEPPER` 設定 | ❌ 未 |
-| 5 | rate limit 方針 | ❌ 未 |
+| 5 | rate limit 方針 | ⚠️ 設計案あり（§7.5・Cloud Armor 60 req/min/IP 案・未承認） |
 | 6 | unsubscribe 冪等性（コード済・本番 store で検証要） | ⚠️ mock のみ |
 | 7 | 全送信入口 suppression ブロック + **fail-closed** | ⚠️ 入口は済、fail-closed 未 |
 | 8 | 配信停止文面・画面の人間確認 | ⚠️ 文案・法務方針は承認済み。live 送信前最終チェックリストは未 |
@@ -502,7 +652,7 @@
 
 ## **No-Go** — Phase 44.1 配信停止 live 化は開始しない
 
-**理由:** 公開 URL・HTTPS・Secret・本番永続化・fail-closed 実装が未達。mock 実装・文案・法務表示方針は整備済み。
+**理由:** 公開 URL・HTTPS・Secret・Cloud Run デプロイ・fail-closed live 接続が未達。GCS 保存設計・mail-ops Cloud Run 設計案は承認/調査済み。mock 実装・文案・法務表示方針は整備済み。
 
 **次のアクション（人間）:** §12 チェックリスト 1〜5・fail-closed を順に実施 → Go 再評価。live 送信前に最終チェックリストを実施。
 

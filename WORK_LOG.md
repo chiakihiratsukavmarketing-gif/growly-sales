@@ -220,8 +220,21 @@
 | 未実施 | 実 GCS 書き込み / IAM 変更 / env 変更 / Secret 設定 / Cloud 変更なし |
 | Phase 44.1 判定 | **No-Go 維持** |
 
+### 2026-07-07 — Phase 44.1 調査: mail-ops 専用 Cloud Run 構成（設計案・読み取りのみ）
 
-## 2026-07-03 — Phase 42 通常運用UI改善 **完了** ✅
+| 項目 | 内容 |
+|------|------|
+| 既存調査 | `Dockerfile`（node:20-slim）/ `05-deploy-cloud-run.sh` / `cloudDeployConfig.ts` / `GROWLY_SALES_CLOUD_SCHEDULER_DEPLOY.md` |
+| 推奨サービス | `growly-sales-mail-ops`（Daily30 と分離） |
+| SA 案 | `growly-mail-ops-runner`（Places / Scheduler 権限なし） |
+| スケール | min 0 / max 2 / concurrency 5 / timeout 30s |
+| endpoint | `GET /health`, `GET/POST /u/{token}`, 将来 `GET /t/{token}.gif` |
+| セキュリティ | token ログマスク・path 正規化・rate limit 案（60 req/min/IP） |
+| IAM | prefix 限定 `mail-operations/**`、delete なし |
+| 未実施 | Cloud Run 作成・デプロイ / IAM / DNS / env / Secret / GCS live 書き込みなし |
+| Phase 44.1 判定 | **No-Go 維持** |
+| commit / push | 本セッションで docs + verify のみ |
+
 
 **進行:** 通常運用UI改善 **7 / 7 フェーズ完了**
 

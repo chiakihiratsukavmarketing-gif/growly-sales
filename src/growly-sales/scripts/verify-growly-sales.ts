@@ -8480,6 +8480,57 @@ async function verifyPhase441OperationsLoggingPreserved(): Promise<void> {
   ok('Phase 44.1 operations logging preserved checks passed');
 }
 
+async function verifyPhase441GcsDesignApprovedDoc(): Promise<void> {
+  const readiness = await readFile(
+    join(PROJECT_ROOT, 'docs/GROWLY_SALES_MAIL_OPERATIONS_LIVE_READINESS.md'),
+    'utf-8'
+  );
+  assert(readiness.includes('Human Approval 済み'), 'GCS design marked human approved');
+  assert(readiness.includes('mail-operations/mail-suppressions.json'), 'suppression object path documented');
+  assert(readiness.includes('ifGenerationMatch=0'), 'new object generation match documented');
+  assert(readiness.includes('最大 retry 5'), 'max retry 5 documented');
+  assert(readiness.includes('exponential backoff + jitter'), 'backoff jitter documented');
+  assert(readiness.includes('delete 権限を付与しない'), 'no delete on cloud run documented');
+  assert(readiness.includes('event-per-object'), 'event-per-object audit documented');
+  assert(readiness.includes('fail-closed'), 'fail-closed documented');
+  assert(readiness.includes('DatabaseMailSuppressionStore'), 'db swappable store documented');
+  const upgrade = await readFile(
+    join(PROJECT_ROOT, 'docs/GROWLY_SALES_MAIL_OPERATIONS_UPGRADE.md'),
+    'utf-8'
+  );
+  assert(upgrade.includes('9.1 Phase 44.1 — mail-operations GCS 保存設計（Human Approval 済み）'), 'upgrade gcs section approved');
+  const gcsStore = await readFile(join(SRC_ROOT, 'mail-operations/suppressionStoreInterface.ts'), 'utf-8');
+  assert(gcsStore.includes('GcsJsonMailSuppressionStore'), 'gcs store interface stub exists');
+  assert(!gcsStore.includes('gcsWriteJsonIfGenerationMatch'), 'gcs suppression store not wired to live write');
+  ok('Phase 44.1 GCS design approved doc checks passed');
+}
+
+async function verifyPhase441MailOpsCloudRunDesignDoc(): Promise<void> {
+  const readiness = await readFile(
+    join(PROJECT_ROOT, 'docs/GROWLY_SALES_MAIL_OPERATIONS_LIVE_READINESS.md'),
+    'utf-8'
+  );
+  assert(readiness.includes('growly-sales-mail-ops'), 'mail-ops service name documented');
+  assert(readiness.includes('GET /health'), 'health endpoint documented');
+  assert(readiness.includes('GET /u/{token}'), 'unsubscribe get path documented');
+  assert(readiness.includes('POST /u/{token}'), 'unsubscribe post path documented');
+  assert(readiness.includes('growly-mail-ops-runner'), 'dedicated sa documented');
+  assert(readiness.includes('token をログ'), 'token logging policy documented');
+  assert(readiness.includes('変更しない'), 'daily30 service untouched documented');
+  const deploy = await readFile(
+    join(PROJECT_ROOT, 'scripts/cloud/growly-daily30/05-deploy-cloud-run.sh'),
+    'utf-8'
+  );
+  assert(deploy.includes('growly-sales-daily30'), 'deploy script targets daily30 only');
+  assert(!deploy.includes('growly-sales-mail-ops'), 'no mail-ops deploy in daily30 script');
+  const cloudConfig = await readFile(join(SRC_ROOT, 'config/cloudDeployConfig.ts'), 'utf-8');
+  assert(cloudConfig.includes("CLOUD_RUN_SERVICE_NAME = 'growly-sales-daily30'"), 'cloud config daily30 only');
+  assert(!cloudConfig.includes('growly-sales-mail-ops'), 'no mail-ops service in cloud config yet');
+  const server = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
+  assert(!server.match(/pathname === '\/u\//), 'no live /u/ route in uiServer');
+  ok('Phase 44.1 mail-ops Cloud Run design doc checks passed');
+}
+
 function verifyPhase20LiteEmailImprovement(): void {
   assert(MAX_ADDITIONAL_CONTACT_PAGES === 4, 'additional page limit is 4');
 
@@ -8943,6 +8994,8 @@ async function main(): Promise<void> {
   await verifyPhase441MaskEmailForDisplay();
   await verifyPhase441NoPrematureSaasFeatures();
   await verifyPhase441OperationsLoggingPreserved();
+  await verifyPhase441GcsDesignApprovedDoc();
+  await verifyPhase441MailOpsCloudRunDesignDoc();
   verifyPhase20LiteEmailImprovement();
   await verifyPhase20LiteEmailImprovementAsync();
   await verifyPhaseBLeadInventory();

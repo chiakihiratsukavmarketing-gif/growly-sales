@@ -506,9 +506,9 @@ src/growly-sales/mail-operations/
 
 ---
 
-## 9.1 Phase 44.1 — mail-operations GCS 保存設計（Human Approval 待ち）
+## 9.1 Phase 44.1 — mail-operations GCS 保存設計（Human Approval 済み）
 
-> **注意:** ここは **Human Approval 済みの設計**。実 GCS 操作（read/write）・IAM変更・Cloud変更・env/Secret設定はまだ行わない（No-Go 維持）。
+> **注意:** ここは **Human Approval 済みの設計**（commit `be9d026`）。実 GCS 操作（read/write）・IAM変更・Cloud変更・env/Secret設定はまだ行わない（No-Go 維持）。
 
 ### 保存先（案）
 
@@ -556,6 +556,57 @@ token / audit も同様に `schemaVersion` を持たせる。
 - 生 token / secret / pepper を JSON に含めない
 - UI 用コピーや本文を保存しない
 - Cloud / env / Secret / IAM の変更は Phase 44.1 では行わない（Go 前）
+
+## 9.2 Phase 44.1 — mail-ops 専用 Cloud Run 設計（調査済み・未デプロイ）
+
+> **2026-07-07 読み取り調査:** 既存 `growly-sales-daily30` デプロイ資産を監査。**サービス作成・デプロイ・IAM 変更は未実施**（No-Go 維持）。
+
+### 分離方針
+
+| 観点 | Daily30 (`growly-sales-daily30`) | mail-ops (`growly-sales-mail-ops`) |
+|------|----------------------------------|-------------------------------------|
+| 用途 | Scheduler 自動候補収集 | 公開 unsubscribe / 将来 open pixel |
+| 認証 | OIDC + `x-growly-daily30-token` | 公開 `/u/*`（LB 任意） |
+| SA | `growly-daily30-runner` | **`growly-mail-ops-runner`（新規案）** |
+| timeout | 900s | **30s** |
+| concurrency | 1 | **5** |
+| max instances | 1 | **2** |
+| UI 静的ファイル | apiOnly 時は非配信 | **含めない** |
+| Places / Scheduler | あり | **なし** |
+
+### 推奨 endpoint
+
+```text
+GET  /health
+GET  /u/{token}      # 確認のみ（停止しない）
+POST /u/{token}      # 冪等停止
+GET  /t/{token}.gif  # 44.3 将来
+```
+
+### セキュリティ
+
+- 生 token をログ・audit 本文に残さない（`tokenHash` / prefix のみ）
+- Cloud Logging は path を `/u/:token` テンプレートに正規化
+- rate limit 案: Cloud Armor **60 req/min/IP** on `/u/*`（Human Approval 要）
+- fail-closed: pepper / GCS 不可時は POST を `temporary_error`
+
+### IAM（mail-ops SA 案）
+
+- `roles/storage.objectUser` + **IAM Condition** `prod/growly-sales/mail-operations/**`
+- **delete 権限なし**
+- `roles/secretmanager.secretAccessor` → `unsubscribe-token-pepper` のみ
+- Daily30 SA・Places secret とは **分離**
+
+### cost
+
+- min instances `0`、slim Dockerfile（UI ビルドなし）、max `2`
+
+### rollback
+
+- Cloud Run リビジョン rollback（mail-ops のみ）
+- suppression レコードは削除しない
+
+**Human Approval 待ち:** サービス作成・デプロイ・公開 invoker・LB/DNS。
 
 ## 10. DDL / env / Cloud 変更候補（実行しない・候補のみ）
 
