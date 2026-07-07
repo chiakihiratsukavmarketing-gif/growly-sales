@@ -90,6 +90,8 @@
 | GCS | `growly-sales-daily30` / `prod/growly-sales/` — **Daily30 用 JSON のみ**（`jsonDocumentStorage` 3 種） |
 | mail-ops JSON | **ローカル `data/growly-sales/` のみ**（GCS 未接続） |
 | GCS 条件付き更新 | `gcsWriteJsonIfGenerationMatch` 実装済み（Daily30 用） |
+| **GCS suppression store** | **`GcsJsonMailSuppressionStore` 実装済み**（`InMemoryGcsJsonStorage` で verify・**実 GCS 未接続**） |
+| **mail-ops entrypoint** | `mailOpsServer.ts` / `run-growly-sales-mail-ops.ts`（mock モードのみ運用） |
 | `.env.example` | mail-ops 用 env **未定義**（Gmail / GCS / Places のみ） |
 
 ---
@@ -273,7 +275,7 @@
 | min / max instances | `0` / `1` | mail-ops: **`0` / `2`**（公開 burst 用・コスト最小） |
 | concurrency | `1`（Daily30 は長時間バッチ） | mail-ops: **`5`**（GCS generation-match 競合を抑えつつ I/O 並列） |
 | timeout | `900`s（15 分・Places fetch） | mail-ops: **`30`s**（短い HTTP のみ） |
-| 認証 | `--no-allow-unauthenticated` + Scheduler OIDC + `x-growly-daily30-token` | mail-ops 公開 path: **`--allow-unauthenticated`** または LB 経由のみ公開 |
+| 認証 | `--no-allow-unauthenticated` + Scheduler OIDC + `x-growly-daily30-token` | mail-ops: **サービス全体を `allUsers` invoker で公開**（path 単位 IAM は不可）。**公開してよい route のみ実装** |
 | env フラグ | `GROWLY_CLOUD_RUN_API_ONLY=true` | mail-ops では **設定しない**（Daily30 専用） |
 | GCS | `growly-sales-daily30` / `prod/growly-sales/` | 同一バケット・**`mail-operations/` prefix のみ**（§4 承認済み） |
 | Secrets | `daily30-cloud-run-token`, `google-places-api-key` | mail-ops: **`unsubscribe-token-pepper`**（将来 `open-tracking-token-pepper`）のみ |
@@ -293,7 +295,34 @@
 | timeout | `30`s | unsubscribe / health のみ |
 | CPU / memory | 1 vCPU / 256Mi（既定） | 軽量 HTTP + GCS I/O |
 | ingress | all（または internal-and-cloud-load-balancing + LB） | カスタムドメイン時は LB 推奨 |
-| 公開 invoker | `allUsers` on `/health`, `/u/*`, `/t/*` のみ | 管理 API は載せない |
+| 公開 invoker | `allUsers` on サービス全体 | **path 単位公開は不可** — 管理 API を載せない設計で緩和 |
+
+### 7.14 実装状況（Phase 44.1 step 8・live 未接続）
+
+| コンポーネント | パス | 状態 |
+|----------------|------|------|
+| GCS suppression store | `gcsJsonMailSuppressionStore.ts` | ✅ generation-match / retry / backup / idempotent |
+| Document schema | `gcsDocumentTypes.ts` / `gcsDocumentParser.ts` | ✅ `schemaVersion: 1` + legacy `version` 移行 |
+| Audit writer | `gcsSuppressionAuditWriter.ts` | ✅ event-per-object |
+| Store factory | `createMailSuppressionStore.ts` | ✅ live+local 拒否・既定 mock |
+| mail-ops server | `server/mailOpsServer.ts` | ✅ `/health`, `/u/:token` のみ |
+| Request logging | `mailOpsRequestLogging.ts` | ✅ route テンプレート化 |
+| Dockerfile | `scripts/cloud/growly-mail-ops/Dockerfile` | ✅ slim・UI なし |
+| Deploy scripts | `scripts/cloud/growly-mail-ops/0*.sh` | ✅ DRY-RUN 既定 |
+
+**未実施:** 実 GCS read/write、Cloud Run デプロイ、IAM、Secret 設定、`MAIL_OPS_MODE=live` 有効化。
+
+### 7.15 Cloud Run プラットフォーム request log リスク
+
+Cloud Run の **プラットフォーム request log** には実 URL path（`/u/{token}`）が含まれる可能性がある。アプリログでは `GET /u/:token` に正規化するが、プラットフォームログは別途対策が必要。
+
+| 将来案 | 内容 |
+|--------|------|
+| A | 外部 LB で URL rewrite 後に Cloud Run へ転送（ログに生 token を残さない） |
+| B | token を path ではなく短期参照 ID 方式へ再設計 |
+| C | request logs の保持期間短縮・アクセス制御強化（ログ閲覧者最小化） |
+
+**今回:** Cloud 設定変更なし。live 前に Human Approval で方針選択。
 
 ### 7.3 公開 endpoint（live 時）
 
@@ -394,14 +423,14 @@
 - pixel path も token ログマスク・rate limit 対象
 - 44.1 安定後に 44.3 で有効化（`MAIL_OPEN_TRACKING_ENABLED`）
 
-### 7.12 実装時の Dockerfile 方針（案・未作成）
+### 7.12 実装時の Dockerfile 方針
 
-| 案 | 内容 | 推奨 |
+| 案 | 内容 | 状態 |
 |----|------|------|
-| A | 既存 `Dockerfile` + `GROWLY_MAIL_OPS_ONLY=true` で UI スキップ | 短期 |
-| B | `Dockerfile.mail-ops`（`node:20-slim`、mail handler のみ） | **推奨**（イメージサイズ・ビルド時間削減） |
+| A | 既存 `Dockerfile` + env で UI スキップ | 未採用 |
+| B | `scripts/cloud/growly-mail-ops/Dockerfile`（slim） | **✅ 実装済み** |
 
-デプロイスクリプト案: `scripts/cloud/growly-mail-ops/05-deploy-cloud-run.sh`（Daily30 スクリプトを **コピーせず** 新規。今回は未作成）。
+デプロイスクリプト: `scripts/cloud/growly-mail-ops/0*.sh`（**DRY-RUN 既定・未実行**）。
 
 ### 7.13 関連リソース（未デプロイ）
 

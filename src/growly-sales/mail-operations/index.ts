@@ -58,10 +58,18 @@ export type {
   UnsubscribeScreenCopy,
   UnsubscribeEmailFooterCopy,
 } from './unsubscribeBranding.js';
+export { LocalJsonMailSuppressionStore } from './suppressionStoreInterface.js';
+export { GcsJsonMailSuppressionStore } from './gcsJsonMailSuppressionStore.js';
 export {
-  LocalJsonMailSuppressionStore,
-  GcsJsonMailSuppressionStore,
-} from './suppressionStoreInterface.js';
+  createMailSuppressionStore,
+  isMailOpsStorageReady,
+  MailOpsConfigurationError,
+} from './createMailSuppressionStore.js';
+export type { MailSuppressionsDocument, UnsubscribeTokensDocument } from './gcsDocumentTypes.js';
+export { parseMailSuppressionsDocument } from './gcsDocumentParser.js';
+export { withGenerationMatchRetry } from './withGenerationMatchRetry.js';
+export { InMemoryGcsJsonStorage } from './gcsJsonStoragePort.js';
+export { MAIL_OPS_SERVICE_NAME } from './mailOpsRequestLogging.js';
 export {
   SuppressionBlockedError,
   checkNotSuppressed,

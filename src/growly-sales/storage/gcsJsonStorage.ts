@@ -117,12 +117,49 @@ export async function gcsWriteJsonIfGenerationMatch(
   ifGenerationMatch: string
 ): Promise<void> {
   const { bucketName, objectPath } = objectRef(logicalFileName);
+  await gcsWriteJsonIfGenerationMatchAtPath(objectPath, jsonText, ifGenerationMatch, bucketName);
+}
+
+/** フル object path 指定（mail-operations audit 等） */
+export async function gcsWriteJsonIfGenerationMatchAtPath(
+  objectPath: string,
+  jsonText: string,
+  ifGenerationMatch: string,
+  bucketName?: string
+): Promise<void> {
+  const bucket = bucketName ?? getGcsBucketName();
+  if (!bucket) throw new Error('GCS bucket is not configured');
   const client = await getGcsClient();
-  const file = client.bucket(bucketName).file(objectPath);
+  const file = client.bucket(bucket).file(objectPath);
   await file.save(jsonText, {
     contentType: 'application/json; charset=utf-8',
     preconditionOpts: { ifGenerationMatch: Number(ifGenerationMatch) },
   });
+}
+
+/** 新規 object のみ（ifGenerationMatch=0） */
+export async function gcsWriteNewJsonAtPath(objectPath: string, jsonText: string): Promise<void> {
+  await gcsWriteJsonIfGenerationMatchAtPath(objectPath, jsonText, '0');
+}
+
+export async function gcsCopyObjectBetweenPaths(
+  sourceObjectPath: string,
+  destObjectPath: string
+): Promise<void> {
+  const bucketName = getGcsBucketName();
+  if (!bucketName) throw new Error('GCS bucket is not configured');
+  const client = await getGcsClient();
+  await client
+    .bucket(bucketName)
+    .file(sourceObjectPath)
+    .copy(client.bucket(bucketName).file(destObjectPath));
+}
+
+export function isGcsPreconditionFailure(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as { code?: number; errors?: Array<{ reason?: string }> };
+  if (e.code === 412) return true;
+  return Boolean(e.errors?.some((item) => item.reason === 'conditionNotMet'));
 }
 
 export async function gcsWriteJson(logicalFileName: string, jsonText: string): Promise<void> {

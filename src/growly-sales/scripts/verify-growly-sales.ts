@@ -8125,7 +8125,8 @@ async function verifyPhase441ReplaceableSuppressionStore(): Promise<void> {
   assert(types.includes('interface MailSuppressionStore {'), 'replaceable store interface exists');
   const impl = await readFile(join(SRC_ROOT, 'mail-operations/suppressionStoreInterface.ts'), 'utf-8');
   assert(impl.includes('LocalJsonMailSuppressionStore'), 'local json store implementation exists');
-  assert(impl.includes('GcsJsonMailSuppressionStore'), 'gcs json store placeholder exists');
+  const gcs = await readFile(join(SRC_ROOT, 'mail-operations/gcsJsonMailSuppressionStore.ts'), 'utf-8');
+  assert(gcs.includes('class GcsJsonMailSuppressionStore'), 'gcs json store implementation exists');
   ok('Phase 44.1 replaceable suppression store checks passed');
 }
 
@@ -8416,10 +8417,12 @@ async function verifyPhase441MockOnlyScreen(): Promise<void> {
 
 async function verifyPhase441NoPrematureLiveEndpoint(): Promise<void> {
   const server = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
-  assert(!server.includes('PUBLIC_BASE_URL/u/'), 'no live public unsubscribe route');
-  const gcs = await readFile(join(SRC_ROOT, 'mail-operations/suppressionStoreInterface.ts'), 'utf-8');
-  assert(gcs.includes('GcsJsonMailSuppressionStore'), 'gcs store stub exists');
-  assert(!gcs.includes('gcsWriteJson'), 'gcs suppression store not writing live');
+  assert(!server.includes('PUBLIC_BASE_URL/u/'), 'no live public unsubscribe route in uiServer');
+  const mailOps = await readFile(join(SRC_ROOT, 'mail-operations/server/mailOpsServer.ts'), 'utf-8');
+  assert(mailOps.includes('/health'), 'mail-ops health route exists');
+  assert(mailOps.includes('/u/'), 'mail-ops unsubscribe route exists');
+  const factory = await readFile(join(SRC_ROOT, 'mail-operations/createMailSuppressionStore.ts'), 'utf-8');
+  assert(factory.includes("mode !== 'live'"), 'live mode not default in factory');
   ok('Phase 44.1 no premature live endpoint checks passed');
 }
 
@@ -8499,9 +8502,9 @@ async function verifyPhase441GcsDesignApprovedDoc(): Promise<void> {
     'utf-8'
   );
   assert(upgrade.includes('9.1 Phase 44.1 — mail-operations GCS 保存設計（Human Approval 済み）'), 'upgrade gcs section approved');
-  const gcsStore = await readFile(join(SRC_ROOT, 'mail-operations/suppressionStoreInterface.ts'), 'utf-8');
-  assert(gcsStore.includes('GcsJsonMailSuppressionStore'), 'gcs store interface stub exists');
-  assert(!gcsStore.includes('gcsWriteJsonIfGenerationMatch'), 'gcs suppression store not wired to live write');
+  const gcsStore = await readFile(join(SRC_ROOT, 'mail-operations/gcsJsonMailSuppressionStore.ts'), 'utf-8');
+  assert(gcsStore.includes('class GcsJsonMailSuppressionStore'), 'gcs store implementation exists');
+  assert(gcsStore.includes('withGenerationMatchRetry'), 'gcs store uses generation retry');
   ok('Phase 44.1 GCS design approved doc checks passed');
 }
 
@@ -8529,6 +8532,308 @@ async function verifyPhase441MailOpsCloudRunDesignDoc(): Promise<void> {
   const server = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
   assert(!server.match(/pathname === '\/u\//), 'no live /u/ route in uiServer');
   ok('Phase 44.1 mail-ops Cloud Run design doc checks passed');
+}
+
+async function verifyPhase441GcsStoreDocumentSchema(): Promise<void> {
+  const { parseMailSuppressionsDocument } = await import('../mail-operations/gcsDocumentParser.js');
+  const { SuppressionStoreUnavailableError } = await import('../mail-operations/suppressionTypes.js');
+  const empty = parseMailSuppressionsDocument(null);
+  assert(empty.schemaVersion === 1 && empty.records.length === 0, 'empty document defaults');
+  const legacy = parseMailSuppressionsDocument(
+    JSON.stringify({
+      version: 1,
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      records: [
+        {
+          suppressionId: 's1',
+          emailAddress: 'a@example.com',
+          normalizedEmail: 'a@example.com',
+          status: 'unsubscribed',
+          source: 'manual',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+    })
+  );
+  assert(legacy.records[0]?.tenantId === 'want-reach', 'legacy record migrates tenantId');
+  let threw = false;
+  try {
+    parseMailSuppressionsDocument(JSON.stringify({ schemaVersion: 9, records: [] }));
+  } catch (err) {
+    threw = err instanceof SuppressionStoreUnavailableError;
+  }
+  assert(threw, 'unknown schemaVersion fails closed');
+  ok('Phase 44.1 GCS store document schema checks passed');
+}
+
+async function verifyPhase441GcsStoreGenerationMatch(): Promise<void> {
+  process.env.GROWLY_GCS_PREFIX = 'prod/growly-sales';
+  const { InMemoryGcsJsonStorage } = await import('../mail-operations/gcsJsonStoragePort.js');
+  const { GcsJsonMailSuppressionStore } = await import('../mail-operations/gcsJsonMailSuppressionStore.js');
+  const { MAIL_OPS_SUPPRESSIONS_LOGICAL } = await import('../mail-operations/mailOpsPaths.js');
+  const storage = new InMemoryGcsJsonStorage();
+  storage.seedLogical(
+    MAIL_OPS_SUPPRESSIONS_LOGICAL,
+    JSON.stringify({ schemaVersion: 1, updatedAt: '2026-01-01T00:00:00.000Z', records: [] }),
+    1
+  );
+  const store = new GcsJsonMailSuppressionStore({ storage });
+  const now = new Date().toISOString();
+  await store.add({
+    suppressionId: 'gen-match-1',
+    tenantId: 'want-reach',
+    emailAddress: 'gen@example.com',
+    normalizedEmail: 'gen@example.com',
+    status: 'manually_blocked',
+    source: 'manual',
+    createdAt: now,
+    updatedAt: now,
+  });
+  const meta = await storage.getMetadata(MAIL_OPS_SUPPRESSIONS_LOGICAL);
+  assert(meta?.generation === '2', 'generation increments after write');
+  ok('Phase 44.1 GCS store generation match checks passed');
+}
+
+async function verifyPhase441GcsStoreFiveRetries(): Promise<void> {
+  const { withGenerationMatchRetry } = await import('../mail-operations/withGenerationMatchRetry.js');
+  const { SuppressionStoreUnavailableError } = await import('../mail-operations/suppressionTypes.js');
+  let attempts = 0;
+  let threw = false;
+  try {
+    await withGenerationMatchRetry({
+      sleep: async () => {},
+      operation: async () => {
+        attempts += 1;
+        const err = Object.assign(new Error('conflict'), { code: 412 });
+        throw err;
+      },
+    });
+  } catch (err) {
+    threw = err instanceof SuppressionStoreUnavailableError;
+  }
+  assert(attempts === 5, 'generation retry stops at 5 attempts');
+  assert(threw, 'retry exhaustion throws SuppressionStoreUnavailableError');
+  ok('Phase 44.1 GCS store five retries checks passed');
+}
+
+async function verifyPhase441GcsStoreBackoffInjection(): Promise<void> {
+  const { withGenerationMatchRetry, BACKOFF_SCHEDULE_MS } = await import(
+    '../mail-operations/withGenerationMatchRetry.js'
+  );
+  const delays: number[] = [];
+  let attempts = 0;
+  try {
+    await withGenerationMatchRetry({
+      sleep: async (ms) => {
+        delays.push(ms);
+      },
+      operation: async () => {
+        attempts += 1;
+        if (attempts < 3) {
+          throw Object.assign(new Error('conflict'), { code: 412 });
+        }
+        return 'ok';
+      },
+    });
+  } catch {
+    // no-op
+  }
+  assert(attempts === 3, 'backoff injection succeeds on third attempt');
+  assert(delays.length === 2, 'two backoff delays before success');
+  assert(delays[0]! >= BACKOFF_SCHEDULE_MS[0], 'first delay uses schedule');
+  ok('Phase 44.1 GCS store backoff injection checks passed');
+}
+
+async function verifyPhase441GcsStoreBackupBeforeWrite(): Promise<void> {
+  process.env.GROWLY_GCS_PREFIX = 'prod/growly-sales';
+  const { InMemoryGcsJsonStorage } = await import('../mail-operations/gcsJsonStoragePort.js');
+  const { GcsJsonMailSuppressionStore } = await import('../mail-operations/gcsJsonMailSuppressionStore.js');
+  const { MAIL_OPS_SUPPRESSIONS_LOGICAL } = await import('../mail-operations/mailOpsPaths.js');
+  const storage = new InMemoryGcsJsonStorage();
+  storage.seedLogical(
+    MAIL_OPS_SUPPRESSIONS_LOGICAL,
+    JSON.stringify({ schemaVersion: 1, updatedAt: '2026-01-01T00:00:00.000Z', records: [] }),
+    3
+  );
+  const store = new GcsJsonMailSuppressionStore({ storage });
+  const now = new Date().toISOString();
+  await store.add({
+    suppressionId: 'backup-1',
+    tenantId: 'want-reach',
+    emailAddress: 'backup@example.com',
+    normalizedEmail: 'backup@example.com',
+    status: 'manually_blocked',
+    source: 'manual',
+    createdAt: now,
+    updatedAt: now,
+  });
+  const paths = storage.listObjectPaths();
+  assert(
+    paths.some((p) => p.includes('mail-operations/backups/mail-suppressions/')),
+    'backup object created before update'
+  );
+  ok('Phase 44.1 GCS store backup before write checks passed');
+}
+
+async function verifyPhase441GcsStoreFailClosed(): Promise<void> {
+  const { parseMailSuppressionsDocument } = await import('../mail-operations/gcsDocumentParser.js');
+  const { SuppressionStoreUnavailableError } = await import('../mail-operations/suppressionTypes.js');
+  let threw = false;
+  try {
+    parseMailSuppressionsDocument('{not-json');
+  } catch (err) {
+    threw = err instanceof SuppressionStoreUnavailableError;
+  }
+  assert(threw, 'corrupt json fails closed');
+  ok('Phase 44.1 GCS store fail closed checks passed');
+}
+
+async function verifyPhase441GcsStoreIdempotent(): Promise<void> {
+  process.env.GROWLY_GCS_PREFIX = 'prod/growly-sales';
+  const { InMemoryGcsJsonStorage } = await import('../mail-operations/gcsJsonStoragePort.js');
+  const { GcsJsonMailSuppressionStore } = await import('../mail-operations/gcsJsonMailSuppressionStore.js');
+  const { MAIL_OPS_SUPPRESSIONS_LOGICAL } = await import('../mail-operations/mailOpsPaths.js');
+  const storage = new InMemoryGcsJsonStorage();
+  const store = new GcsJsonMailSuppressionStore({ storage });
+  const first = await store.addFromUnsubscribe({
+    tenantId: 'want-reach',
+    emailAddress: 'idem@example.com',
+    tokenHash: 'hash-idem',
+  });
+  const second = await store.addFromUnsubscribe({
+    tenantId: 'want-reach',
+    emailAddress: 'idem@example.com',
+    tokenHash: 'hash-idem',
+  });
+  assert(first.created && !second.created, 'unsubscribe add is idempotent');
+  const raw = await storage.readJson(MAIL_OPS_SUPPRESSIONS_LOGICAL);
+  const parsed = JSON.parse(raw ?? '{}') as { records: unknown[] };
+  assert(parsed.records.length === 1, 'idempotent unsubscribe keeps single record');
+  ok('Phase 44.1 GCS store idempotent checks passed');
+}
+
+async function verifyPhase441AuditEventPerObject(): Promise<void> {
+  process.env.GROWLY_GCS_PREFIX = 'prod/growly-sales';
+  const { InMemoryGcsJsonStorage } = await import('../mail-operations/gcsJsonStoragePort.js');
+  const { createGcsSuppressionAuditWriter } = await import('../mail-operations/gcsSuppressionAuditWriter.js');
+  const storage = new InMemoryGcsJsonStorage();
+  const writer = createGcsSuppressionAuditWriter(storage);
+  const result = await writer.writeEvent({
+    tenantId: 'want-reach',
+    action: 'unsubscribe_completed',
+    source: 'unsubscribe_link',
+    actorType: 'system',
+    suppressionId: 'sup-1',
+  });
+  assert(result.ok, 'audit event write succeeds in memory');
+  const paths = storage.listObjectPaths();
+  assert(paths.some((p) => p.includes('/mail-operations/audit/')), 'audit uses per-object path');
+  const body = await storage.readJsonAtPath(paths.find((p) => p.includes('/audit/'))!);
+  assert(body && !body.includes('tokenHash'), 'audit body excludes token hash');
+  ok('Phase 44.1 audit event per object checks passed');
+}
+
+async function verifyPhase441AuditFailureDoesNotUndoSuppression(): Promise<void> {
+  process.env.GROWLY_GCS_PREFIX = 'prod/growly-sales';
+  const { InMemoryGcsJsonStorage } = await import('../mail-operations/gcsJsonStoragePort.js');
+  const { GcsJsonMailSuppressionStore } = await import('../mail-operations/gcsJsonMailSuppressionStore.js');
+  const { createGcsSuppressionAuditWriter } = await import('../mail-operations/gcsSuppressionAuditWriter.js');
+  const storage = new InMemoryGcsJsonStorage();
+  const failingAudit = {
+    writeEvent: async () => ({ ok: false, correlationId: 'c-fail', alertCandidate: true }),
+  };
+  const store = new GcsJsonMailSuppressionStore({ storage, auditWriter: failingAudit });
+  await store.addFromUnsubscribe({
+    tenantId: 'want-reach',
+    emailAddress: 'audit-fail@example.com',
+    tokenHash: 'hash-audit-fail',
+  });
+  const listed = await store.listByTenant('want-reach');
+  assert(listed.length === 1, 'suppression persists when audit fails');
+  ok('Phase 44.1 audit failure does not undo suppression checks passed');
+}
+
+async function verifyPhase441StoreFactoryRejectsLiveLocal(): Promise<void> {
+  const { createMailSuppressionStore, MailOpsConfigurationError } = await import(
+    '../mail-operations/createMailSuppressionStore.js'
+  );
+  let threw = false;
+  try {
+    createMailSuppressionStore({ mode: 'live', storageBackend: 'local' });
+  } catch (err) {
+    threw = err instanceof MailOpsConfigurationError;
+  }
+  assert(threw, 'live + local backend rejected');
+  const mockStore = createMailSuppressionStore({ mode: 'mock', storageBackend: 'local' });
+  assert(mockStore, 'mock mode returns local store');
+  ok('Phase 44.1 store factory rejects live local checks passed');
+}
+
+async function verifyPhase441MailOpsOnlyRoutes(): Promise<void> {
+  const mailOps = await readFile(join(SRC_ROOT, 'mail-operations/server/mailOpsServer.ts'), 'utf-8');
+  assert(mailOps.includes("pathname === '/health'"), 'health route only');
+  assert(mailOps.includes('/u/'), 'unsubscribe routes');
+  assert(!mailOps.includes('/api/cloud/daily30'), 'no daily30 routes');
+  assert(!mailOps.includes('createGmailDraft'), 'no gmail routes');
+  assert(!mailOps.includes('serveStatic'), 'no ui static');
+  ok('Phase 44.1 mail-ops only routes checks passed');
+}
+
+async function verifyPhase441MailOpsHealthFailClosed(): Promise<void> {
+  const { isMailOpsStorageReady } = await import('../mail-operations/createMailSuppressionStore.js');
+  const prevMode = process.env.MAIL_OPS_MODE;
+  const prevPepper = process.env.UNSUBSCRIBE_TOKEN_PEPPER;
+  process.env.MAIL_OPS_MODE = 'live';
+  delete process.env.UNSUBSCRIBE_TOKEN_PEPPER;
+  assert(!isMailOpsStorageReady('live'), 'live health not ready without pepper');
+  process.env.UNSUBSCRIBE_TOKEN_PEPPER = 'test-pepper-not-for-production';
+  process.env.GROWLY_STORAGE_BACKEND = 'gcs';
+  process.env.GROWLY_GCS_BUCKET = 'test-bucket-name';
+  assert(isMailOpsStorageReady('live'), 'live health ready with gcs config and pepper name set');
+  if (prevMode === undefined) delete process.env.MAIL_OPS_MODE;
+  else process.env.MAIL_OPS_MODE = prevMode;
+  if (prevPepper === undefined) delete process.env.UNSUBSCRIBE_TOKEN_PEPPER;
+  else process.env.UNSUBSCRIBE_TOKEN_PEPPER = prevPepper;
+  ok('Phase 44.1 mail-ops health fail closed checks passed');
+}
+
+async function verifyPhase441NoRawTokenLogging(): Promise<void> {
+  const logging = await readFile(join(SRC_ROOT, 'mail-operations/mailOpsRequestLogging.ts'), 'utf-8');
+  assert(logging.includes('/u/:token'), 'route template normalization exists');
+  assert(!logging.includes('req.url'), 'logging module does not read raw url');
+  const mailOps = await readFile(join(SRC_ROOT, 'mail-operations/server/mailOpsServer.ts'), 'utf-8');
+  assert(mailOps.includes('logMailOpsRequest'), 'mail-ops server uses protected logging');
+  ok('Phase 44.1 no raw token logging checks passed');
+}
+
+async function verifyPhase441MailOpsDockerfile(): Promise<void> {
+  const dockerfile = await readFile(
+    join(PROJECT_ROOT, 'scripts/cloud/growly-mail-ops/Dockerfile'),
+    'utf-8'
+  );
+  assert(dockerfile.includes('node:20-slim'), 'mail-ops dockerfile uses node 20 slim');
+  assert(dockerfile.includes('run-growly-sales-mail-ops.ts'), 'mail-ops entrypoint only');
+  assert(!dockerfile.includes('growly-sales:ui:build'), 'no ui build in mail-ops image');
+  assert(dockerfile.includes('USER growly'), 'non-root user');
+  const deploy = await readFile(join(PROJECT_ROOT, 'scripts/cloud/growly-mail-ops/03-deploy.sh'), 'utf-8');
+  assert(deploy.includes('DRY-RUN'), 'deploy script is dry-run by default');
+  ok('Phase 44.1 mail-ops dockerfile checks passed');
+}
+
+async function verifyPhase441NoLiveGcsOperation(): Promise<void> {
+  const gcsStorage = await readFile(join(SRC_ROOT, 'storage/gcsJsonStorage.ts'), 'utf-8');
+  assert(gcsStorage.includes('getGcsClient'), 'gcs client lazy loaded');
+  const factory = await readFile(join(SRC_ROOT, 'mail-operations/createMailSuppressionStore.ts'), 'utf-8');
+  assert(factory.includes("mode !== 'live'"), 'factory defaults away from live gcs');
+  const prevBackend = process.env.GROWLY_STORAGE_BACKEND;
+  process.env.GROWLY_STORAGE_BACKEND = 'local';
+  const { createMailSuppressionStore } = await import('../mail-operations/createMailSuppressionStore.js');
+  const store = createMailSuppressionStore();
+  assert(store.constructor.name === 'LocalJsonMailSuppressionStore', 'default store is local');
+  if (prevBackend === undefined) delete process.env.GROWLY_STORAGE_BACKEND;
+  else process.env.GROWLY_STORAGE_BACKEND = prevBackend;
+  ok('Phase 44.1 no live gcs operation checks passed');
 }
 
 function verifyPhase20LiteEmailImprovement(): void {
@@ -8996,6 +9301,21 @@ async function main(): Promise<void> {
   await verifyPhase441OperationsLoggingPreserved();
   await verifyPhase441GcsDesignApprovedDoc();
   await verifyPhase441MailOpsCloudRunDesignDoc();
+  await verifyPhase441GcsStoreDocumentSchema();
+  await verifyPhase441GcsStoreGenerationMatch();
+  await verifyPhase441GcsStoreFiveRetries();
+  await verifyPhase441GcsStoreBackoffInjection();
+  await verifyPhase441GcsStoreBackupBeforeWrite();
+  await verifyPhase441GcsStoreFailClosed();
+  await verifyPhase441GcsStoreIdempotent();
+  await verifyPhase441AuditEventPerObject();
+  await verifyPhase441AuditFailureDoesNotUndoSuppression();
+  await verifyPhase441StoreFactoryRejectsLiveLocal();
+  await verifyPhase441MailOpsOnlyRoutes();
+  await verifyPhase441MailOpsHealthFailClosed();
+  await verifyPhase441NoRawTokenLogging();
+  await verifyPhase441MailOpsDockerfile();
+  await verifyPhase441NoLiveGcsOperation();
   verifyPhase20LiteEmailImprovement();
   await verifyPhase20LiteEmailImprovementAsync();
   await verifyPhaseBLeadInventory();

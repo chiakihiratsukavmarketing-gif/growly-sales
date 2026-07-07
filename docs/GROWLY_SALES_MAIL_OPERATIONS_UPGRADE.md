@@ -608,6 +608,16 @@ GET  /t/{token}.gif  # 44.3 将来
 
 **Human Approval 待ち:** サービス作成・デプロイ・公開 invoker・LB/DNS。
 
+## 9.3 Phase 44.1 — GCS store / mail-ops entrypoint 実装（live 未接続）
+
+| 項目 | 状態 |
+|------|------|
+| `GcsJsonMailSuppressionStore` | ✅ `withGenerationMatchRetry` + backup + verify用 in-memory adapter |
+| `createMailSuppressionStore` | ✅ mock 既定 / live+gcs のみ / live+local 拒否 |
+| `mailOpsServer` | ✅ `/health`, `GET/POST /u/:token` のみ |
+| `Dockerfile` | ✅ `scripts/cloud/growly-mail-ops/Dockerfile` |
+| 実 GCS / Cloud / IAM / Secret | **未接続** |
+
 ## 10. DDL / env / Cloud 変更候補（実行しない・候補のみ）
 
 現行は **ローカル JSON + オプション GCS** のため RDB DDL は **Phase 43 では必須ではない**。将来 Supabase 等に移行する場合:

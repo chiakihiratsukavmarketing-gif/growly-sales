@@ -1,7 +1,7 @@
 # Growly Sales — NEXT_TASKS
 
 **更新日:** 2026-07-07
-**進行:** Phase 43 **4 / 4** 完了 / Phase 44 **0 / 3**（44.1 準備 **7 / 15**・No-Go 維持）
+**進行:** Phase 43 **4 / 4** 完了 / Phase 44 **0 / 3**（44.1 準備 **8 / 15**・No-Go 維持）
 
 ---
 
@@ -43,6 +43,7 @@
 - [x] mock GET/POST 配信停止画面（maskedEmail のみ・冪等・fail-closed 準備）
 - [x] GCS 保存設計 Human Approval 記録（`be9d026`・実 GCS 操作なし）
 - [x] mail-ops Cloud Run 設計案（読み取り調査・§LIVE_READINESS §7・デプロイなし）
+- [x] GCS store + mail-ops entrypoint 実装（in-memory verify・実 GCS 未接続）
 
 ### 44.1 内部進行（15 ステップ）
 
@@ -50,8 +51,10 @@
 |---|------|------|
 | 1–5 | tenant / contactEmail / 法務 / footer / mock screen | ✅ |
 | 6 | GCS 保存設計承認・commit | ✅ `be9d026` |
-| 7 | mail-ops Cloud Run 設計調査 | ✅ 本セッション（docs のみ） |
-| 8–15 | live 接続・verify 拡張・デプロイ準備等 | 未 |
+| 7 | mail-ops Cloud Run 設計調査 | ✅ `84739d1` |
+| 8 | GCS store 土台 + mail-ops slim コンテナ | ✅ 本セッション |
+| 9 | IAM・Secret 構成調査 | 次 |
+| 10–15 | live 接続・デプロイ準備等 | 未 |
 
 ### Phase 43 完了（mock・参照）
 

@@ -40,7 +40,8 @@
     "growly-sales:cloud-daily30-dry-run": "tsx src/growly-sales/scripts/run-growly-sales-cloud-daily30-dry-run.ts",
     "growly-sales:cloud-daily30-auto-fetch": "tsx src/growly-sales/scripts/run-growly-sales-cloud-daily30-auto-fetch.ts",
     "growly-sales:gcs-storage-check": "tsx src/growly-sales/scripts/run-growly-sales-gcs-storage-check.ts",
-    "growly-sales:cloud-deploy-check": "tsx src/growly-sales/scripts/run-growly-sales-cloud-deploy-check.ts"
+    "growly-sales:cloud-deploy-check": "tsx src/growly-sales/scripts/run-growly-sales-cloud-deploy-check.ts",
+    "growly-sales:mail-ops": "tsx src/growly-sales/scripts/run-growly-sales-mail-ops.ts"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.21.0",

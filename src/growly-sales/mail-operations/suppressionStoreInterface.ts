@@ -47,22 +47,3 @@ export class LocalJsonMailSuppressionStore implements MailSuppressionStore {
     return record;
   }
 }
-
-/** GCS JSON 実装のプレースホルダ（live 書き込みは Phase 44.1 では未開始） */
-export class GcsJsonMailSuppressionStore implements MailSuppressionStore {
-  async listByTenant(_tenantId: string): Promise<MailSuppression[]> {
-    throw new Error('GcsJsonMailSuppressionStore is not enabled (mock/local only)');
-  }
-
-  async findActive(_input: { tenantId: string; normalizedEmail: string }): Promise<MailSuppression | null> {
-    throw new Error('GcsJsonMailSuppressionStore is not enabled (mock/local only)');
-  }
-
-  async add(_input: MailSuppression): Promise<MailSuppression> {
-    throw new Error('GcsJsonMailSuppressionStore is not enabled (mock/local only)');
-  }
-
-  async update(_input: MailSuppression): Promise<MailSuppression> {
-    throw new Error('GcsJsonMailSuppressionStore is not enabled (mock/local only)');
-  }
-}

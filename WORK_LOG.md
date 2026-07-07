@@ -233,8 +233,23 @@
 | IAM | prefix 限定 `mail-operations/**`、delete なし |
 | 未実施 | Cloud Run 作成・デプロイ / IAM / DNS / env / Secret / GCS live 書き込みなし |
 | Phase 44.1 判定 | **No-Go 維持** |
-| commit / push | 本セッションで docs + verify のみ |
+| commit / push | `84739d1` |
 
+### 2026-07-07 — Phase 44.1 実装: GCS store 土台 + mail-ops slim コンテナ ✅
+
+| 項目 | 内容 |
+|------|------|
+| GCS store | `gcsJsonMailSuppressionStore.ts` — generation-match / retry 5 / backup / idempotent |
+| Schema | `gcsDocumentTypes.ts` — `schemaVersion: 1`、legacy `version` 移行 |
+| Audit | `gcsSuppressionAuditWriter.ts` — event-per-object |
+| Factory | `createMailSuppressionStore.ts` — mock 既定、live+local 拒否 |
+| mail-ops | `server/mailOpsServer.ts` — `/health`, `/u/:token` のみ |
+| Docker | `scripts/cloud/growly-mail-ops/Dockerfile` + DRY-RUN deploy scripts |
+| verify | Phase 44.1 +15件（in-memory GCS adapter）/ 2888 passed |
+| 未実施 | 実 GCS / Cloud デプロイ / IAM / Secret / `MAIL_OPS_MODE=live` |
+| Phase 44.1 判定 | **No-Go 維持** |
+
+## 2026-07-03 — Phase 42 通常運用UI改善 **完了** ✅
 
 **進行:** 通常運用UI改善 **7 / 7 フェーズ完了**
 
