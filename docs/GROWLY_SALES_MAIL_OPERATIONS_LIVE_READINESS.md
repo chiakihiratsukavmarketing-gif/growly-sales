@@ -356,7 +356,8 @@ Cloud Run の **プラットフォーム request log** には実 URL path（`/u/
 
 | 権限 | 範囲 | 備考 |
 |------|------|------|
-| `roles/storage.objectUser` | `prod/growly-sales/mail-operations/**` | **IAM Conditions で prefix 限定** |
+| ~~`roles/storage.objectUser`~~ | — | **不採用**（`storage.objects.delete` を含む・§7.19.4） |
+| **カスタム `growlyMailOpsObjectWriter`** | `prod/growly-sales/mail-operations/**` | `get` / `create` / `update` のみ・**IAM Condition 適用済み**（§7.20） |
 | `roles/storage.objectAdmin` | — | **付与しない**（delete 不可） |
 | Daily30 用 prefix | — | mail-ops SA から **アクセス不可** |
 
@@ -375,7 +376,7 @@ Cloud Run の **プラットフォーム request log** には実 URL path（`/u/
 
 | Secret 名 | Cloud Run env | 用途 | 状態 |
 |-----------|---------------|------|------|
-| `unsubscribe-token-pepper` | `UNSUBSCRIBE_TOKEN_PEPPER` | token hash | **未作成** |
+| `unsubscribe-token-pepper` | `UNSUBSCRIBE_TOKEN_PEPPER` | token hash | **version 1 ENABLED**（値は記録しない・§7.20） |
 | `open-tracking-token-pepper` | `OPEN_TRACKING_TOKEN_PEPPER` | 44.3 将来 | 未作成 |
 | `daily30-cloud-run-token` | — | mail-ops では **不要** | 既存（Daily30 のみ） |
 | `google-places-api-key` | — | mail-ops では **不要** | 既存（Daily30 のみ） |
@@ -474,6 +475,253 @@ Secret 値は Console / CLI で人間が設定。docs・ログ・image に含め
 - `allUsers` invoker 付与
 - GCS live 書き込みテスト
 - DNS 変更
+
+### 7.19 Phase 44.1 Step 12 — イメージ build・GCS カスタムロール案・デプロイ dry-run（2026-07-07）
+
+> **実施範囲:** Artifact Registry へのイメージ push のみ。Cloud Run デプロイ・GCS IAM・custom role 作成・Secret 値設定は **未実施**。
+
+#### 7.19.1 build 前安全確認
+
+| 項目 | 値 |
+|------|-----|
+| GCP project | `growly-scheduler` |
+| region | `asia-northeast1` |
+| git commit | `51abcd6`（`origin/main` 一致） |
+| Dockerfile | `scripts/cloud/growly-mail-ops/Dockerfile` |
+| Cloud Build config | `scripts/cloud/growly-mail-ops/cloudbuild.yaml` |
+| アップロード制御 | `.gcloudignore`（413 ファイル・runtime data 除外） |
+
+**Dockerfile COPY 範囲（イメージ層）:** `package.json` / `package-lock.json` / `tsconfig.json` / `src/growly-sales` / `config` のみ。Secret・`.env`・`data/growly-sales/**` は COPY 対象外（`.dockerignore` 併用）。
+
+**DRY-RUN コマンド（記録用・再実行時）:**
+
+```bash
+gcloud builds submit --region=asia-northeast1 \
+  --config scripts/cloud/growly-mail-ops/cloudbuild.yaml \
+  --substitutions=_IMAGE=asia-northeast1-docker.pkg.dev/growly-scheduler/growly-sales/growly-sales-mail-ops:51abcd6 \
+  .
+```
+
+#### 7.19.2 イメージ build 結果
+
+| 項目 | 値 |
+|------|-----|
+| Build ID | `7988bbca-7aad-47e0-9c8e-03b2b0d59503` |
+| Status | **SUCCESS**（34s） |
+| Tag | `asia-northeast1-docker.pkg.dev/growly-scheduler/growly-sales/growly-sales-mail-ops:51abcd6` |
+| Digest | `sha256:76e357e4baac56daa778de3e31d2cf65efb429f41cd52851ff4949d0d9d30235` |
+| FQDN 参照 | `...@sha256:76e357e4baac56daa778de3e31d2cf65efb429f41cd52851ff4949d0d9d30235` |
+
+初回 build `b234442c-a261-4e2a-ba4a-d258364cc442` は `.gcloudignore` の `growly-sales/` が `src/growly-sales` を誤除外し **FAILURE**。`/growly-sales/` 修正後に再実行して SUCCESS。
+
+**`latest` タグは付与していない。** デプロイ時は commit tag または digest を明示指定する。
+
+#### 7.19.3 Secret version 状況
+
+| Secret | リソース | version | 備考 |
+|--------|----------|---------|------|
+| `unsubscribe-token-pepper` | 作成済み | **未登録** | 値は Console / CLI で人間のみ。docs・ログ・image に含めない |
+
+Secret version 未登録のため **Cloud Run デプロイは実施しない**（`--set-secrets` が失敗する）。
+
+#### 7.19.4 `roles/storage.objectUser` 不採用理由
+
+GCP 事前定義ロール `roles/storage.objectUser` には **`storage.objects.delete`** が含まれる。mail-ops 設計では suppression データの object delete を **禁止**（§7.7 / rollback 方針: suppression データは削除しない）。
+
+既存バケット `growly-sales-daily30` の Daily30 領域は `growly-daily30-runner` のみが `objectUser`（無条件）を保持。mail-ops SA に同ロールを付与すると delete 権限が付くため、**prefix 条件付きでもロール自体を採用しない**。
+
+#### 7.19.5 カスタムロール案 `GrowlyMailOpsObjectWriter`
+
+| 項目 | 値 |
+|------|-----|
+| ロール名（表示） | Growly Mail Ops Object Writer |
+| ロール ID 候補 | `growlyMailOpsObjectWriter` |
+| 付与先 SA | `growly-mail-ops-runner@growly-scheduler.iam.gserviceaccount.com` |
+| 状態 | **設計のみ**（作成・binding 未実施） |
+
+**含める権限（最小）:**
+
+| IAM 権限 | コード経路 | 用途 |
+|----------|-----------|------|
+| `storage.objects.get` | `gcsJsonStorage.ts` — `file.exists()` / `download()` / `getMetadata()` / `gcsReadJsonAtPath` | suppression JSON 読込・generation 取得・保存後 verify read |
+| `storage.objects.create` | `gcsWriteNewJsonAtPath`（`ifGenerationMatch=0`）/ `gcsCopyObjectBetweenPaths` の **宛先** / `gcsSuppressionAuditWriter.writeEvent` | 初回 object・バックアップ copy 先・audit event 新規作成 |
+| `storage.objects.update` | `gcsWriteJsonIfGenerationMatchAtPath` — `file.save(..., preconditionOpts: { ifGenerationMatch })` | generation-match 付き suppression 更新 |
+
+**明示的に含めない権限:**
+
+| 権限 | 理由 |
+|------|------|
+| `storage.objects.delete` | 設計上禁止。`objectUser` 不採用の主因 |
+| `storage.objects.list` | mail-ops コードに bucket 走査なし（既知 path のみ） |
+| `storage.buckets.*` | バケット管理・IAM・lifecycle・retention 変更を禁止 |
+| `storage.objects.setIamPolicy` 等 | object レベル IAM 変更不要 |
+
+**IAM Condition（prefix 限定）:**
+
+```
+resource.name.startsWith("projects/_/buckets/growly-sales-daily30/objects/prod/growly-sales/mail-operations/")
+```
+
+対象 object 例（`mailOpsPaths.ts` + `GROWLY_GCS_PREFIX=prod/growly-sales`）:
+
+- `.../mail-operations/mail-suppressions.json`
+- `.../mail-operations/backups/mail-suppressions/*.json`
+- `.../mail-operations/audit/YYYY/MM/DD/*.json`
+
+Daily30 用 prefix（`external-candidates.json` 等）は **条件外** → mail-ops SA からアクセス不可。
+
+**Human Approval 後の適用コマンド（placeholder・今回未実行）:**
+
+```bash
+# 1) カスタムロール作成（プロジェクトレベル）
+gcloud iam roles create growlyMailOpsObjectWriter --project=growly-scheduler \
+  --title="Growly Mail Ops Object Writer" \
+  --permissions=storage.objects.get,storage.objects.create,storage.objects.update
+
+# 2) 条件付き binding
+gcloud storage buckets add-iam-policy-binding gs://growly-sales-daily30 \
+  --member="serviceAccount:growly-mail-ops-runner@growly-scheduler.iam.gserviceaccount.com" \
+  --role="projects/growly-scheduler/roles/growlyMailOpsObjectWriter" \
+  --condition='expression=resource.name.startsWith("projects/_/buckets/growly-sales-daily30/objects/prod/growly-sales/mail-operations/"),title=mail-ops-prefix-only'
+```
+
+#### 7.19.6 Cloud Run deploy dry-run（静的確認・未実行）
+
+**ブロッカー:** Secret version 未登録 **および** GCS custom role / IAM binding 未確定のため、本番デプロイは行わない。
+
+**想定コマンド（private 初回・記録用）:**
+
+```bash
+gcloud run deploy growly-sales-mail-ops \
+  --project=growly-scheduler \
+  --region=asia-northeast1 \
+  --image="asia-northeast1-docker.pkg.dev/growly-scheduler/growly-sales/growly-sales-mail-ops@sha256:76e357e4baac56daa778de3e31d2cf65efb429f41cd52851ff4949d0d9d30235" \
+  --service-account="growly-mail-ops-runner@growly-scheduler.iam.gserviceaccount.com" \
+  --min-instances=0 \
+  --max-instances=2 \
+  --concurrency=5 \
+  --timeout=30 \
+  --port=8080 \
+  --no-allow-unauthenticated \
+  --set-env-vars="NODE_ENV=production,MAIL_OPS_MODE=live,MAIL_OPS_LIVE_EXTERNAL_CONNECTED=false,PUBLIC_BASE_URL=https://mailops.wantreach.jp,GROWLY_STORAGE_BACKEND=gcs,GROWLY_GCS_BUCKET=growly-sales-daily30,GROWLY_GCS_PREFIX=prod/growly-sales" \
+  --set-secrets="UNSUBSCRIBE_TOKEN_PEPPER=unsubscribe-token-pepper:latest"
+```
+
+| チェック項目 | dry-run 結果 |
+|-------------|-------------|
+| 専用 SA `growly-mail-ops-runner` | ✅ 作成済み |
+| image digest / commit tag 明示 | ✅ digest 記録済み（上記） |
+| min 0 / max 2 / concurrency 5 / timeout 30 / port 8080 | ✅ コマンドに反映 |
+| `MAIL_OPS_MODE=live` | ✅ |
+| `MAIL_OPS_LIVE_EXTERNAL_CONNECTED=false` | ✅（live 外部接続なし） |
+| Secret 参照 | ⚠️ version 未登録のためデプロイ不可 |
+| `PUBLIC_BASE_URL=https://mailops.wantreach.jp` | ✅ env に記載（DNS 未設定） |
+| GCS backend env | ✅ `GROWLY_STORAGE_BACKEND=gcs` + bucket + prefix |
+| 初回非公開 `--no-allow-unauthenticated` | ✅ |
+| `allUsers` invoker | ❌ 未付与（意図どおり） |
+
+**デプロイ後（将来・今回未実施）の順序:** private deploy → 認証付き `/health` → 安全確認 → `allUsers` invoker → 公開 `/health` → DNS。
+
+#### 7.19.7 今回の停止線（遵守）
+
+| 項目 | 状態 |
+|------|------|
+| Cloud Run 実デプロイ | **未実施** |
+| GCS IAM binding | **未適用** |
+| custom role 作成 | **未実施** |
+| GCS 実 read/write | **なし** |
+| `allUsers` | **未付与** |
+| DNS | **未変更** |
+| Gmail | **未変更** |
+| `MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true` | **未設定** |
+| live Go/No-Go | **No-Go 維持** |
+| 通常営業運用 | **影響なし** |
+
+#### 7.19.8 次に必要な人間作業
+
+1. **Secret version 登録** — Console: Secret Manager → `unsubscribe-token-pepper` → 新しいバージョン（値はチャット・git に書かない）
+2. **GCS カスタムロール Human Approval** — §7.19.5 の権限セット + IAM Condition
+3. **custom role 作成 + 条件付き bucket binding**（承認後）
+4. **Cloud Run private deploy**（Secret version + GCS IAM 完了後）
+5. 認証付き `/health` 確認 → `allUsers` invoker（別承認）→ DNS → 最後に `MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true`
+
+### 7.20 Phase 44.1 Step 12 — 非公開 Cloud Run デプロイ（2026-07-07）
+
+> **実施範囲:** Secret version 確認・custom role 作成・条件付き GCS IAM・**非公開** Cloud Run デプロイ・認証付き `/health`。**`allUsers`・DNS・live 外部接続は未実施。**
+
+#### 7.20.1 Secret version（存在確認のみ）
+
+| Secret | version | state |
+|--------|---------|-------|
+| `unsubscribe-token-pepper` | 1 | **ENABLED** |
+
+値の access・表示・docs 記録は **禁止**（遵守済み）。
+
+#### 7.20.2 カスタムロール `growlyMailOpsObjectWriter`（作成済み）
+
+| 項目 | 値 |
+|------|-----|
+| フル名 | `projects/growly-scheduler/roles/growlyMailOpsObjectWriter` |
+| title | Growly Mail Ops Object Writer |
+| includedPermissions | `storage.objects.get`, `storage.objects.create`, `storage.objects.update` |
+| 含まない | `delete`, `list`, `storage.buckets.*` |
+
+#### 7.20.3 条件付き GCS IAM binding（適用済み）
+
+| 項目 | 値 |
+|------|-----|
+| bucket | `growly-sales-daily30` |
+| member | `growly-mail-ops-runner@growly-scheduler.iam.gserviceaccount.com` |
+| role | `projects/growly-scheduler/roles/growlyMailOpsObjectWriter` |
+| condition title | `mail-ops-prefix-only` |
+| expression | `resource.name.startsWith('projects/_/buckets/growly-sales-daily30/objects/prod/growly-sales/mail-operations/')` |
+
+**確認:** mail-ops SA はカスタムロール + condition のみ。`roles/storage.objectUser` は **付与していない**（Daily30 SA のみが無条件 `objectUser` を保持）。
+
+#### 7.20.4 Cloud Run 非公開デプロイ
+
+| 項目 | 値 |
+|------|-----|
+| サービス | `growly-sales-mail-ops` |
+| region | `asia-northeast1` |
+| revision | `growly-sales-mail-ops-00001-tff` |
+| image | `...@sha256:76e357e4baac56daa778de3e31d2cf65efb429f41cd52851ff4949d0d9d30235` |
+| SA | `growly-mail-ops-runner@growly-scheduler.iam.gserviceaccount.com` |
+| scaling | min 0 / max 2 / concurrency 5 / timeout 30s / port 8080 |
+| 認証 | `--no-allow-unauthenticated`（**allUsers なし**） |
+| `MAIL_OPS_MODE` | `live` |
+| `MAIL_OPS_LIVE_EXTERNAL_CONNECTED` | **`false`** |
+| `PUBLIC_BASE_URL` | `https://mailops.wantreach.jp`（DNS 未接続） |
+
+#### 7.20.5 認証付き `/health` 結果
+
+| 項目 | 結果 |
+|------|------|
+| 未認証アクセス | **403** |
+| 認証付きレスポンス | `ok:true`, `mode:live`, **`liveConnected:false`**, `storageReady:true` |
+| 漏洩なし | Secret 値・bucket 実値・token・メールアドレスなし |
+
+#### 7.20.6 停止線（今回遵守）
+
+| 項目 | 状態 |
+|------|------|
+| `allUsers` invoker | **未付与** |
+| 公開 `/health` | **未実施**（403 のまま） |
+| DNS / mixhost | **未変更** |
+| `MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true` | **未設定** |
+| GCS suppression 実書込 | **なし** |
+| Gmail 本文 URL 適用 | **なし** |
+| live Go/No-Go | **No-Go 維持** |
+| 通常営業運用 | **影響なし** |
+
+#### 7.20.7 次の停止地点（Human Approval 前）
+
+**一般公開（`allUsers` invoker）の直前で停止。** 次に必要な承認:
+
+1. **`allUsers` → `roles/run.invoker`**（サービス全体・path IAM 不可）
+2. 公開 `/health` スモーク（Secret・PII 漏洩なし再確認）
+3. mixhost DNS → `mailops.wantreach.jp`（別承認）
+4. 最後に `MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true` + suppression スモーク 1 件
 
 ### 7.3 公開 endpoint（live 時）
 

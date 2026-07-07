@@ -274,6 +274,38 @@
 | 未実施 | MAIL_OPS_MODE=live 実環境 / GCS / IAM / Secret / Cloud |
 | Phase 44.1 判定 | **No-Go 維持** |
 
+### 2026-07-07 — Phase 44.1 Step 12（一部）: mail-ops イメージ build/push + IAM 設計更新
+
+| 項目 | 内容 |
+|------|------|
+| 進行 | Phase 44.1 **12 / 15**（イメージ完了・Cloud Run 未デプロイ） |
+| build 前安全確認 | project=`growly-scheduler` / region=`asia-northeast1` / commit=`51abcd6` / Dockerfile=`scripts/cloud/growly-mail-ops/Dockerfile` |
+| アップロード除外 | `.gcloudignore` 新規（`data/growly-sales/`・`/growly-sales/`・`.env`・`_verify*.txt` 等）。413 ファイル・2.5 MiB。初回失敗は `growly-sales/` が `src/growly-sales` を誤除外したため → `/growly-sales/` に修正 |
+| Cloud Build | **SUCCESS** `7988bbca-7aad-47e0-9c8e-03b2b0d59503`（34s） |
+| イメージ | `asia-northeast1-docker.pkg.dev/growly-scheduler/growly-sales/growly-sales-mail-ops:51abcd6` |
+| digest | `sha256:76e357e4baac56daa778de3e31d2cf65efb429f41cd52851ff4949d0d9d30235`（commit tag 維持・`latest` 非依存） |
+| Secret | `unsubscribe-token-pepper` リソースあり・**version 未登録**（値は記録しない） |
+| GCS IAM | **未適用**。`roles/storage.objectUser` は `storage.objects.delete` を含むため不採用。カスタムロール案 `GrowlyMailOpsObjectWriter` を §7.19 に記録 |
+| Cloud Run | **未デプロイ**（dry-run 静的確認のみ・§7.19） |
+| 未実施 | GCS read/write・IAM binding・custom role 作成・allUsers・DNS・Gmail・`MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true` |
+| 通常営業運用 | **影響なし** |
+| Phase 44.1 判定 | **No-Go 維持** |
+
+### 2026-07-07 — Phase 44.1 Step 12（完了）: 非公開 Cloud Run デプロイ + GCS IAM
+
+| 項目 | 内容 |
+|------|------|
+| 進行 | Phase 44.1 **12 / 15**（非公開デプロイまで完了・公開前で停止） |
+| Secret version | `unsubscribe-token-pepper` version **1 ENABLED**（値は記録しない） |
+| カスタムロール | `projects/growly-scheduler/roles/growlyMailOpsObjectWriter` 作成済み — `get` / `create` / `update` のみ |
+| GCS IAM | `gs://growly-sales-daily30` に条件付き binding（`mail-ops-prefix-only`・prefix `prod/growly-sales/mail-operations/`）。mail-ops SA に `objectUser` なし |
+| Cloud Run | `growly-sales-mail-ops` revision **`growly-sales-mail-ops-00001-tff`**（非公開・digest 固定） |
+| 認証付き `/health` | `ok:true` / `mode:live` / **`liveConnected:false`** / `storageReady:true`（Secret・token・メールなし） |
+| 未認証 `/health` | **403**（公開なし） |
+| 未実施 | `allUsers`・DNS・Gmail・GCS 実書込・`MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true` |
+| 通常営業運用 | **影響なし** |
+| Phase 44.1 判定 | **No-Go 維持** |
+
 ## 2026-07-03 — Phase 42 通常運用UI改善 **完了** ✅
 
 **進行:** 通常運用UI改善 **7 / 7 フェーズ完了**

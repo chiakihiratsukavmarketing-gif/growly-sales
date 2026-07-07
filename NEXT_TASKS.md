@@ -1,7 +1,7 @@
 # Growly Sales — NEXT_TASKS
 
 **更新日:** 2026-07-07
-**進行:** Phase 43 **4 / 4** 完了 / Phase 44 **0 / 3**（44.1 準備 **11 / 15**・No-Go 維持）
+**進行:** Phase 43 **4 / 4** 完了 / Phase 44 **0 / 3**（44.1 **12 / 15**・No-Go 維持）
 
 ---
 
@@ -22,10 +22,10 @@
 ### 44.1 Go 再評価に必要な人間作業
 
 - [x] **contactEmail** — `info@wantreach.jp`（Want Reach 既定 tenant・tenant 設定一元管理・2026-07-07 Human Approval）
-- [ ] 公開ドメイン・`PUBLIC_BASE_URL` 決定
-- [ ] Cloud Run mail-ops サービス作成・デプロイ承認（設計案は §LIVE_READINESS §7）
-- [ ] HTTPS 確認
-- [ ] Secret Manager（`UNSUBSCRIBE_TOKEN_PEPPER` 等）
+- [x] 公開ドメイン・`PUBLIC_BASE_URL` 決定（`https://mailops.wantreach.jp`・DNS は未接続）
+- [x] Cloud Run mail-ops **非公開デプロイ**（revision `growly-sales-mail-ops-00001-tff`・§7.20）
+- [ ] HTTPS 確認（独自ドメイン・DNS 未設定）
+- [x] Secret Manager（`unsubscribe-token-pepper` version 登録済み・値は記録しない）
 - [x] suppression 保存先承認（GCS設計 Human Approval 済み: `be9d026` / `mail-operations/` prefix / generation-match / retry / backup / IAM / rollback / audit）
 - [x] **法務表示方針** — Human Approval 済み（2026-07-07・§8.4 / メール全体表示要件・フッター所在地重複なし・一般的運用確認）
 - [x] **配信停止画面文案** — Human Approval 済み（2026-07-07・`UnsubscribeScreenState` 5 状態・mock API のみ）
@@ -54,9 +54,10 @@
 | 7 | mail-ops Cloud Run 設計調査 | ✅ `84739d1` |
 | 8 | GCS store 土台 + mail-ops slim コンテナ | ✅ `cf5deed` |
 | 9 | IAM・Secret 構成調査 | ✅ `33e6895` |
-| 10 | live readiness 統合・起動安全性 | ✅ 本セッション |
+| 10 | live readiness 統合・起動安全性 | ✅ `51abcd6` |
 | 11 | Cloud・Secret・IAM 適用前チェックリスト | ✅ §7.18（実行なし） |
-| 12–15 | 実適用・live 接続・Go 再評価等 | 未 |
+| 12 | イメージ + GCS IAM + **非公開** Cloud Run デプロイ | ✅（`allUsers` 前で停止・§7.20） |
+| 13–15 | 公開 invoker・DNS・live 外部接続・Go 再評価 | 未 |
 
 ### Phase 43 完了（mock・参照）
 

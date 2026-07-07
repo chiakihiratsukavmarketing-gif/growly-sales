@@ -1,0 +1,45 @@
+# Cloud Build upload context — mail-ops image (Phase 44.1 step 12)
+# Dockerfile COPY is selective; this keeps staging upload free of runtime data.
+
+.git
+.gitignore
+
+# Secrets / credentials (never upload)
+.env
+.env.*
+!.env.example
+credentials
+credentials.json
+token.json
+**/*credentials*
+**/token*.json
+
+# Local runtime data
+data/growly-sales/
+
+# Nested duplicate project tree at repo root only (not src/growly-sales)
+/growly-sales/
+
+# Verify / build logs
+_verify*.txt
+_build_out.txt
+verify-*.txt
+*.log
+logs/
+
+# Agent / handoff (not needed for image build)
+agent-transcripts
+WORK_LOG.md
+NEXT_TASKS.md
+
+# Dependencies installed in Cloud Build via npm ci
+node_modules/
+dist/
+build/
+coverage/
+
+# IDE / OS
+.idea
+.vscode
+.DS_Store
+Thumbs.db

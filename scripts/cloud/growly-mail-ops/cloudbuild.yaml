@@ -1,0 +1,12 @@
+# Growly Sales mail-ops — Cloud Build (slim Dockerfile at repo root context)
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - scripts/cloud/growly-mail-ops/Dockerfile
+      - -t
+      - ${_IMAGE}
+      - .
+images:
+  - ${_IMAGE}
