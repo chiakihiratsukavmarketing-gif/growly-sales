@@ -8,6 +8,7 @@ import {
 import {
   addManualSuppressionApi,
   fetchMailSuppressions,
+  fetchUnsubscribeFooterPreview,
   reactivateSuppressionApi,
   SUPPRESSION_MANUAL_CONFIRM_TOKEN,
   SUPPRESSION_REACTIVATE_CONFIRM_TOKEN,
@@ -47,14 +48,19 @@ export function MailSuppressionListPanel({ onError, refreshKey = 0 }: MailSuppre
   const [mockTokenInput, setMockTokenInput] = useState('');
   const [mockPreview, setMockPreview] = useState<string | null>(null);
   const [mockResult, setMockResult] = useState<string | null>(null);
+  const [footerPreview, setFooterPreview] = useState<string | null>(null);
   const tenantId = 'want-reach';
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await fetchMailSuppressions(tenantId);
+      const [data, footer] = await Promise.all([
+        fetchMailSuppressions(tenantId),
+        fetchUnsubscribeFooterPreview(tenantId),
+      ]);
       setRecords(data.records);
       setMode(data.mode);
+      setFooterPreview(footer.previewText);
     } catch (err) {
       onError(err instanceof Error ? err.message : '配信禁止リストの読み込みに失敗しました');
     } finally {
@@ -310,10 +316,10 @@ export function MailSuppressionListPanel({ onError, refreshKey = 0 }: MailSuppre
 
       {(
         <SectionCard title="配信停止案内（mockプレビュー）">
-          <pre className="suppression-mock-preview">{`今後のご案内が不要な場合は、こちらから配信停止できます。
-[配信停止リンク] http://localhost:3847/api/mock/unsubscribe/{token}
-（mockプレビュー — Gmail下書きには自動挿入されません）`}</pre>
-          <p className="hint">Gmail下書きには自動挿入されません（MAIL_OPS_MODE=mock）。</p>
+          <pre className="suppression-mock-preview">
+            {footerPreview ?? '読み込み中…'}
+          </pre>
+          <p className="hint">Gmail下書きには自動挿入されません（MAIL_OPS_MODE=mock）。文案は Human Approval 済みです。</p>
         </SectionCard>
       )}
 

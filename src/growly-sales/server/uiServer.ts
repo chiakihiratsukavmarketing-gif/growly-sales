@@ -331,6 +331,27 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
       return;
     }
 
+    if (req.method === 'GET' && pathname === '/api/mail-suppressions/unsubscribe-footer-preview') {
+      const tenantId = url.searchParams.get('tenantId')?.trim();
+      if (!tenantId) {
+        sendApiError(res, 400, pathname, 'tenantId が必要です');
+        return;
+      }
+      const { requireMailOperationsTenant } = await import('../mail-operations/tenantResolver.js');
+      const { buildUnsubscribeEmailFooterCopy } = await import('../mail-operations/unsubscribeBranding.js');
+      const { getMailOpsMode } = await import('../mail-operations/suppressionPolicy.js');
+      const tenant = requireMailOperationsTenant(tenantId);
+      const footer = buildUnsubscribeEmailFooterCopy(tenant);
+      sendJson(res, 200, {
+        tenantId,
+        footer,
+        previewText: footer.fullText,
+        mode: getMailOpsMode(),
+        note: 'Human Approval 済み文案の mock プレビュー。Gmail下書き・live endpoint には未適用。',
+      });
+      return;
+    }
+
     if (req.method === 'POST' && pathname === '/api/mail-suppressions/manual') {
       const body = await readJsonBody<{
         tenantId?: string;

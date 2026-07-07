@@ -28,7 +28,7 @@
 - [ ] Secret Manager（`UNSUBSCRIBE_TOKEN_PEPPER` 等）
 - [ ] suppression 保存先承認（推奨: GCS JSON + generation-match）
 - [ ] 法務・配信停止画面文案確認
-- [ ] 配信停止メール末尾文面確認
+- [x] **配信停止メール末尾文面** — Human Approval 済み（2026-07-07・`buildUnsubscribeEmailFooterCopy`・所在地なし・Gmail/live 未適用）
 - [ ] fail-closed 実装フェーズへの着手承認
 
 ### 44.1 実装原則（自社優先 + SaaS拡張余地）

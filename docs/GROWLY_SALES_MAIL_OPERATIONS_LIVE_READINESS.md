@@ -31,6 +31,10 @@
     - `tenantResolver` の Want Reach 既定 tenant のみ。Secret ではなく tenant 設定として一元管理
     - 配信停止 mock 画面は `buildUnsubscribeScreenCopy(tenant)` 経由で参照
     - **未適用:** Gmail 下書き本文 / live endpoint / 既存送信済みメール
+  - **配信停止メール末尾（Human Approval 済み 2026-07-07）:** `buildUnsubscribeEmailFooterCopy(tenant)` — displayName / legalName / contactEmail / `buildUnsubscribeUrl` 経由。所在地は表示しない
+    - mock プレビュー: `GET /api/mail-suppressions/unsubscribe-footer-preview`
+    - **未適用:** Gmail 下書き本文 / live endpoint / 既存送信済みメール
+    - **法務表示の最終確認:** 別項目（§12 #6）— 未完了
 - **将来:** multi-tenant SaaS へ移行可能な境界を保持
   - 公開 URL は `resolveMailOperationsPublicBaseUrl(tenantId)` で解決
   - 共通 Growly ドメイン / 顧客独自ドメインへ交換可能
@@ -366,7 +370,8 @@
 | 4 | Secret Manager に pepper 設定 | ☐ 未 |
 | 5 | suppression 保存先決定（GCS 推奨） | ☐ 未承認 |
 | 6 | 法務・特定電子メール法関連の表示確認 | ☐ 人間確認待ち |
-| 7 | 配信停止リンク文面・停止画面文案 | ☐ 未 |
+| 7 | 配信停止メール末尾文面 | ✅ **Human Approval 済み**（2026-07-07・tenant 参照・所在地なし・Gmail/live 未適用） |
+| 7b | 配信停止停止画面文案 | ☐ 未 |
 | 8 | カスタムテンプレート本番内容確認 | ☐ 未 |
 | 9 | テンプレート active 化承認 | ☐ 未 |
 | 10 | 開封計測を利用するか最終判断 | ☐ 未 |

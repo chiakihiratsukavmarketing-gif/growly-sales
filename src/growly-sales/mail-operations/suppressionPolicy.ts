@@ -7,7 +7,8 @@ import {
   touchLastAttemptBlocked,
 } from './suppressionStore.js';
 import { normalizeEmailAddress } from './suppressionToken.js';
-import { getDefaultMailOperationsTenantId } from './tenantResolver.js';
+import { getDefaultMailOperationsTenantId, requireMailOperationsTenant } from './tenantResolver.js';
+import { buildUnsubscribeEmailFooterCopy } from './unsubscribeBranding.js';
 
 export class SuppressionBlockedError extends Error {
   readonly check: Extract<SuppressionCheckResult, { allowed: false }>;
@@ -210,14 +211,10 @@ export function getMailOpsMode(): 'mock' | 'live' {
   return value === 'live' ? 'live' : 'mock';
 }
 
-export function buildMockUnsubscribeNoticePreview(publicBaseUrl?: string | null): string {
-  const base = publicBaseUrl?.trim() || 'http://localhost:3847';
-  const mockUrl = `${base}/api/mock/unsubscribe/{token}`;
-  return [
-    '今後のご案内が不要な場合は、こちらから配信停止できます。',
-    `[配信停止リンク] ${mockUrl}`,
-    '（mockプレビュー — Gmail下書きには自動挿入されません）',
-  ].join('\n');
+export function buildMockUnsubscribeNoticePreview(tenantId?: string | null): string {
+  const resolvedTenantId = tenantId?.trim() || getDefaultMailOperationsTenantId();
+  const tenant = requireMailOperationsTenant(resolvedTenantId);
+  return buildUnsubscribeEmailFooterCopy(tenant).fullText;
 }
 
 export function shouldShowMockUnsubscribePreview(): boolean {

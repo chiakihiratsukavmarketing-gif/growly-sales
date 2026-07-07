@@ -17,6 +17,22 @@ export interface SuppressionCheckResponse {
   blockedAt: string | null;
 }
 
+export async function fetchUnsubscribeFooterPreview(tenantId: string): Promise<{
+  previewText: string;
+  note: string;
+}> {
+  const res = await fetch(
+    `${API_BASE}/api/mail-suppressions/unsubscribe-footer-preview?tenantId=${encodeURIComponent(tenantId)}`
+  );
+  if (!res.ok) {
+    throw new Error(
+      await readApiError(res, 'GET /api/mail-suppressions/unsubscribe-footer-preview', '末尾案内プレビューの取得に失敗しました')
+    );
+  }
+  const data = (await res.json()) as { previewText: string; note: string };
+  return { previewText: data.previewText, note: data.note };
+}
+
 export async function fetchMailSuppressions(tenantId: string): Promise<MailSuppressionsResponse> {
   const res = await fetch(`${API_BASE}/api/mail-suppressions?tenantId=${encodeURIComponent(tenantId)}`);
   if (!res.ok) {

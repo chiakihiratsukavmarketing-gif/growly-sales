@@ -138,6 +138,30 @@
 | Phase 44.1 判定 | **No-Go 維持** |
 | commit / push | **未実施**（ローカル変更のみ） |
 
+### 2026-07-07 — Phase 44.1 Human Approval: 配信停止メール末尾文面 ✅
+
+| 項目 | 内容 |
+|------|------|
+| 承認項目 | **配信停止メール末尾文面** |
+| 生成 | `buildUnsubscribeEmailFooterCopy(tenant)` — displayName / legalName / contactEmail / `buildUnsubscribeUrl` 経由 |
+| 所在地 | **表示しない**（Human Approval 済み） |
+| mock 反映 | `GET /api/mail-suppressions/unsubscribe-footer-preview` / 配信禁止リスト UI |
+| 未適用 | Gmail 下書き本文 / live endpoint / 既存送信済みメール |
+| 法務表示 | **別項目・未完了**（§12 #6 維持） |
+| Phase 44.1 判定 | **No-Go 維持** |
+| commit / push | **未実施**（ローカル変更のみ） |
+
+### 2026-07-07 — Phase 44.1 配信停止メール末尾文面（tenant 参照・mock プレビュー）✅
+
+| 項目 | 内容 |
+|------|------|
+| 実装 | `buildUnsubscribeEmailFooterCopy` — Human Approval 済み文案を tenant から生成 |
+| API | `GET /api/mail-suppressions/unsubscribe-footer-preview?tenantId=` |
+| UI | 配信禁止リストの末尾案内プレビューを API 経由表示（ハードコード削除） |
+| Human Approval | **配信停止メール末尾文面 — 承認済み**（法務最終確認は別項目） |
+| 未適用 | Gmail 下書き本文 / live endpoint / 既存送信済みメール |
+| Phase 44.1 判定 | **No-Go 維持** |
+
 
 ## 2026-07-03 — Phase 42 通常運用UI改善 **完了** ✅
 

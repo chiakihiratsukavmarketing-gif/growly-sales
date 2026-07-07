@@ -37,8 +37,8 @@ export {
   requireMailOperationsTenant,
 } from './tenantResolver.js';
 export { resolveMailOperationsPublicBaseUrl, buildUnsubscribeUrl } from './publicUrlResolver.js';
-export { buildUnsubscribeScreenCopy } from './unsubscribeBranding.js';
-export type { UnsubscribeScreenCopy } from './unsubscribeBranding.js';
+export { buildUnsubscribeScreenCopy, buildUnsubscribeEmailFooterCopy } from './unsubscribeBranding.js';
+export type { UnsubscribeScreenCopy, UnsubscribeEmailFooterCopy } from './unsubscribeBranding.js';
 export {
   LocalJsonMailSuppressionStore,
   GcsJsonMailSuppressionStore,

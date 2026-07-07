@@ -8136,6 +8136,43 @@ async function verifyPhase441NoPrematureSaasFeatures(): Promise<void> {
   ok('Phase 44.1 no premature SaaS features checks passed');
 }
 
+async function verifyPhase441UnsubscribeEmailFooter(): Promise<void> {
+  const branding = await readFile(join(SRC_ROOT, 'mail-operations/unsubscribeBranding.ts'), 'utf-8');
+  assert(branding.includes('buildUnsubscribeEmailFooterCopy'), 'email footer builder exists');
+  assert(branding.includes('tenant.contactEmail'), 'footer uses tenant contactEmail');
+  assert(branding.includes('buildUnsubscribeUrl'), 'footer uses public url resolver');
+  assert(!branding.includes('合同会社Want Reach'), 'footer builder does not hardcode company name');
+  assert(!branding.includes('info@wantreach.jp'), 'footer builder does not hardcode contactEmail');
+  assert(!branding.includes('所在地'), 'footer builder does not include address');
+  assert(!branding.includes('http://localhost:3847'), 'footer builder does not hardcode localhost');
+
+  const { requireMailOperationsTenant } = await import('../mail-operations/tenantResolver.js');
+  const { buildUnsubscribeEmailFooterCopy } = await import('../mail-operations/unsubscribeBranding.js');
+  const tenant = requireMailOperationsTenant('want-reach');
+  const footer = buildUnsubscribeEmailFooterCopy(tenant);
+  assert(footer.introLine === '合同会社Want Reachからのご案内です。', 'intro from tenant displayName');
+  assert(footer.senderLine === '送信者：合同会社Want Reach', 'sender from tenant legalName');
+  assert(footer.contactLine === 'お問い合わせ：info@wantreach.jp', 'contact from tenant contactEmail');
+  assert(
+    footer.unsubscribeUrl === 'https://mailops.wantreach.jp/u/%7Btoken%7D',
+    'unsubscribe url from public resolver'
+  );
+  assert(footer.fullText.includes('弊社からの営業・ご案内メールが不要な場合は'), 'approved body paragraph');
+  assert(!footer.fullText.includes('所在地') && !footer.fullText.includes('住所'), 'no address in generated footer');
+
+  const policy = await readFile(join(SRC_ROOT, 'mail-operations/suppressionPolicy.ts'), 'utf-8');
+  assert(policy.includes('buildUnsubscribeEmailFooterCopy'), 'mock notice uses tenant footer');
+  const panel = await readFile(join(SRC_ROOT, 'ui/MailSuppressionListPanel.tsx'), 'utf-8');
+  assert(panel.includes('fetchUnsubscribeFooterPreview'), 'suppression panel loads footer from API');
+  assert(!panel.includes('http://localhost:3847/api/mock/unsubscribe'), 'panel does not hardcode footer text');
+  const createDraft = await readFile(join(SRC_ROOT, 'workflow/createGmailDraftForLead.ts'), 'utf-8');
+  assert(!createDraft.includes('buildUnsubscribeEmailFooterCopy'), 'gmail draft unchanged for footer');
+  const server = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
+  assert(server.includes('/api/mail-suppressions/unsubscribe-footer-preview'), 'footer preview API exists');
+  assert(!server.includes('/u/{token}') || server.includes('unsubscribe-footer-preview'), 'no live public unsubscribe route');
+  ok('Phase 44.1 unsubscribe email footer checks passed');
+}
+
 async function verifyPhase441OperationsLoggingPreserved(): Promise<void> {
   const workLog = await readFile(join(PROJECT_ROOT, 'WORK_LOG.md'), 'utf-8');
   assert(workLog.includes('## 通常営業運用'), 'routine ops section preserved');
@@ -8589,6 +8626,7 @@ async function main(): Promise<void> {
   await verifyPhase441PublicUrlResolver();
   await verifyPhase441ReplaceableSuppressionStore();
   await verifyPhase441TenantIsolation();
+  await verifyPhase441UnsubscribeEmailFooter();
   await verifyPhase441NoPrematureSaasFeatures();
   await verifyPhase441OperationsLoggingPreserved();
   verifyPhase20LiteEmailImprovement();
