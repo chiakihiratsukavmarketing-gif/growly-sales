@@ -1021,9 +1021,13 @@ openssl s_client -connect mailops.wantreach.jp:443 -servername mailops.wantreach
 | 項目 | 現状 |
 |------|------|
 | `GcsJsonMailSuppressionStore` | ✅ `mail-suppressions.json` 読書・generation-match・backup・audit |
-| `unsubscribe-tokens.json` GCS store | ⚠️ **型定義のみ** — live 読書・発行パス未接続 |
-| `mailOpsServer.ts` live GET/POST | ⚠️ `canProcessUnsubscribe=true` でも **503 スタブ** — **実装要** |
+| `unsubscribe-tokens.json` GCS store | ✅ `GcsUnsubscribeTokenStore` 実装（generation-match / retry 5 / verify read / fail-closed） |
+| `mailOpsServer.ts` live GET/POST | ✅ live handler 実装（GET=確認のみ / POST=冪等停止 / fail-closed） |
 | mock フロー | ✅ `mockUnsubscribeScreen.ts` / in-memory token registry |
+
+**verify（実 GCS 非接続）:**
+
+- `npm run growly-sales:verify-phase441` — Phase 44.1 mail-ops のみの targeted verify（unsubscribe token store / live handler / guardrails）
 
 #### 7.23.3 テスト対象
 

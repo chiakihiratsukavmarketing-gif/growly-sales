@@ -63,6 +63,8 @@ export { GcsJsonMailSuppressionStore } from './gcsJsonMailSuppressionStore.js';
 export {
   createMailSuppressionStore,
   tryCreateMailSuppressionStore,
+  createUnsubscribeTokenStore,
+  tryCreateUnsubscribeTokenStore,
   isMailOpsStorageReady,
   MailOpsConfigurationError,
 } from './createMailSuppressionStore.js';
@@ -81,10 +83,14 @@ export {
 } from './server/mailOpsServerContext.js';
 export type { MailOpsHealthResponse } from './server/mailOpsServerContext.js';
 export type { MailSuppressionsDocument, UnsubscribeTokensDocument } from './gcsDocumentTypes.js';
-export { parseMailSuppressionsDocument } from './gcsDocumentParser.js';
+export { parseMailSuppressionsDocument, parseUnsubscribeTokensDocument } from './gcsDocumentParser.js';
 export { withGenerationMatchRetry } from './withGenerationMatchRetry.js';
 export { InMemoryGcsJsonStorage } from './gcsJsonStoragePort.js';
 export { MAIL_OPS_SERVICE_NAME } from './mailOpsRequestLogging.js';
+export type { UnsubscribeTokenStore } from './unsubscribeTokenStore.js';
+export { InMemoryUnsubscribeTokenStore } from './unsubscribeTokenStore.js';
+export { GcsUnsubscribeTokenStore } from './gcsUnsubscribeTokenStore.js';
+export { resolveLiveUnsubscribeToken } from './resolveLiveUnsubscribeToken.js';
 export {
   SuppressionBlockedError,
   checkNotSuppressed,

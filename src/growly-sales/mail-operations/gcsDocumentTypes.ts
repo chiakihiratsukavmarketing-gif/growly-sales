@@ -11,10 +11,12 @@ export interface UnsubscribeTokenRecord {
   tokenHash: string;
   tenantId: string;
   leadId?: string;
+  sendRecordId?: string;
   companyId?: string;
   normalizedEmail: string;
   expiresAt: string;
   createdAt: string;
+  usedAt?: string;
 }
 
 /** GCS 正本 — mail-operations/unsubscribe-tokens.json */

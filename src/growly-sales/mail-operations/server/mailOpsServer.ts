@@ -64,8 +64,14 @@ async function handleUnsubscribe(
     return { status: 503, screenState: 'temporary_error' };
   }
 
-  sendJson(res, 503, buildTemporaryErrorResponse(false));
-  return { status: 503, screenState: 'temporary_error' };
+  const payload =
+    method === 'GET'
+      ? await ctx.getLiveUnsubscribeScreen(token)
+      : await ctx.postLiveUnsubscribeScreen(token);
+  const status =
+    payload.ok ? 200 : method === 'GET' && payload.screenState === 'invalid_or_expired' ? 404 : 200;
+  sendJson(res, status, payload);
+  return { status, screenState: payload.screenState };
 }
 
 export async function handleMailOpsRequest(

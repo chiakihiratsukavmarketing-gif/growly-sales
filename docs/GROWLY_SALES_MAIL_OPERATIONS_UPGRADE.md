@@ -640,6 +640,11 @@ GET  /t/{token}.gif  # 44.3 将来
 
 正本: `GROWLY_SALES_MAIL_OPERATIONS_LIVE_READINESS.md` §7.18 — **実行は Human Approval 後**
 
+### Phase 44.1 Step 15A（実装フェーズ）— verify 方針
+
+- 全体 `npm run growly-sales:verify` は既知の既存失敗が残る場合があるため、Phase 44.1 mail-ops のみを対象とした verify を追加。
+- `npm run growly-sales:verify-phase441` は **実 GCS 非接続**の in-memory adapter で store/handler/guardrails を検証する（raw token / Secret / email の漏洩なし）。
+
 ## 10. DDL / env / Cloud 変更候補（実行しない・候補のみ）
 
 現行は **ローカル JSON + オプション GCS** のため RDB DDL は **Phase 43 では必須ではない**。将来 Supabase 等に移行する場合:

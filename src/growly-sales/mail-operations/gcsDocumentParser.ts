@@ -131,14 +131,24 @@ export function parseUnsubscribeTokensDocument(raw: string | null): UnsubscribeT
     if (!tenantId || !tokenHash) {
       throw new SuppressionStoreUnavailableError('配信停止トークン情報の形式が不正です');
     }
+    const normalizedEmail = String(record.normalizedEmail ?? '').trim();
+    if (!normalizedEmail) {
+      throw new SuppressionStoreUnavailableError('配信停止トークン情報の形式が不正です');
+    }
+    const expiresAt = String(record.expiresAt ?? '');
+    const createdAt = String(record.createdAt ?? '');
+    const usedAt = record.usedAt ? String(record.usedAt) : undefined;
+    const sendRecordId = record.sendRecordId ? String(record.sendRecordId) : undefined;
     return {
       tokenHash,
       tenantId,
       leadId: record.leadId ? String(record.leadId) : undefined,
+      sendRecordId,
       companyId: record.companyId ? String(record.companyId) : undefined,
-      normalizedEmail: String(record.normalizedEmail ?? '').trim(),
-      expiresAt: String(record.expiresAt ?? ''),
-      createdAt: String(record.createdAt ?? ''),
+      normalizedEmail,
+      expiresAt,
+      createdAt,
+      usedAt,
     };
   });
   return {
@@ -146,4 +156,23 @@ export function parseUnsubscribeTokensDocument(raw: string | null): UnsubscribeT
     updatedAt: String(obj.updatedAt ?? new Date().toISOString()),
     records,
   };
+}
+
+export function serializeUnsubscribeTokensDocument(doc: UnsubscribeTokensDocument): string {
+  const payload: UnsubscribeTokensDocument = {
+    schemaVersion: 1,
+    updatedAt: doc.updatedAt,
+    records: doc.records.map((r) => ({
+      tokenHash: String(r.tokenHash ?? '').trim(),
+      tenantId: String(r.tenantId ?? '').trim() || getDefaultMailOperationsTenantId(),
+      leadId: r.leadId ? String(r.leadId) : undefined,
+      sendRecordId: r.sendRecordId ? String(r.sendRecordId) : undefined,
+      companyId: r.companyId ? String(r.companyId) : undefined,
+      normalizedEmail: String(r.normalizedEmail ?? '').trim(),
+      expiresAt: String(r.expiresAt ?? ''),
+      createdAt: String(r.createdAt ?? ''),
+      usedAt: r.usedAt ? String(r.usedAt) : undefined,
+    })),
+  };
+  return `${JSON.stringify(payload, null, 2)}\n`;
 }
