@@ -188,13 +188,22 @@ export function createMailOpsServerContext(
     }
 
     const store = tryCreateStore(config, readiness);
+    const tokenStore = tryCreateTokenStore(config, readiness);
+    const storageReady = store !== null && tokenStore !== null;
     return {
-      ok: store !== null,
+      ok: storageReady,
       service: config.serviceName,
       mode: 'live',
       liveConnected,
-      storageReady: store !== null,
-      ...(store === null ? { missingConfiguration: ['SUPPRESSION_STORE_INIT'] } : {}),
+      storageReady,
+      ...(!storageReady
+        ? {
+            missingConfiguration: [
+              ...(store === null ? ['SUPPRESSION_STORE_INIT'] : []),
+              ...(tokenStore === null ? ['TOKEN_STORE_INIT'] : []),
+            ],
+          }
+        : {}),
     };
   };
 
