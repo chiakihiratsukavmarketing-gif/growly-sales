@@ -357,6 +357,20 @@
 | 通常営業運用 | **影響なし** |
 | Phase 44.1 判定 | **No-Go 維持** |
 
+### 2026-07-08 — Phase 44.1 Step 14（継続2）: 証明書 FAILED_NOT_VISIBLE — 停止報告
+
+| 項目 | 内容 |
+|------|------|
+| 進行 | Phase 44.1 **14 / 15**（**停止** — 証明書異常） |
+| DNS 解決 | ✅ **136.68.247.144**（8.8.8.8 / 1.1.1.1 / ローカル一致・CNAME なし） |
+| forwarding rule | ✅ 136.68.247.144:443 |
+| URL map host | ✅ `mailops.wantreach.jp` のみ |
+| 証明書 | `growly-mail-ops-cert` — `managed.status: PROVISIONING` / **`domainStatus: FAILED_NOT_VISIBLE`** |
+| HTTPS `/health` | **未実施**（SSL ハンドシェイ失敗 — 証明書未 ACTIVE） |
+| 実施方針 | DNS・証明書の **変更なし**（削除・再作成禁止遵守） |
+| 次 | 人間判断 — 伝播待ち（最大 24h）または GCP Console で証明書詳細確認 |
+| Phase 44.1 判定 | **No-Go 維持** |
+
 ## 2026-07-03 — Phase 42 通常運用UI改善 **完了** ✅
 
 **進行:** 通常運用UI改善 **7 / 7 フェーズ完了**

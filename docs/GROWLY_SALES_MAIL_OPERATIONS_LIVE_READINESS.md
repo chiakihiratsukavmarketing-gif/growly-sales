@@ -956,6 +956,32 @@ openssl s_client -connect mailops.wantreach.jp:443 -servername mailops.wantreach
 
 **ACTIVE 後に実行（§7.22.5）:** HTTPS `/health`・`/u/invalid-test-token`・TLS ホスト名確認・ログ漏洩確認。
 
+#### 7.22.10 証明書 FAILED_NOT_VISIBLE — 停止報告（2026-07-08）
+
+> **明確な異常を検出。** DNS・証明書の変更は **実施しない**（削除・再作成禁止）。
+
+| 項目 | 結果 |
+|------|------|
+| 確認時刻 | 2026-07-08（DNS 追加後） |
+| `managed.status` | PROVISIONING |
+| `domainStatus` | **`mailops.wantreach.jp: FAILED_NOT_VISIBLE`** |
+| DNS（8.8.8.8 / 1.1.1.1） | ✅ A → **136.68.247.144**（TTL 600） |
+| CNAME 重複 | なし |
+| forwarding rule | ✅ 136.68.247.144:443 |
+| cert domains | ✅ `mailops.wantreach.jp` のみ |
+| HTTPS 接続 | SSL ハンドシェイ失敗（証明書未 provision） |
+
+**解釈:** Google 管理証明書のドメイン検証が、LB IP への到達をまだ確認できていない状態。DNS は公開リゾルバで正しく反映済み。伝播遅延・CA 側再試行待ちの可能性あり。
+
+**実施しない:** DNS 追加修正・証明書削除・再作成・HTTPS スモーク（ACTIVE 前）。
+
+**人間作業候補:**
+
+1. GCP Console → Network services → Load balancing → 証明書 `growly-mail-ops-cert` の詳細・イベント確認
+2. 10〜15 分間隔で `domainStatus` 再確認（最大 24h・高頻度監視禁止）
+3. `domainStatus` が **ACTIVE** に変わったら §7.22.5 スモークを実施
+4. 24h 経過後も FAILED のままなら、GCP サポートまたは LB/証明書構成の人間レビュー（再作成は別承認）
+
 **構成スクリプト（参照）:** `scripts/cloud/growly-mail-ops/04-load-balancer.sh`（DRY-RUN 既定）
 
 ### 7.3 公開 endpoint（live 時）
