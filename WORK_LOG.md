@@ -386,6 +386,20 @@
 | 通常営業運用 | **影響なし** |
 | Phase 44.1 判定 | **No-Go 維持** |
 
+### 2026-07-08 — Phase 44.1 Step 15A: live handler + GCS token store（実装）
+
+| 項目 | 内容 |
+|------|------|
+| 進行 | Phase 44.1 **15 / 15 実行前**（handler 実装完了・dry-run 未実行） |
+| token store | `gcsUnsubscribeTokenStore.ts`（generation-match / retry 5 / fail-closed / usedAt 冪等） |
+| live GET/POST | `mailOpsServer.ts` + `mailOpsServerContext.ts`（`liveConnected=false` は 503 temporary_error） |
+| factory | `createUnsubscribeTokenStore`（mock=in-memory / live+gcs / live+local 拒否） |
+| verify | `npm run growly-sales:verify-phase441` ✅（実 GCS 非接続） |
+| commit | `1de5936` — `feat(phase-44): connect live unsubscribe handlers` |
+| 未実施 | `MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true`・実 token・POST・GCS 実書込・Gmail |
+| 通常営業運用 | **影響なし** |
+| Phase 44.1 判定 | **No-Go 維持** |
+
 ## 2026-07-03 — Phase 42 通常運用UI改善 **完了** ✅
 
 **進行:** 通常運用UI改善 **7 / 7 フェーズ完了**
