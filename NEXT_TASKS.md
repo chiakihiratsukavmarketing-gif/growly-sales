@@ -1,7 +1,7 @@
 # Growly Sales — NEXT_TASKS
 
 **更新日:** 2026-07-08
-**進行:** Phase 43 **4 / 4** 完了 / Phase 44 **0 / 3**（44.1 **14 / 15**・No-Go 維持）
+**進行:** Phase 43 **4 / 4** 完了 / Phase 44 **0 / 3**（44.1 **14 / 15** 完了・Step 15 実行前・No-Go 維持）
 
 ---
 
@@ -25,7 +25,7 @@
 - [x] 公開ドメイン・`PUBLIC_BASE_URL` 決定（`https://mailops.wantreach.jp`・DNS は未接続）
 - [x] HTTPS LB 準備（§7.22・固定 IP + NEG + 証明書 PROVISIONING）
 - [x] **mixhost DNS** — A レコード `mailops` → `136.68.247.144`（解決確認済み・§7.22.9）
-- [ ] HTTPS 確認（証明書 **FAILED_NOT_VISIBLE** — ACTIVE 待ち・§7.22.10）
+- [x] HTTPS 確認（§7.22.11 — ACTIVE・`/health` 200・TLS OK）
 - [x] Secret Manager（`unsubscribe-token-pepper` version 登録済み・値は記録しない）
 - [x] suppression 保存先承認（GCS設計 Human Approval 済み: `be9d026` / `mail-operations/` prefix / generation-match / retry / backup / IAM / rollback / audit）
 - [x] **法務表示方針** — Human Approval 済み（2026-07-07・§8.4 / メール全体表示要件・フッター所在地重複なし・一般的運用確認）
@@ -59,8 +59,8 @@
 | 11 | Cloud・Secret・IAM 適用前チェックリスト | ✅ §7.18（実行なし） |
 | 12 | イメージ + GCS IAM + **非公開** Cloud Run デプロイ | ✅ §7.20 |
 | 13 | **公開** invoker + `/health` + 無効 token スモーク | ✅ §7.21 |
-| 14 | HTTPS LB + DNS + 証明書 ACTIVE 待ち | **停止**（FAILED_NOT_VISIBLE・§7.22.10） |
-| 15 | HTTPS スモーク・live 外部接続・Go 再評価 | 未（証明書 ACTIVE 後） |
+| 14 | HTTPS LB + DNS + ドメイン HTTPS スモーク | ✅ §7.22.11 |
+| 15 | live 接続 + suppression 1 件スモーク + Go 再評価 | **実行前**（§7.23 dry-run） |
 
 ### Phase 43 完了（mock・参照）
 

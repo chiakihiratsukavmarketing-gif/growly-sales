@@ -371,6 +371,21 @@
 | 次 | 人間判断 — 伝播待ち（最大 24h）または GCP Console で証明書詳細確認 |
 | Phase 44.1 判定 | **No-Go 維持** |
 
+### 2026-07-08 — Phase 44.1 Step 14（完了）: HTTPS ドメイン確認
+
+| 項目 | 内容 |
+|------|------|
+| 進行 | Phase 44.1 **14 / 15** ✅ |
+| 証明書 | `growly-mail-ops-cert` — **ACTIVE**（`mailops.wantreach.jp`） |
+| DNS | A → **136.68.247.144**（AAAA なし・CNAME 競合なし） |
+| HTTPS `/health` | **200** — `ok:true` / `mode:live` / **`liveConnected:false`** / `storageReady:true` |
+| 無効 token GET | **503** / `screenState:temporary_error`（fail-closed） |
+| TLS | 検証成功・LB 経由・`run.app` リダイレクトなし |
+| ログ | `route=GET /u/:token` テンプレートのみ・漏洩なし |
+| GCS 実書込 / Gmail | **なし** |
+| 通常営業運用 | **影響なし** |
+| Phase 44.1 判定 | **No-Go 維持** |
+
 ## 2026-07-03 — Phase 42 通常運用UI改善 **完了** ✅
 
 **進行:** 通常運用UI改善 **7 / 7 フェーズ完了**

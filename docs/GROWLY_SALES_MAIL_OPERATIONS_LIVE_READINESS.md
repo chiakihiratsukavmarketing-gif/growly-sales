@@ -982,6 +982,111 @@ openssl s_client -connect mailops.wantreach.jp:443 -servername mailops.wantreach
 3. `domainStatus` が **ACTIVE** に変わったら §7.22.5 スモークを実施
 4. 24h 経過後も FAILED のままなら、GCP サポートまたは LB/証明書構成の人間レビュー（再作成は別承認）
 
+#### 7.22.11 Step 14 完了 — HTTPS ドメイン確認（2026-07-08）
+
+| 項目 | 結果 |
+|------|------|
+| 証明書 | **ACTIVE**（`mailops.wantreach.jp`） |
+| DNS A | **136.68.247.144**（8.8.8.8 / 1.1.1.1 一致） |
+| AAAA / CNAME | なし / 競合なし |
+| HTTPS `/health` | **200** — `liveConnected:false`・漏洩なし |
+| 無効 token GET | **503** / `temporary_error` |
+| TLS | 成功・LB 経由（`via: google`） |
+| ログ | route テンプレートのみ |
+| GCS 書込 / Gmail | **なし** |
+
+**Step 14 完了。** 次は §7.23 Step 15 dry-run（live 接続は Human Approval 後）。
+
+### 7.23 Phase 44.1 Step 15 — live 接続・suppression 1 件 dry-run 計画（実行前）
+
+> **本節は計画のみ。** `MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true`・実 token・POST・GCS 書込は **未実施**。
+
+#### 7.23.1 目的
+
+管理可能な **テスト用メールアドレス 1 件** のみで、本番経路（`https://mailops.wantreach.jp`）において以下を検証する。
+
+1. unsubscribe token を安全に 1 件発行
+2. GET `/u/{token}` で確認画面
+3. POST で suppression を GCS 保存
+4. 二重 POST が `already_unsubscribed`
+5. GCS 正本・backup・audit event 確認
+6. 停止後の営業フロー fail-closed
+7. Secret・token・完全メールの漏洩なし
+8. rollback 手順確認
+9. Gmail 送信は行わない
+10. Human Approval 後に Phase 44.1 完了判定
+
+#### 7.23.2 コード前提（実行前に確認）
+
+| 項目 | 現状 |
+|------|------|
+| `GcsJsonMailSuppressionStore` | ✅ `mail-suppressions.json` 読書・generation-match・backup・audit |
+| `unsubscribe-tokens.json` GCS store | ⚠️ **型定義のみ** — live 読書・発行パス未接続 |
+| `mailOpsServer.ts` live GET/POST | ⚠️ `canProcessUnsubscribe=true` でも **503 スタブ** — **実装要** |
+| mock フロー | ✅ `mockUnsubscribeScreen.ts` / in-memory token registry |
+
+#### 7.23.3 テスト対象
+
+| ルール | 内容 |
+|--------|------|
+| メール | **人間が管理するテスト用アドレスのみ** |
+| Lead / 送信記録 | **変更しない** |
+| 識別子 | `leadId` は **テスト専用 fixture**（例: `phase44-smoke-test`） |
+| tenantId | `want-reach` |
+
+#### 7.23.4 token 発行（計画）
+
+| 項目 | 方針 |
+|------|------|
+| 生成 | `generateUnsubscribeToken()` |
+| hash | `hashUnsubscribeTokenWithPepper` — pepper は Secret のみ |
+| 永続化 | `unsubscribe-tokens.json` に **tokenHash のみ** |
+| 生 token | 一度だけ安全な端末に表示。docs / git / ログに **書かない** |
+| URL | 完了報告に **掲載しない** |
+
+#### 7.23.5 live 接続切替（Human Approval 後のみ）
+
+```bash
+gcloud run services update growly-sales-mail-ops \
+  --region=asia-northeast1 --project=growly-scheduler \
+  --update-env-vars=MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true
+# 直後: curl https://mailops.wantreach.jp/health → liveConnected:true
+
+# 異常時 rollback
+gcloud run services update growly-sales-mail-ops \
+  --region=asia-northeast1 --project=growly-scheduler \
+  --update-env-vars=MAIL_OPS_LIVE_EXTERNAL_CONNECTED=false
+```
+
+#### 7.23.6 GCS スモーク確認（metadata のみ）
+
+prefix: `gs://growly-sales-daily30/prod/growly-sales/mail-operations/`
+
+| object | 確認 |
+|--------|------|
+| `mail-suppressions.json` | 更新・generation 増加 |
+| `unsubscribe-tokens.json` | tokenHash レコード |
+| `backups/mail-suppressions/*` | バックアップ 1 件以上 |
+| `audit/YYYY/MM/DD/*` | audit event 1 件 |
+
+#### 7.23.7 fail-closed 確認対象
+
+`applyFullGeneration` / `generateDaily30SalesCopy` / `outreachPolicy` / `createGmailDraftForLead` / `buildTodaySalesQueue` — テスト `normalizedEmail` でブロック確認。
+
+#### 7.23.8 rollback（§11 整合）
+
+1. `MAIL_OPS_LIVE_EXTERNAL_CONNECTED=false`
+2. revision `growly-sales-mail-ops-00001-tff` を rollback 候補として保持
+3. GCS suppression **削除しない**
+
+#### 7.23.9 実行に必要な Human Approval
+
+1. live handler 実装完了確認
+2. テスト用メールアドレス承認
+3. `MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true` 承認
+4. POST 1 件実行承認
+5. fail-closed 確認後 Go 再評価
+
 **構成スクリプト（参照）:** `scripts/cloud/growly-mail-ops/04-load-balancer.sh`（DRY-RUN 既定）
 
 ### 7.3 公開 endpoint（live 時）
