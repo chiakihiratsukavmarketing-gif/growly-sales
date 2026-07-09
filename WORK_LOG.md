@@ -400,6 +400,17 @@
 | commit | （本筋のみ） |
 | Phase 44.1 判定 | **fail-closed 確認完了・live Go No-Go 維持** |
 
+### 2026-07-10 — Phase 44.1 Step 16B: unsubscribe token 発行モジュール ✅
+
+| 項目 | 内容 |
+|------|------|
+| 目的 | 営業パイプライン向け token / URL 発行 API（**Gmail 未接続**） |
+| モジュール | `issueUnsubscribeTokenForOutreach` / `salesUnsubscribeTokenIssueSource` |
+| GCS 保存 | `unsubscribe-tokens.json` に **tokenHash のみ** |
+| fail-closed | pepper / URL 前提 / GCS add 失敗 |
+| verify | `verify:step16b-unsubscribe-token-issue` ✅ + 16A / fail-closed / gcs-readonly / mail-ops 回帰 ✅ |
+| Phase 44.1 判定 | **No-Go 維持** |
+
 ### 2026-07-09 — Phase 44.1 Step 15: live dry-run 1件（完了・live Go 未移行）
 
 | 項目 | 内容 |

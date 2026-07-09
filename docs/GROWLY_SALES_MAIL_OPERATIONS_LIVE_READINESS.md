@@ -1163,6 +1163,7 @@ prefix: `gs://growly-sales-daily30/prod/growly-sales/mail-operations/`
 |----|------|
 | mail-ops（GCS 正本） | Step 15 で実証済み |
 | ローカル営業パイプライン | Step 16A で **読み取り統合**（`MAIL_OPS_MODE=live` かつ GCS env が揃う場合のみ **GCS 正本を read-only 参照**。読めない場合は fail-closed） |
+| token 発行（営業パイプライン） | Step 16B で **発行モジュール追加**（`issueUnsubscribeTokenForOutreach`・GCS には **tokenHash のみ**・Gmail 経路 **未接続**） |
 | Gmail 本文 unsubscribe URL | **未適用**（No-Go 維持の前提） |
 
 **Go / No-Go:**
@@ -1172,6 +1173,22 @@ prefix: `gs://growly-sales-daily30/prod/growly-sales/mail-operations/`
 | 営業フロー fail-closed（in-memory） | ✅ |
 | Phase 44.1 live Go | **No-Go 維持** |
 | Phase 44 全体 live Go | **No-Go 維持** |
+
+#### 7.23.12 Step 16B — 営業パイプライン token 発行モジュール（2026-07-10）
+
+> **in-memory verify のみ。** Gmail 変更・draft 作成・`mail-suppressions.json` 更新なし・`liveConnected=true` なし。
+
+| 項目 | 結果 |
+|------|------|
+| モジュール | `issueUnsubscribeTokenForOutreach` / `salesUnsubscribeTokenIssueSource` |
+| live 条件 | `MAIL_OPS_MODE=live` + GCS env + pepper + URL readiness |
+| GCS 保存 | `unsubscribe-tokens.json` に **tokenHash のみ**（生 token / URL は非永続化） |
+| URL 順序 | URL 前提検証 → token 生成 → URL 組み立て → GCS add |
+| fail-closed | pepper 未設定 / URL 前提不足 / GCS add 失敗 |
+| mock 既定 | `registerMockUnsubscribeToken` 経路維持 |
+| Gmail | **未接続**（`createGmailDraftForLead` 等に issuer なし） |
+| verify | `growly-sales:verify:step16b-unsubscribe-token-issue` ✅ + 16A / fail-closed / gcs-readonly / mail-ops 回帰 ✅ |
+| Go / No-Go | Phase 44.1 **No-Go 維持** |
 
 #### 7.23.8 rollback（§11 整合）
 

@@ -97,6 +97,24 @@ export {
   clearGcsSuppressionReadCacheForTests,
   setGcsSuppressionReadCacheForTests,
 } from './gcsSuppressionReadAdapter.js';
+export {
+  resolveSalesUnsubscribeTokenIssueSource,
+  isSalesUnsubscribeTokenLiveGcsIssueEnabled,
+  assertUnsubscribeUrlIssueReadiness,
+} from './salesUnsubscribeTokenIssueSource.js';
+export type { SalesUnsubscribeTokenIssueSource } from './salesUnsubscribeTokenIssueSource.js';
+export {
+  issueUnsubscribeTokenForOutreach,
+  setUnsubscribeTokenIssueStoragePortForTests,
+} from './issueUnsubscribeTokenForOutreach.js';
+export type {
+  IssueUnsubscribeTokenForOutreachInput,
+  IssuedUnsubscribeTokenForOutreach,
+} from './unsubscribeTokenIssueTypes.js';
+export {
+  UnsubscribeTokenIssueError,
+  DEFAULT_UNSUBSCRIBE_TOKEN_TTL_MS,
+} from './unsubscribeTokenIssueTypes.js';
 export { MAIL_OPS_SERVICE_NAME } from './mailOpsRequestLogging.js';
 export type { UnsubscribeTokenStore } from './unsubscribeTokenStore.js';
 export { InMemoryUnsubscribeTokenStore } from './unsubscribeTokenStore.js';

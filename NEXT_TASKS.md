@@ -63,6 +63,7 @@
 | 15A | live handler + GCS token store 実装 | ✅ Step 15A 完了（mail-ops verify passed・`liveConnected=false`・新 revision デプロイ） |
 | 15 | live 接続 + suppression 1 件スモーク + Go 再評価 | ✅ dry-run 完了（§7.23.10・`liveConnected=false` 復帰） |
 | 16A | sales pipeline suppression の GCS 正本 read-only 参照（B1 解消の第一歩） | ✅ 実装完了（verify 追加: `growly-sales:verify:step16a-gcs-sales-read`・**live Go No-Go 維持**） |
+| 16B | sales pipeline unsubscribe token / URL 発行モジュール（Gmail 未接続） | ✅ 実装完了（verify 追加: `growly-sales:verify:step16b-unsubscribe-token-issue`・**live Go No-Go 維持**） |
 
 ### Phase 43 完了（mock・参照）
 
