@@ -398,7 +398,9 @@
 | validate | `npm run growly-sales:mail-ops:validate` ✅ |
 | ui:build | ✅ |
 | 全体 verify | 2967 passed / 62 failed（Daily30/UI 既存・mail-ops 無関係） |
-| deploy | commit tag 固定・`liveConnected=false`・rollback=`growly-sales-mail-ops-00001-tff` |
+| deploy | revision **`growly-sales-mail-ops-00002-vt8`** / image `:48fb762` / digest `sha256:28a31767...650f0f` |
+| smoke | `/health` 200 `liveConnected:false` / invalid GET 503 `temporary_error` |
+| rollback | `growly-sales-mail-ops-00001-tff` |
 | 未実施 | `MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true`・実 token・POST・GCS 実書込・Gmail |
 | Phase 44.1 判定 | **No-Go 維持** |
 
