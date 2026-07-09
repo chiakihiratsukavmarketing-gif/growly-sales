@@ -386,6 +386,20 @@
 | 通常営業運用 | **影響なし** |
 | Phase 44.1 判定 | **No-Go 維持** |
 
+### 2026-07-09 — Phase 44.1 営業フロー fail-closed 確認（in-memory + GCS 読み取り）
+
+| 項目 | 内容 |
+|------|------|
+| Phase A | `verify:mail-ops` ✅ / generation・draft パスに live token・footer 自動挿入なし |
+| Phase B | `verify:sales-fail-closed` ✅（in-memory のみ・Gmail API 不使用） |
+| 入口 | `assertNotSuppressed` / `generateDaily30SalesCopy` / `applyFullGeneration` / `isInitialOutreachEligible` / `isFollowUpSuppressed` |
+| store 障害 | `SuppressionStoreUnavailableError` で fail-closed |
+| Gmail | **変更なし**・下書き作成 **未実施** |
+| Phase C | `verify:gcs-readonly` ✅ — suppression **1件**・audit **1件**（Step 15 結果維持） |
+| 既知ギャップ | ローカル営業 OS は `data/growly-sales/mail-suppressions.json` 参照。**GCS 正本は mail-ops のみ** |
+| commit | （本筋のみ） |
+| Phase 44.1 判定 | **fail-closed 確認完了・live Go No-Go 維持** |
+
 ### 2026-07-09 — Phase 44.1 Step 15: live dry-run 1件（完了・live Go 未移行）
 
 | 項目 | 内容 |

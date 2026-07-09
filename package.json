@@ -10,6 +10,8 @@
     "growly-sales:verify": "tsx src/growly-sales/scripts/verify-growly-sales.ts",
     "growly-sales:verify-phase441": "tsx src/growly-sales/scripts/verify-phase441-mail-ops.ts",
     "growly-sales:verify:mail-ops": "tsx src/growly-sales/scripts/verify-phase441-mail-ops.ts",
+    "growly-sales:verify:sales-fail-closed": "tsx src/growly-sales/scripts/verify-phase441-sales-fail-closed.ts",
+    "growly-sales:verify:gcs-readonly": "tsx src/growly-sales/scripts/verify-phase441-gcs-readonly.ts",
     "growly-sales:ui:build": "vite build",
     "growly-sales:ui": "vite build && tsx src/growly-sales/scripts/run-growly-sales-ui.ts",
     "growly-sales:export-drafts": "tsx src/growly-sales/scripts/run-growly-sales-export-drafts.ts",

@@ -1,7 +1,7 @@
 # Growly Sales — NEXT_TASKS
 
 **更新日:** 2026-07-09
-**進行:** Phase 43 **4 / 4** 完了 / Phase 44 **0 / 3**（44.1 **15 / 15 dry-run 完了**・**live Go No-Go 維持**）
+**進行:** Phase 43 **4 / 4** 完了 / Phase 44 **0 / 3**（44.1 **dry-run + fail-closed 確認完了**・**live Go No-Go 維持**）
 
 ---
 
@@ -31,7 +31,7 @@
 - [x] **法務表示方針** — Human Approval 済み（2026-07-07・§8.4 / メール全体表示要件・フッター所在地重複なし・一般的運用確認）
 - [x] **配信停止画面文案** — Human Approval 済み（2026-07-07・`UnsubscribeScreenState` 5 状態・mock API のみ）
 - [x] **配信停止メール末尾文面** — Human Approval 済み（2026-07-07・`buildUnsubscribeEmailFooterCopy`・所在地なし・Gmail/live 未適用）
-- [ ] fail-closed 実装フェーズへの着手承認
+- [x] fail-closed 営業フロー確認（in-memory verify 済み・§7.23.11・GCS↔ローカル未接続ギャップ記録）
 
 ### 44.1 実装原則（自社優先 + SaaS拡張余地）
 

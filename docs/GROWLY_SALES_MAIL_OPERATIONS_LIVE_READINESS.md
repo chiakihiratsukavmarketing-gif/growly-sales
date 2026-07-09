@@ -1087,7 +1087,8 @@ openssl s_client -connect mailops.wantreach.jp:443 -servername mailops.wantreach
 **verify（実 GCS 非接続）:**
 
 - `npm run growly-sales:verify-phase441` — Phase 44.1 mail-ops のみの targeted verify（unsubscribe token store / live handler / guardrails）
-- `npm run growly-sales:verify:mail-ops` — 上記の別名（Step 15A 以降の commit 条件）
+- `npm run growly-sales:verify:sales-fail-closed` — 営業パイプライン fail-closed（in-memory・Gmail API 不使用）
+- `npm run growly-sales:verify:gcs-readonly` — GCS mail-ops 正本の読み取り構造確認（件数のみ・PII なし）
 
 #### 7.23.3 テスト対象
 
@@ -1136,6 +1137,41 @@ prefix: `gs://growly-sales-daily30/prod/growly-sales/mail-operations/`
 #### 7.23.7 fail-closed 確認対象
 
 `applyFullGeneration` / `generateDaily30SalesCopy` / `outreachPolicy` / `createGmailDraftForLead` / `buildTodaySalesQueue` — テスト `normalizedEmail` でブロック確認。
+
+#### 7.23.11 営業フロー fail-closed 確認結果（2026-07-09）
+
+> **in-memory / 読み取りのみ。** Gmail 変更・実送信・GCS 書込・`liveConnected=true` 再切替なし。
+
+| 項目 | 結果 |
+|------|------|
+| Phase A | `npm run growly-sales:verify:mail-ops` ✅ |
+| 静的監査 | generation/draft/Gmail adapter に `generateUnsubscribeToken` / footer 自動挿入 **なし** |
+| Phase B | `npm run growly-sales:verify:sales-fail-closed` ✅ |
+| 停止済み fixture | `assertNotSuppressed` → `SuppressionBlockedError` |
+| store 障害 | `SuppressionStoreUnavailableError`（fail-closed） |
+| Daily30 / 生成 / 初回対象 / follow-up | 入口でブロック確認 |
+| Gmail draft | `assertNotSuppressed` 配線のみ（**API 未呼び出し**） |
+| Phase C | `npm run growly-sales:verify:gcs-readonly` ✅ |
+| GCS suppression | schemaVersion **1** / active **1件**（Step 15 維持） |
+| GCS audit | **1件**（2026-07-09） |
+| GCS backup | 初回正本経路のため **0件**（Step 15 時点と同様） |
+| 漏洩 | token / URL / 完全メール **なし** |
+
+**既知ギャップ（live Go ブロッカー）:**
+
+| 層 | 状態 |
+|----|------|
+| mail-ops（GCS 正本） | Step 15 で実証済み |
+| ローカル営業パイプライン | **ローカル JSON** 参照。GCS 正本と **未接続** |
+| Gmail 本文 unsubscribe URL | **未適用**（No-Go 維持の前提） |
+
+**Go / No-Go:**
+
+| 観点 | 判定 |
+|------|------|
+| 営業フロー fail-closed（in-memory） | ✅ |
+| Phase 44.1 live Go | **No-Go 維持** |
+| Phase 44 全体 live Go | **No-Go 維持** |
 
 #### 7.23.8 rollback（§11 整合）
 
