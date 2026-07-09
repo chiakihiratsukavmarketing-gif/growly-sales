@@ -20,6 +20,8 @@ export {
 export {
   loadMailSuppressionStore,
   loadMailSuppressionStoreSync,
+  refreshSalesSuppressionReadCache,
+  readSalesSuppressionStoreDocument,
   listMailSuppressions,
   addManualSuppression,
   reactivateSuppression,
@@ -85,6 +87,16 @@ export type { MailSuppressionsDocument, UnsubscribeTokensDocument } from './gcsD
 export { parseMailSuppressionsDocument, parseUnsubscribeTokensDocument } from './gcsDocumentParser.js';
 export { withGenerationMatchRetry } from './withGenerationMatchRetry.js';
 export { InMemoryGcsJsonStorage } from './gcsJsonStoragePort.js';
+export {
+  resolveSalesSuppressionReadSource,
+  isSalesSuppressionGcsReadEnabled,
+} from './salesSuppressionReadSource.js';
+export type { SalesSuppressionReadSource } from './salesSuppressionReadSource.js';
+export {
+  setGcsSuppressionReadStoragePortForTests,
+  clearGcsSuppressionReadCacheForTests,
+  setGcsSuppressionReadCacheForTests,
+} from './gcsSuppressionReadAdapter.js';
 export { MAIL_OPS_SERVICE_NAME } from './mailOpsRequestLogging.js';
 export type { UnsubscribeTokenStore } from './unsubscribeTokenStore.js';
 export { InMemoryUnsubscribeTokenStore } from './unsubscribeTokenStore.js';

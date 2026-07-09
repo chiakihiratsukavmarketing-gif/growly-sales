@@ -1162,7 +1162,7 @@ prefix: `gs://growly-sales-daily30/prod/growly-sales/mail-operations/`
 | 層 | 状態 |
 |----|------|
 | mail-ops（GCS 正本） | Step 15 で実証済み |
-| ローカル営業パイプライン | **ローカル JSON** 参照。GCS 正本と **未接続** |
+| ローカル営業パイプライン | Step 16A で **読み取り統合**（`MAIL_OPS_MODE=live` かつ GCS env が揃う場合のみ **GCS 正本を read-only 参照**。読めない場合は fail-closed） |
 | Gmail 本文 unsubscribe URL | **未適用**（No-Go 維持の前提） |
 
 **Go / No-Go:**

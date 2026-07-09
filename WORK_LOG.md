@@ -396,7 +396,7 @@
 | store 障害 | `SuppressionStoreUnavailableError` で fail-closed |
 | Gmail | **変更なし**・下書き作成 **未実施** |
 | Phase C | `verify:gcs-readonly` ✅ — suppression **1件**・audit **1件**（Step 15 結果維持） |
-| 既知ギャップ | ローカル営業 OS は `data/growly-sales/mail-suppressions.json` 参照。**GCS 正本は mail-ops のみ** |
+| 既知ギャップ | （Step 16A で解消）`MAIL_OPS_MODE=live` + GCS env が揃う場合のみ sales pipeline が GCS 正本を read-only 参照。読めない場合は fail-closed |
 | commit | （本筋のみ） |
 | Phase 44.1 判定 | **fail-closed 確認完了・live Go No-Go 維持** |
 

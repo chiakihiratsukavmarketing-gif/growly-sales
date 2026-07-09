@@ -18,6 +18,12 @@ import {
 } from './suppressionToken.js';
 import { getDefaultMailOperationsTenantId } from './tenantResolver.js';
 import { SuppressionStoreUnavailableError } from './suppressionTypes.js';
+import { isSalesSuppressionGcsReadEnabled } from './salesSuppressionReadSource.js';
+import {
+  getGcsSuppressionReadCache,
+  readGcsSuppressionStoreDocument,
+  refreshGcsSuppressionReadCache,
+} from './gcsSuppressionReadAdapter.js';
 
 const EMPTY_STORE: MailSuppressionStoreDocument = {
   version: 1,
@@ -73,19 +79,37 @@ function hydrateStore(doc: MailSuppressionStoreDocument): MailSuppressionStoreDo
   };
 }
 
+function loadLocalMailSuppressionStoreSync(): MailSuppressionStoreDocument {
+  const path = getMailSuppressionsPath();
+  if (!existsSync(path)) return { ...EMPTY_STORE };
+  const raw = readFileSync(path, 'utf-8');
+  const parsed = JSON.parse(raw) as MailSuppressionStoreDocument;
+  if (!parsed.records || !Array.isArray(parsed.records)) {
+    return { ...EMPTY_STORE };
+  }
+  return hydrateStore(parsed);
+}
+
+async function loadLocalMailSuppressionStore(): Promise<MailSuppressionStoreDocument> {
+  await ensureStoreFile();
+  const raw = await readFile(getMailSuppressionsPath(), 'utf-8');
+  const parsed = JSON.parse(raw) as MailSuppressionStoreDocument;
+  if (!parsed.records || !Array.isArray(parsed.records)) {
+    return { ...EMPTY_STORE };
+  }
+  return hydrateStore(parsed);
+}
+
 export async function loadMailSuppressionStore(): Promise<MailSuppressionStoreDocument> {
   if (forceSuppressionStoreUnavailableForTests) {
     throw new SuppressionStoreUnavailableError();
   }
   if (storeOverride) return structuredClone(storeOverride);
   try {
-    await ensureStoreFile();
-    const raw = await readFile(getMailSuppressionsPath(), 'utf-8');
-    const parsed = JSON.parse(raw) as MailSuppressionStoreDocument;
-    if (!parsed.records || !Array.isArray(parsed.records)) {
-      return { ...EMPTY_STORE };
+    if (isSalesSuppressionGcsReadEnabled()) {
+      return await refreshGcsSuppressionReadCache();
     }
-    return hydrateStore(parsed);
+    return await loadLocalMailSuppressionStore();
   } catch (err) {
     if (err instanceof SuppressionStoreUnavailableError) throw err;
     throw new SuppressionStoreUnavailableError();
@@ -98,18 +122,36 @@ export function loadMailSuppressionStoreSync(): MailSuppressionStoreDocument {
   }
   if (storeOverride) return structuredClone(storeOverride);
   try {
-    const path = getMailSuppressionsPath();
-    if (!existsSync(path)) return { ...EMPTY_STORE };
-    const raw = readFileSync(path, 'utf-8');
-    const parsed = JSON.parse(raw) as MailSuppressionStoreDocument;
-    if (!parsed.records || !Array.isArray(parsed.records)) {
-      return { ...EMPTY_STORE };
+    if (isSalesSuppressionGcsReadEnabled()) {
+      const cached = getGcsSuppressionReadCache();
+      if (!cached) {
+        throw new SuppressionStoreUnavailableError();
+      }
+      return structuredClone(cached);
     }
-    return hydrateStore(parsed);
+    return loadLocalMailSuppressionStoreSync();
   } catch (err) {
     if (err instanceof SuppressionStoreUnavailableError) throw err;
     throw new SuppressionStoreUnavailableError();
   }
+}
+
+export async function refreshSalesSuppressionReadCache(): Promise<MailSuppressionStoreDocument> {
+  if (!isSalesSuppressionGcsReadEnabled()) {
+    return loadMailSuppressionStore();
+  }
+  return refreshGcsSuppressionReadCache();
+}
+
+export async function readSalesSuppressionStoreDocument(): Promise<MailSuppressionStoreDocument> {
+  if (forceSuppressionStoreUnavailableForTests) {
+    throw new SuppressionStoreUnavailableError();
+  }
+  if (storeOverride) return structuredClone(storeOverride);
+  if (isSalesSuppressionGcsReadEnabled()) {
+    return readGcsSuppressionStoreDocument();
+  }
+  return loadLocalMailSuppressionStore();
 }
 
 export async function persistMailSuppressionStoreDocument(
