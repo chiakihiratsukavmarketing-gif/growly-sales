@@ -1026,11 +1026,41 @@ openssl s_client -connect mailops.wantreach.jp:443 -servername mailops.wantreach
 | 無効 token GET | **503** / `temporary_error` / `liveConnected:false` |
 | GCS 書込 / POST | **なし** |
 
-### 7.23 Phase 44.1 Step 15 — live 接続・suppression 1 件 dry-run 計画（実行前）
+### 7.23 Phase 44.1 Step 15 — live 接続・suppression 1 件 dry-run
 
-> **本節は計画のみ。** `MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true`・実 token・POST・GCS 書込は **未実施**。
+> **2026-07-09 実施完了。** 1件検証後 `liveConnected=false` に復帰。Gmail 変更なし。
 
-#### 7.23.1 目的
+#### 7.23.10 Step 15 dry-run 実施結果（2026-07-09）
+
+| 項目 | 結果 |
+|------|------|
+| テスト対象 | want-reach tenant・`in***@wantreach.jp`（masked のみ記録） |
+| CP1 | `MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true` 承認済み |
+| revision（live 中） | `growly-sales-mail-ops-00003-c5d` |
+| token 発行 | GCS `unsubscribe-tokens.json` — **tokenHash のみ**（生 token / URL は docs 非記載） |
+| GET `/u/{token}` | **200** / `confirm` / `liveConnected:true` |
+| CP2 | POST 1件承認済み |
+| POST `/u/{token}` | **200** / `completed` |
+| 二重 POST | **200** / `already_unsubscribed` |
+| `mail-suppressions.json` | 更新（generation 増加） |
+| backup | **なし**（初回正本作成・既存 generation なし経路） |
+| audit event | **1件**（`audit/2026/07/09/`） |
+| 復帰 | `liveConnected=false` → revision **`growly-sales-mail-ops-00004-fpt`** |
+| `/health` 復帰後 | **200** / `liveConnected:false` |
+| 無効 token GET | **503** / `temporary_error` |
+| 漏洩 | Secret / token / 完全メール **なし** |
+| Gmail | **変更なし** |
+
+**Go / No-Go 再評価:**
+
+| 観点 | 判定 |
+|------|------|
+| Step 15 dry-run（配信停止経路） | ✅ **成功** |
+| Phase 44.1 技術準備（15ステップ） | ✅ **dry-run 完了** |
+| Phase 44.1 **live Go**（本番営業適用） | **No-Go 維持** — 営業パイプライン fail-closed 実地確認未了・Gmail 本文 URL 未適用・正式完了は人間判定 |
+| Phase 44 全体 live Go | **No-Go 維持**（44.2/44.3 未着手） |
+
+#### 7.23.1 目的（計画・参照）
 
 管理可能な **テスト用メールアドレス 1 件** のみで、本番経路（`https://mailops.wantreach.jp`）において以下を検証する。
 

@@ -386,6 +386,29 @@
 | 通常営業運用 | **影響なし** |
 | Phase 44.1 判定 | **No-Go 維持** |
 
+### 2026-07-09 — Phase 44.1 Step 15: live dry-run 1件（完了・live Go 未移行）
+
+| 項目 | 内容 |
+|------|------|
+| 進行 | Phase 44.1 **15 / 15 dry-run 完了** |
+| テスト対象 | `in***@wantreach.jp`（want-reach tenant・leadId fixture `phase44-smoke-test`） |
+| CP1 | `MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true` → revision `growly-sales-mail-ops-00003-c5d` |
+| token | GCS `unsubscribe-tokens.json` に **tokenHash のみ** 1件（生 token は記録なし） |
+| GET | **200** / `confirm` / `liveConnected:true` / maskedEmail のみ |
+| CP2 | POST 1件承認済み |
+| POST | **200** / `completed` |
+| 二重 POST | **200** / `already_unsubscribed` |
+| GCS 正本 | `mail-suppressions.json` 更新（generation 増加・729 bytes） |
+| GCS backup | **なし**（初回正本作成経路・既存 generation なしのため設計どおり） |
+| GCS audit | `audit/2026/07/09/` に event **1件**（309 bytes） |
+| 復帰 | `liveConnected=false` → revision **`growly-sales-mail-ops-00004-fpt`** |
+| `/health` 復帰後 | **200** / `liveConnected:false` / `storageReady:true` |
+| 無効 token GET | **503** / `temporary_error` |
+| 漏洩 | Secret / 生 token / URL / 完全メール **なし** |
+| Gmail | **変更なし** |
+| rollback 候補 | `growly-sales-mail-ops-00001-tff` 維持 |
+| Phase 44.1 判定 | **dry-run 成功・live Go は No-Go 維持**（営業フロー fail-closed 本番確認・Gmail 未適用・44.1 正式完了は人間判定待ち） |
+
 ### 2026-07-09 — Phase 44.1 Step 15A: live handler 精緻化 + mail-ops verify + deploy
 
 | 項目 | 内容 |

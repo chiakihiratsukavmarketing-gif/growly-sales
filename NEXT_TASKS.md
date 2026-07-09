@@ -1,7 +1,7 @@
 # Growly Sales — NEXT_TASKS
 
 **更新日:** 2026-07-09
-**進行:** Phase 43 **4 / 4** 完了 / Phase 44 **0 / 3**（44.1 **15 / 15 実行前**・Step 15A 完了・No-Go 維持）
+**進行:** Phase 43 **4 / 4** 完了 / Phase 44 **0 / 3**（44.1 **15 / 15 dry-run 完了**・**live Go No-Go 維持**）
 
 ---
 
@@ -61,7 +61,7 @@
 | 13 | **公開** invoker + `/health` + 無効 token スモーク | ✅ §7.21 |
 | 14 | HTTPS LB + DNS + ドメイン HTTPS スモーク | ✅ §7.22.11 |
 | 15A | live handler + GCS token store 実装 | ✅ Step 15A 完了（mail-ops verify passed・`liveConnected=false`・新 revision デプロイ） |
-| 15 | live 接続 + suppression 1 件スモーク + Go 再評価 | **実行前**（§7.23・Human Approval 待ち） |
+| 15 | live 接続 + suppression 1 件スモーク + Go 再評価 | ✅ dry-run 完了（§7.23.10・`liveConnected=false` 復帰） |
 
 ### Phase 43 完了（mock・参照）
 
