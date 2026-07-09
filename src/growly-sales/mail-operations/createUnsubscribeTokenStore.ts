@@ -1,9 +1,5 @@
 import type { GrowlyStorageBackend } from '../config/storageBackend.js';
 import { InvalidStorageBackendError } from '../config/storageBackend.js';
-import type { MailSuppressionStore } from './suppressionTypes.js';
-import { LocalJsonMailSuppressionStore } from './suppressionStoreInterface.js';
-import { GcsJsonMailSuppressionStore } from './gcsJsonMailSuppressionStore.js';
-import type { GcsJsonStoragePort } from './gcsJsonStoragePort.js';
 import {
   loadMailOpsRuntimeConfig,
   type MailOpsMode,
@@ -12,28 +8,30 @@ import {
 import { validateMailOpsLiveReadiness } from './validateMailOpsLiveReadiness.js';
 import { assertUnsubscribeTokenPepperForLive } from './resolveUnsubscribeTokenPepper.js';
 import { MailOpsConfigurationError } from './mailOpsConfigurationError.js';
+import type { GcsJsonStoragePort } from './gcsJsonStoragePort.js';
+import { GcsUnsubscribeTokenStore } from './gcsUnsubscribeTokenStore.js';
+import { InMemoryUnsubscribeTokenStore, type UnsubscribeTokenStore } from './unsubscribeTokenStore.js';
 
-export type MailSuppressionStoreMode = MailOpsMode;
-export { MailOpsConfigurationError };
+export type UnsubscribeTokenStoreMode = MailOpsMode;
 
-export interface CreateMailSuppressionStoreInput {
-  mode?: MailSuppressionStoreMode;
+export interface CreateUnsubscribeTokenStoreInput {
+  mode?: UnsubscribeTokenStoreMode;
   storageBackend?: GrowlyStorageBackend;
   gcsStorage?: GcsJsonStoragePort;
   env?: NodeJS.ProcessEnv;
   config?: MailOpsRuntimeConfig;
 }
 
-export function createMailSuppressionStore(
-  input: CreateMailSuppressionStoreInput = {}
-): MailSuppressionStore {
+export function createUnsubscribeTokenStore(
+  input: CreateUnsubscribeTokenStoreInput = {}
+): UnsubscribeTokenStore {
   const env = input.env ?? process.env;
   const config = input.config ?? loadMailOpsRuntimeConfig(env);
   const mode = input.mode ?? config.mode;
   const backend = input.storageBackend ?? config.storageBackend;
 
   if (mode !== 'live') {
-    return new LocalJsonMailSuppressionStore();
+    return new InMemoryUnsubscribeTokenStore();
   }
 
   const readiness = validateMailOpsLiveReadiness({ ...config, mode: 'live' });
@@ -57,6 +55,10 @@ export function createMailSuppressionStore(
     throw new MailOpsConfigurationError('不明なストレージ backend です');
   }
 
+  if (!config.gcsBucketConfigured) {
+    throw new MailOpsConfigurationError('GCS バケットが未設定です');
+  }
+
   try {
     assertUnsubscribeTokenPepperForLive('live', env);
   } catch (err) {
@@ -64,20 +66,14 @@ export function createMailSuppressionStore(
     throw new MailOpsConfigurationError('UNSUBSCRIBE_TOKEN_PEPPER が未設定です');
   }
 
-  if (!config.gcsBucketConfigured) {
-    throw new MailOpsConfigurationError('GCS バケットが未設定です');
-  }
-
-  return new GcsJsonMailSuppressionStore({
-    storage: input.gcsStorage,
-  });
+  return new GcsUnsubscribeTokenStore({ storage: input.gcsStorage });
 }
 
-export function tryCreateMailSuppressionStore(
-  input: CreateMailSuppressionStoreInput = {}
-): MailSuppressionStore | null {
+export function tryCreateUnsubscribeTokenStore(
+  input: CreateUnsubscribeTokenStoreInput = {}
+): UnsubscribeTokenStore | null {
   try {
-    return createMailSuppressionStore(input);
+    return createUnsubscribeTokenStore(input);
   } catch (err) {
     if (err instanceof MailOpsConfigurationError) return null;
     if (err instanceof InvalidStorageBackendError) return null;
@@ -85,24 +81,3 @@ export function tryCreateMailSuppressionStore(
   }
 }
 
-export function isMailOpsStorageReady(
-  mode: MailSuppressionStoreMode = loadMailOpsRuntimeConfig().mode,
-  env: NodeJS.ProcessEnv = process.env
-): boolean {
-  const config = loadMailOpsRuntimeConfig(env);
-  if (mode === 'mock' || config.mode === 'mock') {
-    return true;
-  }
-  const readiness = validateMailOpsLiveReadiness({ ...config, mode: 'live' });
-  if (!readiness.ready) {
-    return false;
-  }
-  return tryCreateMailSuppressionStore({ mode: 'live', env, config }) !== null;
-}
-
-export {
-  createUnsubscribeTokenStore,
-  tryCreateUnsubscribeTokenStore,
-  type CreateUnsubscribeTokenStoreInput,
-  type UnsubscribeTokenStoreMode,
-} from './createUnsubscribeTokenStore.js';

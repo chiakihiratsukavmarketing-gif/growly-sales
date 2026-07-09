@@ -386,6 +386,22 @@
 | 通常営業運用 | **影響なし** |
 | Phase 44.1 判定 | **No-Go 維持** |
 
+### 2026-07-09 — Phase 44.1 Step 15A: live handler 精緻化 + mail-ops verify + deploy
+
+| 項目 | 内容 |
+|------|------|
+| 進行 | Phase 44.1 **15 / 15 実行前**（Step 15A 完了・dry-run 未実行） |
+| 差分整理 | Daily30/UI 副作用 15 ファイル revert。mail-ops 本筋のみ commit |
+| token factory | `createUnsubscribeTokenStore.ts` 分離 + `mailOpsConfigurationError.ts` |
+| live handler | `now()` 修正・GET 書込なし・POST 保存確認後 completed |
+| verify | `npm run growly-sales:verify:mail-ops` ✅（in-memory・実 GCS 非接続） |
+| validate | `npm run growly-sales:mail-ops:validate` ✅ |
+| ui:build | ✅ |
+| 全体 verify | 2967 passed / 62 failed（Daily30/UI 既存・mail-ops 無関係） |
+| deploy | commit tag 固定・`liveConnected=false`・rollback=`growly-sales-mail-ops-00001-tff` |
+| 未実施 | `MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true`・実 token・POST・GCS 実書込・Gmail |
+| Phase 44.1 判定 | **No-Go 維持** |
+
 ### 2026-07-08 — Phase 44.1 Step 15A: live handler + GCS token store（実装）
 
 | 項目 | 内容 |

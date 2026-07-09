@@ -1,14 +1,14 @@
 import type { UnsubscribeTokenRecord, UnsubscribeTokensDocument } from './gcsDocumentTypes.js';
-import { SuppressionStoreUnavailableError } from './suppressionTypes.js';
-import type { UnsubscribeTokenStore } from './unsubscribeTokenStore.js';
 import type { GcsJsonStoragePort } from './gcsJsonStoragePort.js';
 import { createDefaultGcsJsonStoragePort } from './gcsJsonStoragePort.js';
-import { withGenerationMatchRetry } from './withGenerationMatchRetry.js';
-import { MAIL_OPS_TOKENS_LOGICAL } from './mailOpsPaths.js';
 import { parseUnsubscribeTokensDocument, serializeUnsubscribeTokensDocument } from './gcsDocumentParser.js';
+import { MAIL_OPS_TOKENS_LOGICAL } from './mailOpsPaths.js';
+import type { UnsubscribeTokenStore } from './unsubscribeTokenStore.js';
+import { SuppressionStoreUnavailableError } from './suppressionTypes.js';
+import { withGenerationMatchRetry } from './withGenerationMatchRetry.js';
 
-function isExpired(record: UnsubscribeTokenRecord, now: Date): boolean {
-  const t = Date.parse(record.expiresAt);
+function isExpired(expiresAt: string, now: Date): boolean {
+  const t = Date.parse(expiresAt);
   return Number.isNaN(t) || t < now.getTime();
 }
 
@@ -45,33 +45,30 @@ export class GcsUnsubscribeTokenStore implements UnsubscribeTokenStore {
     const found = doc.records.find((r) => r.tokenHash === trimmed) ?? null;
     if (!found) return null;
     assertRecordShape(found);
-    if (isExpired(found, this.now())) {
-      return null;
-    }
+    if (isExpired(found.expiresAt, this.now())) return null;
     return found;
   }
 
   async add(record: UnsubscribeTokenRecord): Promise<void> {
-    assertRecordShape(record);
     const next: UnsubscribeTokenRecord = {
       ...record,
-      tenantId: record.tenantId.trim(),
-      tokenHash: record.tokenHash.trim(),
-      normalizedEmail: record.normalizedEmail.trim().toLowerCase(),
+      tenantId: String(record.tenantId ?? '').trim(),
+      tokenHash: String(record.tokenHash ?? '').trim(),
+      normalizedEmail: String(record.normalizedEmail ?? '').trim().toLowerCase(),
       leadId: record.leadId?.trim() || undefined,
       companyId: record.companyId?.trim() || undefined,
       sendRecordId: record.sendRecordId?.trim() || undefined,
+      expiresAt: String(record.expiresAt ?? ''),
+      createdAt: String(record.createdAt ?? ''),
       usedAt: record.usedAt?.trim() || undefined,
     };
+    assertRecordShape(next);
 
     await this.mutate(async (doc) => {
       const idx = doc.records.findIndex((r) => r.tokenHash === next.tokenHash);
-      if (idx !== -1) {
-        // idempotent add; keep existing
-        return { doc, wrote: false };
-      }
+      if (idx !== -1) return doc; // idempotent add
       doc.records.push(next);
-      return { doc, wrote: true };
+      return doc;
     });
   }
 
@@ -79,16 +76,15 @@ export class GcsUnsubscribeTokenStore implements UnsubscribeTokenStore {
     const tokenHash = input.tokenHash.trim();
     const usedAt = input.usedAt.trim();
     if (!tokenHash || !usedAt) return;
+
     await this.mutate(async (doc) => {
       const idx = doc.records.findIndex((r) => r.tokenHash === tokenHash);
-      if (idx === -1) return { doc, wrote: false };
+      if (idx === -1) return doc;
       const current = doc.records[idx]!;
       assertRecordShape(current);
-      if (current.usedAt) {
-        return { doc, wrote: false };
-      }
+      if (current.usedAt) return doc; // idempotent
       doc.records[idx] = { ...current, usedAt };
-      return { doc, wrote: true };
+      return doc;
     });
   }
 
@@ -102,9 +98,7 @@ export class GcsUnsubscribeTokenStore implements UnsubscribeTokenStore {
     }
   }
 
-  private async mutate(
-    mutate: (doc: UnsubscribeTokensDocument) => Promise<{ doc: UnsubscribeTokensDocument; wrote: boolean }>
-  ): Promise<void> {
+  private async mutate(mutate: (doc: UnsubscribeTokensDocument) => Promise<UnsubscribeTokensDocument>): Promise<void> {
     await withGenerationMatchRetry({
       operation: async () => {
         const raw = await this.storage.readJson(MAIL_OPS_TOKENS_LOGICAL);
@@ -112,17 +106,16 @@ export class GcsUnsubscribeTokenStore implements UnsubscribeTokenStore {
         const doc = parseUnsubscribeTokensDocument(raw);
         const mutated = await mutate(doc);
         const nextDoc: UnsubscribeTokensDocument = {
-          ...mutated.doc,
+          ...mutated,
           schemaVersion: 1,
           updatedAt: this.now().toISOString(),
         };
         const jsonText = serializeUnsubscribeTokensDocument(nextDoc);
-        const generation = meta?.generation ?? null;
-        if (generation) {
-          await this.storage.writeIfGenerationMatch(MAIL_OPS_TOKENS_LOGICAL, jsonText, generation);
-        } else {
-          await this.storage.writeIfGenerationMatch(MAIL_OPS_TOKENS_LOGICAL, jsonText, '0');
-        }
+        await this.storage.writeIfGenerationMatch(
+          MAIL_OPS_TOKENS_LOGICAL,
+          jsonText,
+          meta?.generation ?? '0'
+        );
 
         const verifyRaw = await this.storage.readJson(MAIL_OPS_TOKENS_LOGICAL);
         if (!verifyRaw?.trim()) {

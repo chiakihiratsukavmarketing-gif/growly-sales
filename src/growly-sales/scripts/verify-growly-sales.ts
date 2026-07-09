@@ -8567,6 +8567,113 @@ async function verifyPhase441GcsStoreDocumentSchema(): Promise<void> {
   ok('Phase 44.1 GCS store document schema checks passed');
 }
 
+async function verifyPhase441GcsTokenStoreDocumentSchema(): Promise<void> {
+  const { parseUnsubscribeTokensDocument } = await import('../mail-operations/gcsDocumentParser.js');
+  const { SuppressionStoreUnavailableError } = await import('../mail-operations/suppressionTypes.js');
+  const empty = parseUnsubscribeTokensDocument(null);
+  assert(empty.schemaVersion === 1 && empty.records.length === 0, 'empty token document defaults');
+  let threw = false;
+  try {
+    parseUnsubscribeTokensDocument('{not-json');
+  } catch (err) {
+    threw = err instanceof SuppressionStoreUnavailableError;
+  }
+  assert(threw, 'corrupt token json fails closed');
+  threw = false;
+  try {
+    parseUnsubscribeTokensDocument(JSON.stringify({ schemaVersion: 9, records: [] }));
+  } catch (err) {
+    threw = err instanceof SuppressionStoreUnavailableError;
+  }
+  assert(threw, 'unknown token schemaVersion fails closed');
+  ok('Phase 44.1 GCS token store document schema checks passed');
+}
+
+async function verifyPhase441GcsTokenStoreMarkUsedIdempotent(): Promise<void> {
+  process.env.GROWLY_GCS_PREFIX = 'prod/growly-sales';
+  const { InMemoryGcsJsonStorage } = await import('../mail-operations/gcsJsonStoragePort.js');
+  const { GcsUnsubscribeTokenStore } = await import('../mail-operations/gcsUnsubscribeTokenStore.js');
+  const { MAIL_OPS_TOKENS_LOGICAL } = await import('../mail-operations/mailOpsPaths.js');
+  const storage = new InMemoryGcsJsonStorage();
+  const store = new GcsUnsubscribeTokenStore({ storage, now: () => new Date('2026-01-01T00:00:00.000Z') });
+  await store.add({
+    tokenHash: 'hash-1',
+    tenantId: 'want-reach',
+    normalizedEmail: 'idem@verify.test',
+    expiresAt: '2026-12-01T00:00:00.000Z',
+    createdAt: '2026-01-01T00:00:00.000Z',
+  });
+  await store.markUsed({ tokenHash: 'hash-1', usedAt: '2026-01-02T00:00:00.000Z' });
+  await store.markUsed({ tokenHash: 'hash-1', usedAt: '2026-01-03T00:00:00.000Z' });
+  const raw = await storage.readJson(MAIL_OPS_TOKENS_LOGICAL);
+  const parsed = JSON.parse(raw ?? '{}') as { records?: Array<{ tokenHash: string; usedAt?: string }> };
+  const rec = parsed.records?.find((r) => r.tokenHash === 'hash-1');
+  assert(rec?.usedAt === '2026-01-02T00:00:00.000Z', 'usedAt update is idempotent (first wins)');
+  ok('Phase 44.1 GCS token store usedAt idempotent checks passed');
+}
+
+async function verifyPhase441ResolveLiveTokenStates(): Promise<void> {
+  process.env.GROWLY_GCS_PREFIX = 'prod/growly-sales';
+  const { InMemoryGcsJsonStorage } = await import('../mail-operations/gcsJsonStoragePort.js');
+  const { GcsJsonMailSuppressionStore } = await import('../mail-operations/gcsJsonMailSuppressionStore.js');
+  const { GcsUnsubscribeTokenStore } = await import('../mail-operations/gcsUnsubscribeTokenStore.js');
+  const { hashUnsubscribeTokenWithPepper } = await import('../mail-operations/suppressionToken.js');
+  const { resolveLiveUnsubscribeToken } = await import('../mail-operations/resolveLiveUnsubscribeToken.js');
+
+  const storage = new InMemoryGcsJsonStorage();
+  const suppressionStore = new GcsJsonMailSuppressionStore({ storage });
+  const tokenStore = new GcsUnsubscribeTokenStore({ storage });
+  const pepper = 'verify-pepper';
+  const rawToken = 'raw-token-for-verify';
+  const tokenHash = hashUnsubscribeTokenWithPepper(rawToken, pepper);
+
+  await tokenStore.add({
+    tokenHash,
+    tenantId: 'want-reach',
+    normalizedEmail: 'resolve@verify.test',
+    expiresAt: '2026-12-01T00:00:00.000Z',
+    createdAt: '2026-01-01T00:00:00.000Z',
+  });
+
+  const confirm = await resolveLiveUnsubscribeToken({
+    rawToken,
+    pepper,
+    tokenStore,
+    suppressionStore,
+    now: new Date('2026-02-01T00:00:00.000Z'),
+  });
+  assert(confirm.ok && confirm.screen.screenState === 'confirm', 'valid token resolves to confirm');
+  const confirmJson = JSON.stringify(confirm.screen);
+  assert(!confirmJson.includes('tenantId'), 'no tenantId in live screen');
+  assert(!confirmJson.includes('normalizedEmail'), 'no normalizedEmail in live screen');
+  assert(!confirmJson.includes(rawToken), 'no raw token in live screen');
+  assert(!confirmJson.includes(tokenHash), 'no tokenHash in live screen');
+
+  await suppressionStore.addFromUnsubscribe({
+    tenantId: 'want-reach',
+    emailAddress: 'resolve@verify.test',
+    tokenHash: 'hash-sup',
+  });
+  const already = await resolveLiveUnsubscribeToken({
+    rawToken,
+    pepper,
+    tokenStore,
+    suppressionStore,
+    now: new Date('2026-02-01T00:00:00.000Z'),
+  });
+  assert(already.ok && already.screen.screenState === 'already_unsubscribed', 'suppressed returns already_unsubscribed');
+
+  const invalid = await resolveLiveUnsubscribeToken({
+    rawToken: 'missing-token',
+    pepper,
+    tokenStore,
+    suppressionStore,
+    now: new Date('2026-02-01T00:00:00.000Z'),
+  });
+  assert(!invalid.ok && invalid.screen.screenState === 'invalid_or_expired', 'missing token is invalid_or_expired');
+  ok('Phase 44.1 resolve live token state checks passed');
+}
+
 async function verifyPhase441GcsStoreGenerationMatch(): Promise<void> {
   process.env.GROWLY_GCS_PREFIX = 'prod/growly-sales';
   const { InMemoryGcsJsonStorage } = await import('../mail-operations/gcsJsonStoragePort.js');
@@ -8770,6 +8877,110 @@ async function verifyPhase441StoreFactoryRejectsLiveLocal(): Promise<void> {
   ok('Phase 44.1 store factory rejects live local checks passed');
 }
 
+async function verifyPhase441TokenStoreFactoryRejectsLiveLocal(): Promise<void> {
+  const { createUnsubscribeTokenStore } = await import('../mail-operations/createUnsubscribeTokenStore.js');
+  const { MailOpsConfigurationError } = await import('../mail-operations/mailOpsConfigurationError.js');
+  let threw = false;
+  try {
+    createUnsubscribeTokenStore({ mode: 'live', storageBackend: 'local' });
+  } catch (err) {
+    threw = err instanceof MailOpsConfigurationError;
+  }
+  assert(threw, 'token store live + local backend rejected');
+  const mock = createUnsubscribeTokenStore({ mode: 'mock', storageBackend: 'local' });
+  assert(mock, 'mock mode returns local token store');
+  ok('Phase 44.1 token store factory rejects live local checks passed');
+}
+
+async function verifyPhase441GcsTokenStoreSchema(): Promise<void> {
+  const { parseUnsubscribeTokensDocument } = await import('../mail-operations/gcsDocumentParser.js');
+  const { SuppressionStoreUnavailableError } = await import('../mail-operations/suppressionTypes.js');
+  const okDoc = parseUnsubscribeTokensDocument(
+    JSON.stringify({
+      schemaVersion: 1,
+      updatedAt: new Date().toISOString(),
+      records: [
+        {
+          tokenHash: 'hash',
+          tenantId: 'want-reach',
+          normalizedEmail: 'a@example.com',
+          expiresAt: new Date(Date.now() + 60_000).toISOString(),
+          createdAt: new Date().toISOString(),
+          usedAt: new Date().toISOString(),
+          sendRecordId: 'sr-1',
+        },
+      ],
+    })
+  );
+  assert(okDoc.records.length === 1, 'token doc parses');
+  let threw = false;
+  try {
+    parseUnsubscribeTokensDocument('{not-json');
+  } catch (err) {
+    threw = err instanceof SuppressionStoreUnavailableError;
+  }
+  assert(threw, 'token doc corrupt json fails closed');
+  ok('Phase 44.1 GCS token store schema checks passed');
+}
+
+async function verifyPhase441GcsTokenStoreGenerationMatch(): Promise<void> {
+  process.env.GROWLY_GCS_PREFIX = 'prod/growly-sales';
+  const { InMemoryGcsJsonStorage } = await import('../mail-operations/gcsJsonStoragePort.js');
+  const { GcsUnsubscribeTokenStore } = await import('../mail-operations/gcsUnsubscribeTokenStore.js');
+  const { MAIL_OPS_TOKENS_LOGICAL } = await import('../mail-operations/mailOpsPaths.js');
+  const storage = new InMemoryGcsJsonStorage();
+  const store = new GcsUnsubscribeTokenStore({ storage, now: () => new Date('2026-07-01T00:00:00.000Z') });
+  await store.add({
+    tokenHash: 'hash-1',
+    tenantId: 'want-reach',
+    normalizedEmail: 'gen@example.com',
+    expiresAt: new Date('2026-07-02T00:00:00.000Z').toISOString(),
+    createdAt: new Date('2026-07-01T00:00:00.000Z').toISOString(),
+  });
+  const raw = await storage.readJson(MAIL_OPS_TOKENS_LOGICAL);
+  assert(raw && raw.includes('hash-1'), 'token write persisted');
+  ok('Phase 44.1 GCS token store generation match checks passed');
+}
+
+async function verifyPhase441GcsTokenStoreFailClosed(): Promise<void> {
+  process.env.GROWLY_GCS_PREFIX = 'prod/growly-sales';
+  const { InMemoryGcsJsonStorage } = await import('../mail-operations/gcsJsonStoragePort.js');
+  const { GcsUnsubscribeTokenStore } = await import('../mail-operations/gcsUnsubscribeTokenStore.js');
+  const { MAIL_OPS_TOKENS_LOGICAL } = await import('../mail-operations/mailOpsPaths.js');
+  const { SuppressionStoreUnavailableError } = await import('../mail-operations/suppressionTypes.js');
+  const storage = new InMemoryGcsJsonStorage();
+  storage.seedLogical(MAIL_OPS_TOKENS_LOGICAL, '{not-json', 1);
+  const store = new GcsUnsubscribeTokenStore({ storage });
+  let threw = false;
+  try {
+    await store.findByTokenHash('hash');
+  } catch (err) {
+    threw = err instanceof SuppressionStoreUnavailableError;
+  }
+  assert(threw, 'corrupt token json fails closed');
+  ok('Phase 44.1 GCS token store fail-closed checks passed');
+}
+
+async function verifyPhase441GcsTokenStoreIdempotentMarkUsed(): Promise<void> {
+  process.env.GROWLY_GCS_PREFIX = 'prod/growly-sales';
+  const { InMemoryGcsJsonStorage } = await import('../mail-operations/gcsJsonStoragePort.js');
+  const { GcsUnsubscribeTokenStore } = await import('../mail-operations/gcsUnsubscribeTokenStore.js');
+  const storage = new InMemoryGcsJsonStorage();
+  const store = new GcsUnsubscribeTokenStore({ storage, now: () => new Date('2026-07-01T00:00:00.000Z') });
+  await store.add({
+    tokenHash: 'hash-used',
+    tenantId: 'want-reach',
+    normalizedEmail: 'used@example.com',
+    expiresAt: new Date('2026-07-02T00:00:00.000Z').toISOString(),
+    createdAt: new Date('2026-07-01T00:00:00.000Z').toISOString(),
+  });
+  await store.markUsed({ tokenHash: 'hash-used', usedAt: '2026-07-01T01:00:00.000Z' });
+  await store.markUsed({ tokenHash: 'hash-used', usedAt: '2026-07-01T02:00:00.000Z' });
+  const found = await store.findByTokenHash('hash-used');
+  assert(found?.usedAt === '2026-07-01T01:00:00.000Z', 'usedAt is idempotent');
+  ok('Phase 44.1 token usedAt idempotent checks passed');
+}
+
 async function verifyPhase441MailOpsOnlyRoutes(): Promise<void> {
   const mailOps = await readFile(join(SRC_ROOT, 'mail-operations/server/mailOpsServer.ts'), 'utf-8');
   assert(mailOps.includes("pathname === '/health'"), 'health route only');
@@ -8931,6 +9142,7 @@ async function verifyPhase441StoreFactoryIntegrated(): Promise<void> {
   assert(server.includes('tryCreateStore') || server.includes('canProcessUnsubscribe'), 'server gates unsubscribe');
   const ctxModule = await readFile(join(SRC_ROOT, 'mail-operations/server/mailOpsServerContext.ts'), 'utf-8');
   assert(ctxModule.includes('createMailSuppressionStore'), 'context integrates store factory');
+  assert(ctxModule.includes('createUnsubscribeTokenStore'), 'context integrates token store factory');
   ok('Phase 44.1 store factory integrated checks passed');
 }
 
@@ -9517,9 +9729,15 @@ async function main(): Promise<void> {
   await verifyPhase441GcsStoreBackupBeforeWrite();
   await verifyPhase441GcsStoreFailClosed();
   await verifyPhase441GcsStoreIdempotent();
+  await verifyPhase441GcsTokenStoreSchema();
+  await verifyPhase441GcsTokenStoreGenerationMatch();
+  await verifyPhase441GcsTokenStoreFailClosed();
+  await verifyPhase441GcsTokenStoreIdempotentMarkUsed();
+  await verifyPhase441ResolveLiveTokenStates();
   await verifyPhase441AuditEventPerObject();
   await verifyPhase441AuditFailureDoesNotUndoSuppression();
   await verifyPhase441StoreFactoryRejectsLiveLocal();
+  await verifyPhase441TokenStoreFactoryRejectsLiveLocal();
   await verifyPhase441MailOpsOnlyRoutes();
   await verifyPhase441MailOpsHealthFailClosed();
   await verifyPhase441NoRawTokenLogging();

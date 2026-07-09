@@ -69,7 +69,11 @@ async function handleUnsubscribe(
       ? await ctx.getLiveUnsubscribeScreen(token)
       : await ctx.postLiveUnsubscribeScreen(token);
   const status =
-    payload.ok ? 200 : method === 'GET' && payload.screenState === 'invalid_or_expired' ? 404 : 200;
+    payload.screenState === 'temporary_error'
+      ? 503
+      : payload.screenState === 'invalid_or_expired'
+        ? 404
+        : 200;
   sendJson(res, status, payload);
   return { status, screenState: payload.screenState };
 }

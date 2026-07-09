@@ -1,7 +1,7 @@
 # Growly Sales — NEXT_TASKS
 
-**更新日:** 2026-07-08
-**進行:** Phase 43 **4 / 4** 完了 / Phase 44 **0 / 3**（44.1 **15 / 15 実行前**・live handler 実装済み・No-Go 維持）
+**更新日:** 2026-07-09
+**進行:** Phase 43 **4 / 4** 完了 / Phase 44 **0 / 3**（44.1 **15 / 15 実行前**・Step 15A 完了・No-Go 維持）
 
 ---
 
@@ -60,7 +60,7 @@
 | 12 | イメージ + GCS IAM + **非公開** Cloud Run デプロイ | ✅ §7.20 |
 | 13 | **公開** invoker + `/health` + 無効 token スモーク | ✅ §7.21 |
 | 14 | HTTPS LB + DNS + ドメイン HTTPS スモーク | ✅ §7.22.11 |
-| 15A | live handler + GCS token store 実装 | ✅ `1de5936`（実 GCS 未接続・`liveConnected=false`） |
+| 15A | live handler + GCS token store 実装 | ✅ Step 15A 完了（mail-ops verify passed・`liveConnected=false`・新 revision デプロイ） |
 | 15 | live 接続 + suppression 1 件スモーク + Go 再評価 | **実行前**（§7.23・Human Approval 待ち） |
 
 ### Phase 43 完了（mock・参照）
@@ -84,6 +84,14 @@
 **禁止:** 自動送信 / force=true / 無断デプロイ / Scheduler・Secret変更 / Phase 44 live 機能の本番適用（Go 前）
 
 **WORK_LOG:** `## 通常営業運用` に日次件数を記録
+
+---
+
+## 過去 Phase（参照・運用ゲート）
+
+- **Phase 18**: 候補収集（外部候補）— ゲート `FETCH_CANDIDATES`
+- **Phase 19**: Gmail 下書き作成（送信は禁止）— ゲート `CREATE_DRAFTS`
+- **Phase 21**: 候補収集（互換 / dry-run あり）
 
 ---
 

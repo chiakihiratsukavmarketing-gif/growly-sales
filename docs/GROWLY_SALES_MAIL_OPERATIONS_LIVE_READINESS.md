@@ -997,6 +997,28 @@ openssl s_client -connect mailops.wantreach.jp:443 -servername mailops.wantreach
 
 **Step 14 完了。** 次は §7.23 Step 15 dry-run（live 接続は Human Approval 後）。
 
+#### 7.22.12 Phase 44.1 Step 15A — live handler 実装完了 + 新 revision デプロイ（2026-07-09）
+
+> **実施範囲:** token store factory 分離・live handler 精緻化・mail-ops 専用 verify・新 Cloud Run revision（`liveConnected=false`）。**GCS 実書込・POST 本番・Gmail 変更なし。**
+
+| 項目 | 結果 |
+|------|------|
+| `GcsUnsubscribeTokenStore` | ✅ generation-match / retry 5 / usedAt 冪等 / tokenHash のみ |
+| `createUnsubscribeTokenStore` | ✅ 独立 factory（mock=in-memory / live+gcs / live+local 拒否） |
+| live GET/POST | ✅ `mailOpsServer.ts` + `resolveLiveUnsubscribeToken` |
+| `liveConnected=false` | ✅ GCS lookup せず 503 `temporary_error` |
+| mail-ops validate | ✅ `npm run growly-sales:mail-ops:validate` |
+| mail-ops verify | ✅ `npm run growly-sales:verify:mail-ops`（in-memory のみ・実 GCS 非接続） |
+| ui:build | ✅ |
+| 全体 verify | ⚠️ 62 failed（Daily30/UI 既存・今回 mail-ops 差分と無関係） |
+| rollback revision | `growly-sales-mail-ops-00001-tff` 維持 |
+
+**verify script:** `npm run growly-sales:verify:mail-ops`（`verify-phase441-mail-ops.ts`）
+
+**イメージ / revision:** commit tag 固定（`latest` 禁止）。build / deploy 結果は WORK_LOG に記録。
+
+**停止線:** Step 15 dry-run（`MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true`・実 token・POST・GCS 書込）は **Human Approval 後**。
+
 ### 7.23 Phase 44.1 Step 15 — live 接続・suppression 1 件 dry-run 計画（実行前）
 
 > **本節は計画のみ。** `MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true`・実 token・POST・GCS 書込は **未実施**。
@@ -1028,6 +1050,7 @@ openssl s_client -connect mailops.wantreach.jp:443 -servername mailops.wantreach
 **verify（実 GCS 非接続）:**
 
 - `npm run growly-sales:verify-phase441` — Phase 44.1 mail-ops のみの targeted verify（unsubscribe token store / live handler / guardrails）
+- `npm run growly-sales:verify:mail-ops` — 上記の別名（Step 15A 以降の commit 条件）
 
 #### 7.23.3 テスト対象
 

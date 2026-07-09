@@ -15,18 +15,17 @@ import {
 import {
   createUnsubscribeTokenStore,
   type CreateUnsubscribeTokenStoreInput,
-} from '../createMailSuppressionStore.js';
+} from '../createUnsubscribeTokenStore.js';
 import {
   getMockUnsubscribeScreen,
   postMockUnsubscribeScreen,
 } from '../mockUnsubscribeScreen.js';
 import type { GcsJsonStoragePort } from '../gcsJsonStoragePort.js';
 import type { UnsubscribeTokenStore } from '../unsubscribeTokenStore.js';
-import type { MailOperationsTenant } from '../tenantTypes.js';
 import { requireMailOperationsTenant } from '../tenantResolver.js';
 import { resolveUnsubscribeTokenPepper } from '../resolveUnsubscribeTokenPepper.js';
 import { resolveLiveUnsubscribeToken } from '../resolveLiveUnsubscribeToken.js';
-import type { UnsubscribeScreenState } from '../unsubscribeBranding.js';
+import { buildUnsubscribeScreenStateCopy } from '../unsubscribeBranding.js';
 import { randomUUID } from 'node:crypto';
 import { SuppressionStoreUnavailableError } from '../suppressionTypes.js';
 
@@ -219,25 +218,17 @@ export function createMailOpsServerContext(
     return tryCreateStore(config, readiness) !== null && tryCreateTokenStore(config, readiness) !== null;
   };
 
-  const buildLiveScreenResponse = (
-    tenant: MailOperationsTenant,
-    screenState: UnsubscribeScreenState,
-    input: {
-      ok: boolean;
-      message: string;
-      title: string;
-      actionLabel?: string;
-      maskedEmail?: string;
-    }
-  ) => {
+  const buildLiveState = (tenantId: string, state: 'confirm' | 'completed' | 'already_unsubscribed' | 'invalid_or_expired' | 'temporary_error', maskedEmail?: string) => {
+    const tenant = requireMailOperationsTenant(tenantId);
+    const copy = buildUnsubscribeScreenStateCopy(tenant, state);
     return {
-      ok: input.ok,
-      screenState,
-      title: input.title,
-      message: input.message,
-      ...(input.actionLabel ? { actionLabel: input.actionLabel } : {}),
-      ...(input.maskedEmail ? { maskedEmail: input.maskedEmail } : {}),
-      contactEmail: tenant.contactEmail?.trim() || null,
+      ok: state === 'confirm' || state === 'completed' || state === 'already_unsubscribed',
+      screenState: copy.state,
+      title: copy.title,
+      message: copy.message,
+      ...(copy.confirmButtonLabel && state === 'confirm' ? { actionLabel: copy.confirmButtonLabel } : {}),
+      ...(maskedEmail ? { maskedEmail } : {}),
+      contactEmail: copy.contactEmail,
       isMock: false as const,
       liveConnected: true as const,
     };
@@ -302,22 +293,12 @@ export function createMailOpsServerContext(
     const suppressionStore = input.suppressionStore ?? tryCreateStore(config, readiness);
     const tokenStore = input.tokenStore ?? tryCreateTokenStore(config, readiness);
     if (!suppressionStore || !tokenStore) {
-      const tenant = requireMailOperationsTenant('want-reach');
-      return buildLiveScreenResponse(tenant, 'temporary_error', {
-        ok: false,
-        title: '一時的に処理できません',
-        message: '現在、配信停止のお手続きを完了できません。お手数ですがお問い合わせください。',
-      });
+      return buildLiveState('want-reach', 'temporary_error');
     }
 
     const pepper = resolveUnsubscribeTokenPepper(env);
     if (!pepper) {
-      const tenant = requireMailOperationsTenant('want-reach');
-      return buildLiveScreenResponse(tenant, 'temporary_error', {
-        ok: false,
-        title: '一時的に処理できません',
-        message: '現在、配信停止のお手続きを完了できません。お手数ですがお問い合わせください。',
-      });
+      return buildLiveState('want-reach', 'temporary_error');
     }
 
     const resolved = await resolveLiveUnsubscribeToken({
@@ -325,16 +306,9 @@ export function createMailOpsServerContext(
       pepper,
       tokenStore,
       suppressionStore,
-      now,
+      now: now(),
     });
-    const tenant = requireMailOperationsTenant(resolved.tenantId ?? 'want-reach');
-    return buildLiveScreenResponse(tenant, resolved.screenState, {
-      ok: resolved.screenState === 'confirm' || resolved.screenState === 'already_unsubscribed',
-      title: resolved.title,
-      message: resolved.message,
-      actionLabel: resolved.actionLabel,
-      maskedEmail: resolved.maskedEmail,
-    });
+    return resolved.screen;
   };
 
   const postLiveUnsubscribeScreen = async (token: string) => {
@@ -344,12 +318,7 @@ export function createMailOpsServerContext(
     const tokenStore = input.tokenStore ?? tryCreateTokenStore(config, readiness);
     const pepper = resolveUnsubscribeTokenPepper(env);
     if (!suppressionStore || !tokenStore || !pepper) {
-      const tenant = requireMailOperationsTenant('want-reach');
-      return buildLiveScreenResponse(tenant, 'temporary_error', {
-        ok: false,
-        title: '一時的に処理できません',
-        message: '現在、配信停止のお手続きを完了できません。お手数ですがお問い合わせください。',
-      });
+      return buildLiveState('want-reach', 'temporary_error');
     }
 
     const resolved = await resolveLiveUnsubscribeToken({
@@ -357,72 +326,51 @@ export function createMailOpsServerContext(
       pepper,
       tokenStore,
       suppressionStore,
-      now,
+      now: now(),
     });
 
-    const tenant = requireMailOperationsTenant(resolved.tenantId ?? 'want-reach');
-    if (resolved.screenState === 'invalid_or_expired' || resolved.screenState === 'temporary_error') {
-      return buildLiveScreenResponse(tenant, resolved.screenState, {
-        ok: false,
-        title: resolved.title,
-        message: resolved.message,
-      });
+    if (!resolved.ok) {
+      return resolved.screen;
     }
 
-    // confirm or already_unsubscribed: ensure suppression persisted idempotently
+    const tenantId = resolved.record.tenantId.trim() || 'want-reach';
+    const normalizedEmail = resolved.record.normalizedEmail.trim().toLowerCase();
+
+    // If already unsubscribed, keep idempotent result (no writes).
+    if (resolved.screen.screenState === 'already_unsubscribed') {
+      return resolved.screen;
+    }
+
+    // confirm → write suppression, then best-effort markUsed
     try {
-      const normalizedEmail = (resolved.normalizedEmail ?? '').trim().toLowerCase();
-      if (!normalizedEmail) {
-        return buildLiveScreenResponse(tenant, 'temporary_error', {
-          ok: false,
-          title: '一時的に処理できません',
-          message: '現在、配信停止のお手続きを完了できません。お手数ですがお問い合わせください。',
-        });
-      }
       const { created } = await addSuppressionFromUnsubscribe({
         suppressionStore,
-        tenantId: resolved.tenantId ?? 'want-reach',
+        tenantId,
         normalizedEmail,
-        leadId: resolved.leadId,
-        companyId: resolved.companyId,
-        tokenHash: resolved.tokenHash ?? 'invalid',
+        leadId: resolved.record.leadId,
+        companyId: resolved.record.companyId,
+        tokenHash: resolved.tokenHash,
       });
 
-      // token usedAt: best-effort; suppression is primary
-      if (resolved.tokenHash) {
-        try {
-          await tokenStore.markUsed({ tokenHash: resolved.tokenHash, usedAt: now().toISOString() });
-        } catch {
-          // suppression already persisted; keep safe
-        }
+      // save verification: suppression is primary
+      const verified = await suppressionStore.findActive({ tenantId, normalizedEmail });
+      if (!verified) {
+        return buildLiveState(tenantId, 'temporary_error');
       }
 
-      const nextState: UnsubscribeScreenState =
-        created ? 'completed' : 'already_unsubscribed';
-      const title = nextState === 'completed' ? '配信を停止しました' : resolved.title;
-      const message =
-        nextState === 'completed'
-          ? '今後、このアドレス宛に営業・ご案内メールは送信しません。'
-          : resolved.message;
-      return buildLiveScreenResponse(tenant, nextState, {
-        ok: true,
-        title,
-        message,
-        maskedEmail: resolved.maskedEmail,
-      });
+      try {
+        await tokenStore.markUsed({ tokenHash: resolved.tokenHash, usedAt: now().toISOString() });
+      } catch {
+        console.warn('[mail-ops] token usedAt update failed; suppression persisted');
+      }
+
+      const next = created ? 'completed' : 'already_unsubscribed';
+      return buildLiveState(tenantId, next, resolved.screen.maskedEmail);
     } catch (err) {
       if (err instanceof SuppressionStoreUnavailableError) {
-        return buildLiveScreenResponse(tenant, 'temporary_error', {
-          ok: false,
-          title: '一時的に処理できません',
-          message: '現在、配信停止のお手続きを完了できません。しばらくしてから再度お試しください。',
-        });
+        return buildLiveState(tenantId, 'temporary_error');
       }
-      return buildLiveScreenResponse(tenant, 'temporary_error', {
-        ok: false,
-        title: '一時的に処理できません',
-        message: '現在、配信停止のお手続きを完了できません。しばらくしてから再度お試しください。',
-      });
+      return buildLiveState(tenantId, 'temporary_error');
     }
   };
 

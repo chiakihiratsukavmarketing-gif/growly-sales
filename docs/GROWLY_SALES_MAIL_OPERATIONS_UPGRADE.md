@@ -643,7 +643,8 @@ GET  /t/{token}.gif  # 44.3 将来
 ### Phase 44.1 Step 15A（実装フェーズ）— verify 方針
 
 - 全体 `npm run growly-sales:verify` は既知の既存失敗が残る場合があるため、Phase 44.1 mail-ops のみを対象とした verify を追加。
-- `npm run growly-sales:verify-phase441` は **実 GCS 非接続**の in-memory adapter で store/handler/guardrails を検証する（raw token / Secret / email の漏洩なし）。
+- `npm run growly-sales:verify-phase441` / `npm run growly-sales:verify:mail-ops` は **実 GCS 非接続**の in-memory adapter で store/handler/guardrails を検証する（raw token / Secret / email の漏洩なし）。
+- Step 15A commit 条件: mail-ops validate + mail-ops verify + ui:build。全体 verify の Daily30/UI 系 failure は別タスク。
 
 ## 10. DDL / env / Cloud 変更候補（実行しない・候補のみ）
 

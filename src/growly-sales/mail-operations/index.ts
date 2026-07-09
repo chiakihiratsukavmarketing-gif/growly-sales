@@ -63,11 +63,10 @@ export { GcsJsonMailSuppressionStore } from './gcsJsonMailSuppressionStore.js';
 export {
   createMailSuppressionStore,
   tryCreateMailSuppressionStore,
-  createUnsubscribeTokenStore,
-  tryCreateUnsubscribeTokenStore,
   isMailOpsStorageReady,
   MailOpsConfigurationError,
 } from './createMailSuppressionStore.js';
+export { createUnsubscribeTokenStore, tryCreateUnsubscribeTokenStore } from './createUnsubscribeTokenStore.js';
 export { loadMailOpsRuntimeConfig, isMailOpsLiveExternallyConnected } from './config/mailOpsRuntimeConfig.js';
 export type { MailOpsRuntimeConfig, MailOpsMode } from './config/mailOpsRuntimeConfig.js';
 export { validateMailOpsLiveReadiness } from './validateMailOpsLiveReadiness.js';
