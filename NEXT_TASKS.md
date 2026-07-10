@@ -1,7 +1,7 @@
 # Growly Sales — NEXT_TASKS
 
-**更新日:** 2026-07-09
-**進行:** Phase 43 **4 / 4** 完了 / Phase 44 **0 / 3**（44.1 **dry-run + fail-closed 確認完了**・**live Go No-Go 維持**）
+**更新日:** 2026-07-10
+**進行:** Phase 43 **4 / 4** 完了 / Phase 44 **0 / 3**（44.1 **限定パイロット Go**・全体 live Go **No-Go 維持**）
 
 ---
 
@@ -10,7 +10,7 @@
 | サブフェーズ | 内容 | 状態 |
 |-------------|------|------|
 | **44.0** | live 化前安全確認 | ✅ `9c9dd45` |
-| **44.1** | 配信停止 live 準備（tenant境界・保存境界） | ✅ 準備完了 `9d07810` / **No-Go 維持** |
+| **44.1** | 配信停止 live（限定パイロット） | ✅ 技術準備 + CP-16D-draft + **CP-Go 限定パイロット Go**（2026-07-10・平塚）/ 全体一括適用ではない |
 | 44.2 | カスタムテンプレート live | 未着手 |
 | 44.3 | 開封計測 live | 未着手 |
 
@@ -65,7 +65,30 @@
 | 16A | sales pipeline suppression の GCS 正本 read-only 参照（B1 解消の第一歩） | ✅ 実装完了（verify 追加: `growly-sales:verify:step16a-gcs-sales-read`・**live Go No-Go 維持**） |
 | 16B | sales pipeline unsubscribe token / URL 発行モジュール（Gmail 未接続） | ✅ 実装完了（verify 追加: `growly-sales:verify:step16b-unsubscribe-token-issue`・**live Go No-Go 維持**） |
 | 16C | CREATE_DRAFTS 前 token/URL fail-closed ゲート（footer 未挿入） | ✅ 実装完了（verify 追加: `growly-sales:verify:step16c-draft-token-gate`・**live Go No-Go 維持**） |
-| 16D | Gmail 本文 unsubscribe footer 配線（実 draft は別承認） | ✅ コード完了（verify 追加: `growly-sales:verify:step16d-unsubscribe-footer`・**Gmail API 未実行・live Go No-Go 維持**） |
+| 16D | Gmail 本文 unsubscribe footer 配線（実 draft は別承認） | ✅ コード完了 `bd0b3f6` + CP-16D-draft テスト下書き1件確認 |
+| CP-Go | 限定パイロット Go 承認 | ✅ 2026-07-10・平塚・**N=1**・`liveConnected` は送信ウィンドウのみ |
+| A1 | Cloud Armor preview（`/u/*` rate limit） | ✅ policy `growly-mail-ops-armor` attached・**preview のみ**（§7.23.18） |
+| CP-Pilot-N1 | CREATE_DRAFTS 1件（`phase44-pilot-n1`） | ✅ footer 確認・送信なし |
+| Approval A | `liveConnected=true` 切替 | ✅ 実施後、Approval B 中止により **false 復帰済** |
+| Approval B | Gmail 手動送信 | ❌ **中止**（件名に「送信しない」検証文言のため） |
+| P1–P6 | 送信用パイロット `phase44-pilot-send-n1` | ✅ Lead準備→CREATE_DRAFTS→目視→liveConnected→**手動送信**→記録→**false復帰** |
+
+### 44.1 限定パイロット — 状態
+
+- [x] 送信用 Lead `phase44-pilot-send-n1` 準備（P1）
+- [x] CREATE_DRAFTS 1件 + footer 確認（P2）
+- [x] Gmail 目視確認（P3）
+- [x] 送信ウィンドウ `liveConnected=true`（P4）
+- [x] Gmail 手動送信 1件（P5・Growly send API 未呼出）
+- [x] 手動送信記録 + `liveConnected=false` 復帰（P6）
+
+**現状:** `liveConnected=false` / `phase44-pilot-send-n1` は **送信記録済**（`sendStatus=sent`）/ 追加 draft なし / Cloud Armor **preview 適用済**（enforce は別承認）
+
+**次:** Armor preview ログ観測（任意）・受信者 unsubscribe リンク動作確認（任意）・パイロット結果の人間レビュー・44.2/44.3 は別ゲート
+
+**パイロット制約:** Want Reach / CREATE_DRAFTS のみ / token・完全URL・完全メール非出力 / Step 15 suppression active 1件維持
+
+**Phase 44 全体 live Go:** **No-Go 維持**（44.2 / 44.3 未着手）
 
 ### Phase 43 完了（mock・参照）
 
@@ -85,7 +108,7 @@
 2. Daily 30: 候補収集 → Lead化承認 → 営業文 → 下書き → Gmail手動送信 → 送信記録
 3. 各ゲート承認必須（`FETCH_DAILY_30` / `GENERATE_DAILY_30_COPY` / `IMPORT_*` / `CREATE_DRAFTS`）
 
-**禁止:** 自動送信 / force=true / 無断デプロイ / Scheduler・Secret変更 / Phase 44 live 機能の本番適用（Go 前）
+**禁止:** 自動送信 / force=true / 無断デプロイ / Scheduler・Secret変更 / Phase 44.2・44.3 の無断 live 化 / 44.1 パイロット範囲外の一括適用 / `liveConnected` 無断切替
 
 **WORK_LOG:** `## 通常営業運用` に日次件数を記録
 

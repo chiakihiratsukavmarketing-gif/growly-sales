@@ -2,7 +2,7 @@
 
 > **正本:** Phase 44 live 化前の監査・Go/No-Go・人間作業一覧。
 > **仕様正本（mock）:** `docs/GROWLY_SALES_MAIL_OPERATIONS_UPGRADE.md`
-> **状態:** 2026-07-06 監査完了。**実装・デプロイ・env 変更は未実施。**
+> **状態:** 2026-07-10 — Phase 44.1 **限定パイロット Go**（CP-Go）。送信用パイロット P1–P6 完了（`phase44-pilot-send-n1` 手動送信記録済・**`liveConnected=false` 復帰済**）。**Cloud Armor A1** — `growly-mail-ops-armor` **preview 適用済**（§7.23.18）。Phase 44 全体は **No-Go**。
 
 ---
 
@@ -12,7 +12,7 @@
 |-------|------|------|
 | 43.1〜43.4 | mock 実装 | ✅ 完了（`98abff3` / `5ed05de` / `51acf05` / `fc1a686` / `e28e311`） |
 | **44.0** | **live 化前安全確認** | **本ドキュメント** |
-| 44.1 | 配信停止 live | **No-Go**（条件未達） |
+| 44.1 | 配信停止 live | **限定パイロット Go**（2026-07-10 CP-Go・平塚）/ 一括本番適用ではない |
 | 44.2 | カスタムテンプレート live | 未着手 |
 | 44.3 | 開封計測 live | 未着手 |
 
@@ -1165,7 +1165,7 @@ prefix: `gs://growly-sales-daily30/prod/growly-sales/mail-operations/`
 | ローカル営業パイプライン | Step 16A で **読み取り統合**（`MAIL_OPS_MODE=live` かつ GCS env が揃う場合のみ **GCS 正本を read-only 参照**。読めない場合は fail-closed） |
 | token 発行（営業パイプライン） | Step 16B で **発行モジュール追加**（`issueUnsubscribeTokenForOutreach`・GCS には **tokenHash のみ**） |
 | CREATE_DRAFTS 前 token ゲート | Step 16C で **Gmail API 前 fail-closed**（preview は readiness-only） |
-| Gmail 本文 unsubscribe URL | Step 16D で **create 経路に footer 配線**（実 draft は CP-16D-draft 待ち・送信禁止） |
+| Gmail 本文 unsubscribe URL | Step 16D + CP-16D-draft 確認済・**限定パイロット Go**（§7.23.15・追加 draft / liveConnected 切替は別承認） |
 
 **Go / No-Go:**
 
@@ -1218,9 +1218,82 @@ prefix: `gs://growly-sales-daily30/prod/growly-sales/mail-operations/`
 | preview | footer **未挿入**（`lead.emailBody` プレビューのみ） |
 | Lead JSON | `emailBody` **未改変** |
 | 送信 | send API **なし** |
-| 実 draft | **CP-16D-draft 待ち**（本ステップでは未実行） |
+| 実 draft | 本ステップ時点では未実行 → 後続 **CP-16D-draft** でテスト下書き 1件確認 |
 | verify | `growly-sales:verify:step16d-unsubscribe-footer` ✅ + 16A〜16C / fail-closed / gcs-readonly / mail-ops 回帰 ✅ |
-| Go / No-Go | Phase 44.1 **No-Go 維持** |
+| Go / No-Go | 本ステップ時点 **No-Go 維持**（CP-Go は §7.23.15） |
+
+#### 7.23.15 CP-Go — Phase 44.1 限定パイロット Go（2026-07-10）
+
+> **記録のみ。** 本承認では `liveConnected=true` 切替・追加 Gmail draft・Cloud/env 変更・suppression 更新 **なし**。
+
+| 項目 | 内容 |
+|------|------|
+| 判定 | **限定パイロット Go** |
+| 承認者 / 日付 | 平塚 / 2026-07-10 |
+| 初回上限 N | **1 件** |
+| liveConnected | **送信ウィンドウのみ true**（切替は **別承認**・現状 `false` 維持） |
+| Cloud Armor | パイロットでは **未適用を許容**（別承認で追加可） |
+| 対象 | Want Reach / CREATE_DRAFTS / GCS suppression read-only / token 発行（tokenHash のみ）/ fail-closed / footer / 下書きのみ・送信は人間手動 |
+| 除外 | 実送信・自動送信・send API・一括適用・44.2/44.3・Daily30/UI failures・suppression 削除・自動解除 |
+| 秘匿 | token / rawToken / 完全 URL / 完全メールをログ・docs・UI・console・報告に出さない |
+| suppression | Step 15 active **1件維持**・削除禁止 |
+| Phase 44 全体 | **live Go No-Go 維持** |
+| 次（別承認） | ①送信ウィンドウ前 `liveConnected=true` ②初回パイロット対象 Lead 1件確認 ③CREATE_DRAFTS 1件 |
+| safe-stop | `liveConnected=false` / mail-ops rollback / 営業側非 live / suppression **削除しない** |
+
+**先行確認（CP-16D-draft）:** テスト下書き **1件**・footer 確認・送信なし・send API 未呼出・GCS suppressions active 1 / tokens count 3（masked・件数・metadata のみ）。
+
+#### 7.23.16 CP-Pilot-N1 + Approval A / B abort（2026-07-10）
+
+| 項目 | 結果 |
+|------|------|
+| CREATE_DRAFTS | `phase44-pilot-n1` **1件**（footer 確認・send API 未呼出） |
+| Approval A | `MAIL_OPS_LIVE_EXTERNAL_CONNECTED=true` → revision `00005-5j4` / `/health` **`liveConnected:true`** |
+| Approval B | **中止** — 下書きに「送信しない」検証文言があり **手動送信しない** |
+| 復帰 | `MAIL_OPS_LIVE_EXTERNAL_CONNECTED=false` → revision `00006-2wc` / `/health` **`liveConnected:false`** |
+| 下書き | **削除せず保持**（`draft_created` / `sendStatus=not_sent`） |
+| Gmail 送信 | **未実施** |
+| GCS | suppressions active **1** 維持・tokens は metadata/count のみ |
+| Phase 44.1 | **限定パイロット Go 維持** |
+| Phase 44 全体 | **No-Go 維持** |
+| 学び | 送信用パイロット下書きの件名・本文に送信禁止文言を入れない |
+
+#### 7.23.17 送信用パイロット P1–P6 完了（2026-07-10）
+
+| 項目 | 結果 |
+|------|------|
+| 対象 Lead | `phase44-pilot-send-n1`（masked テスト宛） |
+| P1–P2 | Lead 準備 + CREATE_DRAFTS **1件**（footer 確認） |
+| P3 | Gmail 目視 OK（送信禁止文言なし・footer 形式 OK） |
+| P4 | `liveConnected=true`（revision `00008-p4f`） |
+| P5 | **Gmail 手動送信 1件**（Growly send API **未呼出**） |
+| P6 | 手動送信記録 `sendStatus=sent` + `liveConnected=false`（revision `00009-6qq`） |
+| `/health` 復帰後 | **`liveConnected:false`** / 漏洩キーなし |
+| GCS | suppressions active **1** 維持 / tokens count **5**（metadata・count のみ） |
+| Phase 44.1 | **限定パイロット Go 維持** |
+| Phase 44 全体 | **No-Go 維持** |
+
+#### 7.23.18 Human Approval A1 — Cloud Armor preview（2026-07-10）
+
+> **実施範囲:** `mailops.wantreach.jp` HTTPS LB 経路のみ。`growly-mail-ops-backend` に security policy attach。**preview のみ**（enforce なし）。Cloud Run env・GCS suppression・`liveConnected` **変更なし**。
+
+| 項目 | 結果 |
+|------|------|
+| Human Approval | **A1 承認**（Cloud Armor / rate limit 導入） |
+| policy 名 | `growly-mail-ops-armor` |
+| backend attach | `growly-mail-ops-backend` — **attached** |
+| モード | rate-limit rule **preview: true**（enforce **未実施**） |
+| rule 100 | `request.path == '/health'` → **allow**（preview: false） |
+| rule 1000 | `request.path.startsWith('/u/')` → **throttle** 60 req / 60 sec / IP、超過 **deny-429**（**preview: true**） |
+| rule 2147483647 | default **allow**（preview: false） |
+| `/health` smoke | **200** / `liveConnected:false` |
+| 無効 token GET smoke | **503** / `temporary_error`（`liveConnected:false` 時の fail-closed・token/URL 非出力） |
+| GCS | suppressions active **1** 維持 / tokens count **5**（metadata・count のみ） |
+| Gmail / send / draft | **未実施** |
+| Phase 44.1 | **限定パイロット Go 維持** |
+| Phase 44 全体 | **No-Go 維持** |
+
+**構成スクリプト（参照）:** `scripts/cloud/growly-mail-ops/05-cloud-armor.sh`（DRY-RUN 既定）
 
 #### 7.23.8 rollback（§11 整合）
 
@@ -1437,7 +1510,7 @@ prefix: `gs://growly-sales-daily30/prod/growly-sales/mail-operations/`
 | GET 挙動 | ✅ 確認のみ（停止しない）・`maskedEmail` のみ | 同上 |
 | POST 挙動 | ✅ 冪等・`completed` / `already_unsubscribed` | 本番 store でも維持 |
 | 全送信入口ブロック | ✅ `assertNotSuppressed` + 読込失敗時 `SuppressionStoreUnavailableError` | GCS 読込失敗時 **fail-closed** 維持 |
-| 下書き末尾リンク | ✅ create 経路コード配線（Step 16D）・**実 draft は CP-16D-draft 待ち** | テスト下書き 1件目視・送信禁止 |
+| 下書き末尾リンク | ✅ Step 16D + CP-16D-draft テスト下書き1件確認・**限定パイロット Go** | 初回パイロット CREATE_DRAFTS は Lead 確認後・別承認・送信禁止 |
 | token 有効期限 | mock TTL 30 日 | live 方針を人間承認（無期限 + rotate 案） |
 | `doNotContact` 互換 | ✅ legacy チェック維持 | suppression を正規ソースに |
 
@@ -1575,29 +1648,39 @@ prefix: `gs://growly-sales-daily30/prod/growly-sales/mail-operations/`
 
 ## 15. Phase 44.1 Go / No-Go 条件
 
-### 最低条件（すべて必須）
+### 最低条件（すべて必須）— 2026-07-10 再評価
 
 | # | 条件 | 判定 |
 |---|------|------|
-| 1 | 公開 URL（ドメイン）決定 | ❌ 未 |
-| 2 | HTTPS 有効 | ❌ 未 |
-| 3 | suppression 本番永続化（GCS 等）設計承認 | ✅ 承認済み（§4・実装未接続） |
-| 4 | `UNSUBSCRIBE_TOKEN_PEPPER` 設定 | ❌ 未 |
-| 5 | rate limit 方針 | ⚠️ 設計案あり（§7.5・Cloud Armor 60 req/min/IP 案・未承認） |
-| 6 | unsubscribe 冪等性（コード済・本番 store で検証要） | ⚠️ mock のみ |
-| 7 | 全送信入口 suppression ブロック + **fail-closed** | ⚠️ 入口は済、fail-closed 未 |
-| 8 | 配信停止文面・画面の人間確認 | ⚠️ 文案・法務方針は承認済み。live 送信前最終チェックリストは未 |
-| 9 | 障害時 fail-closed 実装 | ❌ 未 |
-| 10 | rollback 手順文書化 | ✅ 本ドキュメント §11 |
-| 11 | Human Approval 完了 | ⚠️ 文案・法務方針は済。インフラ・fail-closed は未 |
+| 1 | 公開 URL（ドメイン）決定 | ✅ `mailops.wantreach.jp` |
+| 2 | HTTPS 有効 | ✅ LB + 証明書 ACTIVE |
+| 3 | suppression 本番永続化（GCS） | ✅ 設計承認 + Step 15 dry-run + 16A read-only |
+| 4 | `UNSUBSCRIBE_TOKEN_PEPPER` | ✅ Secret Manager（値は記録しない） |
+| 5 | rate limit 方針 | ⚠️ Cloud Armor **preview 適用済**（A1・§7.23.18）— enforce は **別承認** |
+| 6 | unsubscribe 冪等性 | ✅ Step 15 dry-run で確認 |
+| 7 | 全送信入口 suppression + fail-closed | ✅ 16A〜16C + in-memory verify |
+| 8 | 配信停止文面・画面 | ✅ Human Approval + CP-16D-draft footer 確認 |
+| 9 | 障害時 fail-closed / safe-stop | ✅ 実装 + §11 / §7.23.15 |
+| 10 | rollback 手順文書化 | ✅ §11 |
+| 11 | Human Approval（CP-Go） | ✅ 限定パイロット Go（平塚 / 2026-07-10） |
 
 ### 現在の判定
 
-## **No-Go** — Phase 44.1 配信停止 live 化は開始しない
+## **限定パイロット Go** — Phase 44.1（2026-07-10 CP-Go）
 
-**理由:** 公開 URL・HTTPS・Secret・Cloud Run デプロイ・fail-closed live 接続が未達。GCS 保存設計・mail-ops Cloud Run 設計案は承認/調査済み。mock 実装・文案・法務表示方針は整備済み。
+**範囲:** Want Reach / CREATE_DRAFTS のみ / 初回上限 **1件** / 下書きのみ・送信は人間手動 / Armor 未適用許容 / `liveConnected` は **送信ウィンドウのみ**（**本承認では未切替**）。
 
-**次のアクション（人間）:** §12 チェックリスト 1〜5・fail-closed を順に実施 → Go 再評価。live 送信前に最終チェックリストを実施。
+**まだしないこと:** `liveConnected=true` / 追加 draft / 実送信 / send API / suppression 削除 / 44.2・44.3。
+
+**Phase 44 全体 live Go:** **No-Go 維持**（44.2 / 44.3 未着手）。
+
+**次のアクション（人間・別承認）:**
+
+1. ~~送信用パイロット P1–P6~~ → **完了**（`phase44-pilot-send-n1` 手動送信記録済・`liveConnected=false` 復帰済）  
+2. 受信者 unsubscribe リンク動作の任意確認（masked・件数のみ報告）  
+3. パイロット結果の人間レビュー（44.1 限定 Go 継続可否）  
+4. 44.2 / 44.3 は **別ゲート**（Phase 44 全体は No-Go 維持）  
+5. 問題時は safe-stop
 
 ---
 

@@ -437,6 +437,83 @@
 | 次 | **CP-16D-draft**（テスト下書き 1件・送信禁止）後に Go 再評価 |
 | Go/No-Go | Phase 44.1 **No-Go 維持** |
 
+### 2026-07-10 — Phase 44.1 CP-16D-draft 確認（テスト下書き 1件）
+
+| 項目 | 内容 |
+|------|------|
+| 下書き | **1件**（テスト宛のみ・`draft_created`） |
+| footer | `配信停止：` + `mailops.wantreach.jp/u/` 形式確認（URL全文未出力） |
+| 送信 | **なし** / send API **未呼び出し** |
+| GCS | suppressions active **1** 維持 / tokens count **3**（metadata・count のみ） |
+| Go/No-Go | 当時 **No-Go 維持**（CP-Go 待ち） |
+
+### 2026-07-10 — Phase 44.1 CP-Go: 限定パイロット Go 承認 ✅（記録のみ）
+
+| 項目 | 内容 |
+|------|------|
+| 判定 | **限定パイロット Go**（本番一括適用ではない） |
+| 承認者 / 日付 | 平塚 / 2026-07-10 |
+| 初回上限 N | **1 件** |
+| liveConnected | **送信ウィンドウのみ true**（本承認では切替しない・`false` 維持） |
+| Cloud Armor | パイロットでは **未適用を許容** |
+| 対象 | Want Reach / CREATE_DRAFTS のみ / suppression GCS read-only / token 発行（tokenHash のみ）/ fail-closed / footer 挿入 / 下書きのみ |
+| 除外 | 実送信・自動送信・send API・一括適用・44.2/44.3・Daily30/UI failures 修正・suppression 削除・自動解除 |
+| 本承認でしないこと | `liveConnected=true` 切替 / 追加 Gmail draft / Cloud・env 変更 / suppression 更新 |
+| 秘匿 | token / rawToken / 完全 URL / 完全メールはログ・docs・UI・console・報告に出さない（masked / 件数 / 成否 / GCS metadata-count のみ） |
+| suppression | Step 15 active **1件維持**・削除禁止 |
+| Phase 44 全体 | **live Go No-Go 維持** |
+| 次（別承認） | ①送信ウィンドウ前 `liveConnected=true` 別承認 ②初回パイロット対象 Lead 1件の確認 → その後 CREATE_DRAFTS 1件別承認 |
+| 障害時 | safe-stop（`liveConnected=false` / mail-ops rollback / 営業側非 live・suppression 削除しない） |
+
+### 2026-07-10 — Phase 44.1 CP-Pilot-N1 + Approval A/B abort
+
+| 項目 | 内容 |
+|------|------|
+| 対象 Lead | `phase44-pilot-n1`（masked `in***@wantreach.jp`） |
+| CREATE_DRAFTS | **1件成功**（footer 確認・send API 未呼出） |
+| Approval A | `liveConnected=true`（mail-ops revision `00005-5j4`）→ `/health` true 確認 |
+| Approval B | **中止** — 下書き件名/本文に「送信しない」検証文言があり、手動送信しない |
+| 復帰 | `MAIL_OPS_LIVE_EXTERNAL_CONNECTED=false`（revision `growly-sales-mail-ops-00006-2wc`） |
+| `/health` 復帰後 | **200** / `liveConnected:false` / `storageReady:true` / 漏洩キーなし |
+| Gmail 送信 | **未実施** / send API **未呼出** |
+| 下書き | **削除せず保持**（`draft_created` / `sendStatus=not_sent`） |
+| GCS | suppressions active **1** 維持・tokens count/generation は metadata のみ確認 |
+| Phase 44.1 | **限定パイロット Go 維持** |
+| Phase 44 全体 | **No-Go 維持** |
+| 学び | パイロット送信用下書きの件名・本文に「送信しない」等の送信禁止文言を入れない |
+
+### 2026-07-10 — Phase 44.1 送信用パイロット P1–P6 完了（`phase44-pilot-send-n1`）
+
+| 項目 | 内容 |
+|------|------|
+| P1 | 送信用 Lead `phase44-pilot-send-n1` 準備（送信禁止文言なし） |
+| P2 | CREATE_DRAFTS **1件**（footer 確認・send API 未呼出） |
+| P3 | Gmail 目視確認 OK（To テスト宛・footer `mailops.wantreach.jp/u/` 形式） |
+| P4 | `liveConnected=true`（mail-ops revision `00008-p4f`） |
+| P5 | **Gmail 手動送信 1件**（Growly send API **未呼出**） |
+| P6 | 手動送信記録（`sendStatus=sent`）+ `liveConnected=false` 復帰（revision `00009-6qq`） |
+| `/health` 復帰後 | **200** / `liveConnected:false` / `storageReady:true` / 漏洩キーなし |
+| GCS | suppressions active **1** 維持 / tokens count **5**（metadata・count のみ） |
+| 保護 Lead | `phase44-pilot-n1` / `phase44-footer-test` 未変更 |
+| Phase 44.1 | **限定パイロット Go 維持** |
+| Phase 44 全体 | **No-Go 維持** |
+
+### 2026-07-10 — Phase 44.1 Human Approval A1: Cloud Armor preview 導入
+
+| 項目 | 内容 |
+|------|------|
+| 承認 | **A1** — Cloud Armor / rate limit（preview のみ） |
+| policy | `growly-mail-ops-armor` |
+| backend | `growly-mail-ops-backend` — security policy **attached** |
+| rules | 100 `/health` allow / 1000 `/u/*` throttle 60 req·60 sec·IP preview deny-429 / default allow |
+| enforce | **未実施**（rate-limit rule は preview: true） |
+| `/health` | **200** / `liveConnected:false` |
+| 無効 token GET | **503** / `temporary_error`（token・完全URL 非出力） |
+| GCS | suppressions active **1** 維持 / tokens count **5**（metadata・count のみ） |
+| 未実施 | `liveConnected=true` / Gmail draft / send / send API / Cloud Run env 変更 / GCS suppression 更新 |
+| Phase 44.1 | **限定パイロット Go 維持** |
+| Phase 44 全体 | **No-Go 維持** |
+
 ### 2026-07-09 — Phase 44.1 Step 15: live dry-run 1件（完了・live Go 未移行）
 
 | 項目 | 内容 |
