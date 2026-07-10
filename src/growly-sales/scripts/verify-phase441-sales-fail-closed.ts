@@ -220,16 +220,20 @@ async function verifyGmailDraftGateWired(): Promise<void> {
     draftSrc.includes('assertUnsubscribeTokenReadyForGmailDraft'),
     'gmail draft path uses token issue gate (Step 16C)'
   );
-  assert(!draftSrc.includes('buildUnsubscribeEmailFooterCopy'), 'gmail draft has no footer insert');
+  assert(
+    draftSrc.includes('buildUnsubscribeEmailFooterCopy'),
+    'gmail draft create path uses footer (Step 16D)'
+  );
   assert(!draftSrc.includes('generateUnsubscribeToken'), 'gmail draft has no direct token generation');
-  ok('gmail draft gate wired: suppression + token issue; no footer/direct token');
+  assert(!draftSrc.includes('users.drafts.send'), 'gmail draft path has no drafts.send');
+  assert(!draftSrc.includes('users.messages.send'), 'gmail draft path has no messages.send');
+  ok('gmail draft gate wired: suppression + token issue + footer; no send/direct token');
 }
 
 async function verifyGenerationPathsNoLiveToken(): Promise<void> {
   const paths = [
     'generation/applyFullGeneration.ts',
     'candidates/generateDaily30SalesCopy.ts',
-    'workflow/createGmailDraftForLead.ts',
     'integrations/gmail/gmailDraftAdapter.ts',
   ];
   for (const rel of paths) {
@@ -237,7 +241,7 @@ async function verifyGenerationPathsNoLiveToken(): Promise<void> {
     assert(!src.includes('generateUnsubscribeToken'), `${rel} has no generateUnsubscribeToken`);
     assert(!src.includes('buildUnsubscribeEmailFooterCopy'), `${rel} has no footer auto insert`);
   }
-  ok('generation/draft paths have no live token or footer auto insert');
+  ok('generation/adapter paths have no live token or footer auto insert');
 }
 
 async function verifyFollowUpSuppressed(): Promise<void> {

@@ -166,24 +166,22 @@ async function verifyStaticWiring(): Promise<void> {
   const createFnSrc = draftSrc.slice(createFnStart);
   const eligibleIdx = createFnSrc.indexOf('assertEligibleForGmailDraftCreate(lead, offer)');
   const issueIdx = createFnSrc.indexOf('assertUnsubscribeTokenReadyForGmailDraft({ lead })');
-  const buildIdx = createFnSrc.indexOf('buildGmailDraftMessage(lead)');
+  const buildIdx = createFnSrc.indexOf('buildGmailDraftMessage(lead,');
   const apiIdx = createFnSrc.indexOf('createVerifiedGmailDraft');
   assert(eligibleIdx !== -1 && issueIdx !== -1 && buildIdx !== -1 && apiIdx !== -1);
   assert(eligibleIdx < issueIdx, 'suppression/eligibility before token gate');
+  const footerIdx = createFnSrc.indexOf('buildUnsubscribeEmailFooterCopy');
   assert(issueIdx < buildIdx, 'token gate before buildGmailDraftMessage');
   assert(issueIdx < apiIdx, 'token gate before Gmail API');
-  assert(!draftSrc.includes('buildUnsubscribeEmailFooterCopy'), 'no footer insert');
+  assert(footerIdx !== -1 && issueIdx < footerIdx && footerIdx < apiIdx, 'footer after token, before API');
   assert(!draftSrc.includes('generateUnsubscribeToken'), 'no direct generateUnsubscribeToken');
 
-  for (const rel of [
-    'integrations/gmail/buildGmailDraftMessage.ts',
-    'integrations/gmail/gmailDraftAdapter.ts',
-  ]) {
+  for (const rel of ['integrations/gmail/gmailDraftAdapter.ts']) {
     const src = readFileSync(join(SRC_ROOT, rel), 'utf8');
     assert(!src.includes('buildUnsubscribeEmailFooterCopy'), `${rel} has no footer`);
     assert(!src.includes('assertUnsubscribeTokenReadyForGmailDraft'), `${rel} has no gate`);
   }
-  ok('createGmailDraftForLead gates wired before Gmail API; footer unused');
+  ok('createGmailDraftForLead gates wired before Gmail API; footer after token gate');
 }
 
 async function verifyMockGateSuccess(): Promise<void> {

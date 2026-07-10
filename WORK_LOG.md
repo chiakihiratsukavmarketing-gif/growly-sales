@@ -423,6 +423,20 @@
 | verify | `verify:step16c-draft-token-gate` ✅ + 16A/16B/fail-closed/gcs-readonly/mail-ops 回帰 ✅ |
 | Go/No-Go | Phase 44.1 **No-Go 維持**（B2 footer 未適用） |
 
+### 2026-07-10 — Phase 44.1 Step 16D: Gmail 本文 unsubscribe footer 配線 ✅（コードのみ）
+
+| 項目 | 内容 |
+|------|------|
+| 目的 | create 経路で発行済み `unsubscribeUrl` を下書き本文末尾に付与（**実 draft / 送信は未実施**） |
+| API | `buildUnsubscribeEmailFooterCopy({ unsubscribeUrl })` / `buildGmailDraftMessage({ unsubscribeFooterText })` |
+| 順序 | eligibility → token issue → footer → build → 検証 → Gmail API |
+| preview | footer 未挿入 |
+| Lead | `emailBody` 未改変 |
+| 禁止遵守 | Gmail API 未実行 / draft 未作成 / send なし / suppression 正本未変更 / token・URL・完全メール出力なし |
+| verify | `verify:step16d-unsubscribe-footer` ✅ + 16A〜16C / fail-closed / gcs-readonly / mail-ops 回帰 ✅ |
+| 次 | **CP-16D-draft**（テスト下書き 1件・送信禁止）後に Go 再評価 |
+| Go/No-Go | Phase 44.1 **No-Go 維持** |
+
 ### 2026-07-09 — Phase 44.1 Step 15: live dry-run 1件（完了・live Go 未移行）
 
 | 項目 | 内容 |

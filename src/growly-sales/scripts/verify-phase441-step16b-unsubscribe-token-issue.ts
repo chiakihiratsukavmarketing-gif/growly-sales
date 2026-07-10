@@ -267,19 +267,19 @@ async function verifyGcsAddFailureFailClosed(): Promise<void> {
 }
 
 async function verifyGmailDraftNotWired(): Promise<void> {
+  // Step 16B contract: issuer module exists; create path wiring is 16C/16D.
+  // Generation paths must still not issue tokens or insert footers.
   const paths = [
-    'workflow/createGmailDraftForLead.ts',
-    'integrations/gmail/buildGmailDraftMessage.ts',
-    'integrations/gmail/gmailDraftAdapter.ts',
     'candidates/generateDaily30SalesCopy.ts',
     'generation/applyFullGeneration.ts',
+    'integrations/gmail/gmailDraftAdapter.ts',
   ];
   for (const rel of paths) {
     const src = readFileSync(join(SRC_ROOT, rel), 'utf8');
     assert(!src.includes('issueUnsubscribeTokenForOutreach'), `${rel} has no issuer import`);
     assert(!src.includes('buildUnsubscribeEmailFooterCopy'), `${rel} has no footer auto insert`);
   }
-  ok('Gmail draft / generation paths have no issuer or footer wiring');
+  ok('generation / adapter paths have no issuer or footer wiring');
 }
 
 function assertStdoutHasNoSensitiveOutput(issuedRawToken?: string): void {

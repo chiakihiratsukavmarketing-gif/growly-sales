@@ -1164,8 +1164,8 @@ prefix: `gs://growly-sales-daily30/prod/growly-sales/mail-operations/`
 | mail-ops（GCS 正本） | Step 15 で実証済み |
 | ローカル営業パイプライン | Step 16A で **読み取り統合**（`MAIL_OPS_MODE=live` かつ GCS env が揃う場合のみ **GCS 正本を read-only 参照**。読めない場合は fail-closed） |
 | token 発行（営業パイプライン） | Step 16B で **発行モジュール追加**（`issueUnsubscribeTokenForOutreach`・GCS には **tokenHash のみ**） |
-| CREATE_DRAFTS 前 token ゲート | Step 16C で **Gmail API 前 fail-closed**（footer 未挿入・preview は readiness-only） |
-| Gmail 本文 unsubscribe URL | **未適用**（No-Go 維持の前提・16D） |
+| CREATE_DRAFTS 前 token ゲート | Step 16C で **Gmail API 前 fail-closed**（preview は readiness-only） |
+| Gmail 本文 unsubscribe URL | Step 16D で **create 経路に footer 配線**（実 draft は CP-16D-draft 待ち・送信禁止） |
 
 **Go / No-Go:**
 
@@ -1205,6 +1205,22 @@ prefix: `gs://growly-sales-daily30/prod/growly-sales/mail-operations/`
 | mock 既定 | token ゲート成功で日常 CREATE_DRAFTS 可能 |
 | verify | `growly-sales:verify:step16c-draft-token-gate` ✅ + 16A/16B/fail-closed/gcs-readonly/mail-ops 回帰 ✅ |
 | Go / No-Go | Phase 44.1 **No-Go 維持**（footer 未適用 = B2 残） |
+
+#### 7.23.14 Step 16D — Gmail 本文 unsubscribe footer 配線（2026-07-10）
+
+> **コード + in-memory/静的 verify のみ。** Gmail API・draft 作成・実送信・`liveConnected=true` **未実施**。
+
+| 項目 | 結果 |
+|------|------|
+| footer API | `buildUnsubscribeEmailFooterCopy(tenant, { unsubscribeUrl })` |
+| MIME | `buildGmailDraftMessage(lead, { unsubscribeFooterText })` — 本文末尾に空行+footer |
+| create 順序 | eligibility → token issue → footer → build → body 検証 → Gmail API |
+| preview | footer **未挿入**（`lead.emailBody` プレビューのみ） |
+| Lead JSON | `emailBody` **未改変** |
+| 送信 | send API **なし** |
+| 実 draft | **CP-16D-draft 待ち**（本ステップでは未実行） |
+| verify | `growly-sales:verify:step16d-unsubscribe-footer` ✅ + 16A〜16C / fail-closed / gcs-readonly / mail-ops 回帰 ✅ |
+| Go / No-Go | Phase 44.1 **No-Go 維持** |
 
 #### 7.23.8 rollback（§11 整合）
 
@@ -1421,7 +1437,7 @@ prefix: `gs://growly-sales-daily30/prod/growly-sales/mail-operations/`
 | GET 挙動 | ✅ 確認のみ（停止しない）・`maskedEmail` のみ | 同上 |
 | POST 挙動 | ✅ 冪等・`completed` / `already_unsubscribed` | 本番 store でも維持 |
 | 全送信入口ブロック | ✅ `assertNotSuppressed` + 読込失敗時 `SuppressionStoreUnavailableError` | GCS 読込失敗時 **fail-closed** 維持 |
-| 下書き末尾リンク | ❌ 未挿入 | CREATE_DRAFTS 後・token 発行・hash 保存 |
+| 下書き末尾リンク | ✅ create 経路コード配線（Step 16D）・**実 draft は CP-16D-draft 待ち** | テスト下書き 1件目視・送信禁止 |
 | token 有効期限 | mock TTL 30 日 | live 方針を人間承認（無期限 + rotate 案） |
 | `doNotContact` 互換 | ✅ legacy チェック維持 | suppression を正規ソースに |
 

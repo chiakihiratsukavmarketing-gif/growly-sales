@@ -114,13 +114,18 @@ const DEFAULT_TOKEN_PLACEHOLDER = '{token}';
 
 export function buildUnsubscribeEmailFooterCopy(
   tenant: MailOperationsTenant,
-  input: { tokenPlaceholder?: string } = {}
+  input: { tokenPlaceholder?: string; unsubscribeUrl?: string } = {}
 ): UnsubscribeEmailFooterCopy {
   const displayName = tenant.displayName.trim() || tenant.legalName.trim();
   const senderName = tenant.legalName.trim() || displayName;
   const contactEmail = tenant.contactEmail.trim() || null;
-  const tokenPlaceholder = input.tokenPlaceholder?.trim() || DEFAULT_TOKEN_PLACEHOLDER;
-  const unsubscribeUrl = buildUnsubscribeUrl({ tenantId: tenant.tenantId, token: tokenPlaceholder });
+  const providedUrl = input.unsubscribeUrl?.trim();
+  const unsubscribeUrl = providedUrl
+    ? providedUrl
+    : buildUnsubscribeUrl({
+        tenantId: tenant.tenantId,
+        token: input.tokenPlaceholder?.trim() || DEFAULT_TOKEN_PLACEHOLDER,
+      });
 
   const introLine = `${displayName}からのご案内です。`;
   const bodyParagraph =

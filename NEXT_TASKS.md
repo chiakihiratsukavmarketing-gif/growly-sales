@@ -65,6 +65,7 @@
 | 16A | sales pipeline suppression の GCS 正本 read-only 参照（B1 解消の第一歩） | ✅ 実装完了（verify 追加: `growly-sales:verify:step16a-gcs-sales-read`・**live Go No-Go 維持**） |
 | 16B | sales pipeline unsubscribe token / URL 発行モジュール（Gmail 未接続） | ✅ 実装完了（verify 追加: `growly-sales:verify:step16b-unsubscribe-token-issue`・**live Go No-Go 維持**） |
 | 16C | CREATE_DRAFTS 前 token/URL fail-closed ゲート（footer 未挿入） | ✅ 実装完了（verify 追加: `growly-sales:verify:step16c-draft-token-gate`・**live Go No-Go 維持**） |
+| 16D | Gmail 本文 unsubscribe footer 配線（実 draft は別承認） | ✅ コード完了（verify 追加: `growly-sales:verify:step16d-unsubscribe-footer`・**Gmail API 未実行・live Go No-Go 維持**） |
 
 ### Phase 43 完了（mock・参照）
 

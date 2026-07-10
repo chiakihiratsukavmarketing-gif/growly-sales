@@ -27,6 +27,8 @@ import {
   assertNotSuppressed,
   assertUnsubscribeTokenReadyForGmailDraft,
   assertUnsubscribeTokenReadinessForGmailDraft,
+  buildUnsubscribeEmailFooterCopy,
+  requireMailOperationsTenant,
 } from '../mail-operations/index.js';
 import {
   verifyLeadEmailBodyForGmailDraft,
@@ -267,10 +269,15 @@ export async function createGmailDraftForLead(
 
   assertEligibleForGmailDraftCreate(lead, offer);
 
-  // CREATE_DRAFTS token gate: fail-closed before Gmail API. Footer not inserted in Step 16C.
-  await assertUnsubscribeTokenReadyForGmailDraft({ lead });
-
-  const message = buildGmailDraftMessage(lead);
+  // CREATE_DRAFTS: token issue → footer (memory only) → MIME. lead.emailBody unchanged.
+  const issued = await assertUnsubscribeTokenReadyForGmailDraft({ lead });
+  const tenant = requireMailOperationsTenant('want-reach');
+  const footer = buildUnsubscribeEmailFooterCopy(tenant, {
+    unsubscribeUrl: issued.unsubscribeUrl,
+  });
+  const message = buildGmailDraftMessage(lead, {
+    unsubscribeFooterText: footer.fullText,
+  });
   const bodyErrors = verifyLeadEmailBodyForGmailDraft(lead, message.body);
   if (bodyErrors.length > 0) {
     throw new GmailDraftCreateNotAllowedError(bodyErrors.join(' / '));

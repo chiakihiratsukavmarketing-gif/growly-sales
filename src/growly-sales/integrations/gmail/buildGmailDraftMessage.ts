@@ -41,14 +41,24 @@ export function buildGmailDraftMimeRaw(input: {
   return `${headerBlock}\r\n\r\n${encodeBase64Body(input.body)}`;
 }
 
-export function buildGmailDraftMessage(lead: Lead): GmailDraftMessage {
+export interface BuildGmailDraftMessageOptions {
+  /** Appended after emailBody with a blank line. Do not pass rawToken. */
+  unsubscribeFooterText?: string;
+}
+
+export function buildGmailDraftMessage(
+  lead: Lead,
+  options?: BuildGmailDraftMessageOptions
+): GmailDraftMessage {
   const to = pickGmailToAddress(lead);
   if (!to) {
     throw new Error('emailCandidates が空のため Gmail 下書きメッセージを作成できません');
   }
 
   const subject = lead.emailSubject.trim();
-  const body = lead.emailBody.trim();
+  const baseBody = lead.emailBody.trim();
+  const footerText = options?.unsubscribeFooterText?.trim();
+  const body = footerText ? `${baseBody}\n\n${footerText}` : baseBody;
   const fromEmail = getOutreachFromEmail();
   const fromDisplayName = getOutreachFromDisplayName();
   const replyTo = getOutreachReplyToEmail();
