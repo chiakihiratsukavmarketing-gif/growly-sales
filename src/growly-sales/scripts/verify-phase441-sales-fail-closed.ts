@@ -216,9 +216,13 @@ async function verifyOutreachEligibilityBlocked(): Promise<void> {
 async function verifyGmailDraftGateWired(): Promise<void> {
   const draftSrc = readFileSync(join(SRC_ROOT, 'workflow/createGmailDraftForLead.ts'), 'utf8');
   assert(draftSrc.includes('assertNotSuppressed'), 'gmail draft path uses assertNotSuppressed');
+  assert(
+    draftSrc.includes('assertUnsubscribeTokenReadyForGmailDraft'),
+    'gmail draft path uses token issue gate (Step 16C)'
+  );
   assert(!draftSrc.includes('buildUnsubscribeEmailFooterCopy'), 'gmail draft has no footer insert');
-  assert(!draftSrc.includes('generateUnsubscribeToken'), 'gmail draft has no live token generation');
-  ok('gmail draft gate wired without live footer/token');
+  assert(!draftSrc.includes('generateUnsubscribeToken'), 'gmail draft has no direct token generation');
+  ok('gmail draft gate wired: suppression + token issue; no footer/direct token');
 }
 
 async function verifyGenerationPathsNoLiveToken(): Promise<void> {

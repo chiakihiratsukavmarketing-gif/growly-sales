@@ -107,6 +107,10 @@ export {
   issueUnsubscribeTokenForOutreach,
   setUnsubscribeTokenIssueStoragePortForTests,
 } from './issueUnsubscribeTokenForOutreach.js';
+export {
+  assertUnsubscribeTokenReadyForGmailDraft,
+  assertUnsubscribeTokenReadinessForGmailDraft,
+} from './assertUnsubscribeTokenReadyForGmailDraft.js';
 export type {
   IssueUnsubscribeTokenForOutreachInput,
   IssuedUnsubscribeTokenForOutreach,

@@ -14,6 +14,7 @@
     "growly-sales:verify:gcs-readonly": "tsx src/growly-sales/scripts/verify-phase441-gcs-readonly.ts",
     "growly-sales:verify:step16a-gcs-sales-read": "tsx src/growly-sales/scripts/verify-phase441-step16a-gcs-sales-read.ts",
     "growly-sales:verify:step16b-unsubscribe-token-issue": "tsx src/growly-sales/scripts/verify-phase441-step16b-unsubscribe-token-issue.ts",
+    "growly-sales:verify:step16c-draft-token-gate": "tsx src/growly-sales/scripts/verify-phase441-step16c-draft-token-gate.ts",
     "growly-sales:ui:build": "vite build",
     "growly-sales:ui": "vite build && tsx src/growly-sales/scripts/run-growly-sales-ui.ts",
     "growly-sales:export-drafts": "tsx src/growly-sales/scripts/run-growly-sales-export-drafts.ts",

@@ -23,7 +23,11 @@ import {
   getGmailDraftExclusionReason,
   isGmailDraftEligible,
 } from '../outreach/outreachPolicy.js';
-import { assertNotSuppressed } from '../mail-operations/index.js';
+import {
+  assertNotSuppressed,
+  assertUnsubscribeTokenReadyForGmailDraft,
+  assertUnsubscribeTokenReadinessForGmailDraft,
+} from '../mail-operations/index.js';
 import {
   verifyLeadEmailBodyForGmailDraft,
   buildGmailDraftMimeChecklist,
@@ -205,6 +209,8 @@ export function buildGmailDraftPreviewForLead(lead: Lead, offer?: OfferProfile):
 
   try {
     assertEligibleForGmailDraftCreate(lead, offer);
+    // readiness only — no GCS token write on preview
+    assertUnsubscribeTokenReadinessForGmailDraft({ lead });
     const message = buildGmailDraftMessage(lead);
     to = message.to;
     const bodyErrors = verifyLeadEmailBodyForGmailDraft(lead, message.body);
@@ -260,6 +266,9 @@ export async function createGmailDraftForLead(
   if (!lead) throw new LeadNotFoundError(leadId);
 
   assertEligibleForGmailDraftCreate(lead, offer);
+
+  // CREATE_DRAFTS token gate: fail-closed before Gmail API. Footer not inserted in Step 16C.
+  await assertUnsubscribeTokenReadyForGmailDraft({ lead });
 
   const message = buildGmailDraftMessage(lead);
   const bodyErrors = verifyLeadEmailBodyForGmailDraft(lead, message.body);

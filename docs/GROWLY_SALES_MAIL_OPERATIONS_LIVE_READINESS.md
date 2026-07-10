@@ -1163,8 +1163,9 @@ prefix: `gs://growly-sales-daily30/prod/growly-sales/mail-operations/`
 |----|------|
 | mail-ops（GCS 正本） | Step 15 で実証済み |
 | ローカル営業パイプライン | Step 16A で **読み取り統合**（`MAIL_OPS_MODE=live` かつ GCS env が揃う場合のみ **GCS 正本を read-only 参照**。読めない場合は fail-closed） |
-| token 発行（営業パイプライン） | Step 16B で **発行モジュール追加**（`issueUnsubscribeTokenForOutreach`・GCS には **tokenHash のみ**・Gmail 経路 **未接続**） |
-| Gmail 本文 unsubscribe URL | **未適用**（No-Go 維持の前提） |
+| token 発行（営業パイプライン） | Step 16B で **発行モジュール追加**（`issueUnsubscribeTokenForOutreach`・GCS には **tokenHash のみ**） |
+| CREATE_DRAFTS 前 token ゲート | Step 16C で **Gmail API 前 fail-closed**（footer 未挿入・preview は readiness-only） |
+| Gmail 本文 unsubscribe URL | **未適用**（No-Go 維持の前提・16D） |
 
 **Go / No-Go:**
 
@@ -1186,9 +1187,24 @@ prefix: `gs://growly-sales-daily30/prod/growly-sales/mail-operations/`
 | URL 順序 | URL 前提検証 → token 生成 → URL 組み立て → GCS add |
 | fail-closed | pepper 未設定 / URL 前提不足 / GCS add 失敗 |
 | mock 既定 | `registerMockUnsubscribeToken` 経路維持 |
-| Gmail | **未接続**（`createGmailDraftForLead` 等に issuer なし） |
+| Gmail | Step 16B 時点では未配線（16C で CREATE_DRAFTS 前ゲート接続） |
 | verify | `growly-sales:verify:step16b-unsubscribe-token-issue` ✅ + 16A / fail-closed / gcs-readonly / mail-ops 回帰 ✅ |
 | Go / No-Go | Phase 44.1 **No-Go 維持** |
+
+#### 7.23.13 Step 16C — CREATE_DRAFTS 前 token fail-closed ゲート（2026-07-10）
+
+> **in-memory / 静的検証のみ。** Gmail API・draft 作成・footer 挿入・`mail-suppressions.json` 更新なし。
+
+| 項目 | 結果 |
+|------|------|
+| 配線 | `assertEligibleForGmailDraftCreate` の後 → `assertUnsubscribeTokenReadyForGmailDraft` → `buildGmailDraftMessage` / `createVerifiedGmailDraft` の前 |
+| preview | `assertUnsubscribeTokenReadinessForGmailDraft`（**GCS write なし**） |
+| 優先順位 | suppression blocked / store unavailable → eligibility → token 発行 |
+| fail-closed | pepper / URL 前提 / GCS add 失敗で Gmail API 未到達 |
+| footer | **未挿入**（`buildUnsubscribeEmailFooterCopy` 未使用） |
+| mock 既定 | token ゲート成功で日常 CREATE_DRAFTS 可能 |
+| verify | `growly-sales:verify:step16c-draft-token-gate` ✅ + 16A/16B/fail-closed/gcs-readonly/mail-ops 回帰 ✅ |
+| Go / No-Go | Phase 44.1 **No-Go 維持**（footer 未適用 = B2 残） |
 
 #### 7.23.8 rollback（§11 整合）
 

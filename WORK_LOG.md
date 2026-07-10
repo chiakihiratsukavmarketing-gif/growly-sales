@@ -411,6 +411,18 @@
 | verify | `verify:step16b-unsubscribe-token-issue` ✅ + 16A / fail-closed / gcs-readonly / mail-ops 回帰 ✅ |
 | Phase 44.1 判定 | **No-Go 維持** |
 
+### 2026-07-10 — Phase 44.1 Step 16C: CREATE_DRAFTS 前 token fail-closed ゲート ✅
+
+| 項目 | 内容 |
+|------|------|
+| 目的 | Gmail API 前に token/URL 発行できない場合は CREATE_DRAFTS を stop（**footer 未挿入**） |
+| 配線 | eligibility → `assertUnsubscribeTokenReadyForGmailDraft` → `buildGmailDraftMessage` / Gmail API |
+| preview | `assertUnsubscribeTokenReadinessForGmailDraft`（GCS write なし） |
+| 優先 | suppression blocked / store unavailable が token ゲートより先 |
+| 禁止遵守 | Gmail API 非呼び出し verify / footer なし / suppression 正本未変更 / token・URL・完全メール出力なし |
+| verify | `verify:step16c-draft-token-gate` ✅ + 16A/16B/fail-closed/gcs-readonly/mail-ops 回帰 ✅ |
+| Go/No-Go | Phase 44.1 **No-Go 維持**（B2 footer 未適用） |
+
 ### 2026-07-09 — Phase 44.1 Step 15: live dry-run 1件（完了・live Go 未移行）
 
 | 項目 | 内容 |
