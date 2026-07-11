@@ -1827,3 +1827,20 @@ From / Reply-To / 署名: **c_hiratsuka@wantreach.jp**
 
 - `npm run growly-sales:verify` 実行（ベースライン・コード変更なし）
 
+---
+
+### 2026-07-11 — Phase 44.1 Step 16E 手動/返信停止 suppression GCS write 接続 ✅
+
+**種別:** Phase 43開発（44.1 配信停止）。実 GCS 書込・送信・CREATE_DRAFTS **未実施**。
+
+| 項目 | 内容 |
+|------|------|
+| write source | `resolveSalesSuppressionWriteSource()` — live+gcs → `GcsJsonMailSuppressionStore.add()` |
+| 手動 | 設定タブ `addManualSuppression()` — local/mock または GCS（readiness 必須） |
+| 返信停止 | `register-suppression-from-reply` API + UI ボタン / `source: reply_opt_out` |
+| Human Approval | `SUPPRESSION_REPLY_OPT_OUT`（返信管理）/ 既存 `SUPPRESSION_MANUAL` |
+| verify | `growly-sales:verify:step16e-manual-suppression-write` ✅ / verify 静的 16E ✅ |
+| 未実施 | **CP-16E-write**（実 GCS 登録）/ liveConnected=true / Gmail / 送信 |
+
+**停止位置:** コード + InMemory verify 完了。CP-16E-write は Human Approval 待ち。
+

@@ -8,6 +8,7 @@ export type MailSuppressionStatus =
 export type MailSuppressionSource =
   | 'unsubscribe_link'
   | 'manual'
+  | 'reply_opt_out'
   | 'bounce'
   | 'complaint'
   | 'import'

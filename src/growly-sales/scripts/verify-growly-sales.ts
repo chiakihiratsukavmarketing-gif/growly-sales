@@ -7618,6 +7618,7 @@ async function verifyPhase432SuppressionTypes(): Promise<void> {
   assert(types.includes('MailSuppressionStatus'), 'suppression status type exists');
   assert(types.includes('unsubscribed'), 'unsubscribed status');
   assert(types.includes('manually_blocked'), 'manually_blocked status');
+  assert(types.includes('reply_opt_out'), 'reply_opt_out source');
   assert(types.includes('tokenHash'), 'tokenHash field');
   assert(types.includes('SuppressionCheckResult'), 'check result union');
   ok('Phase 43.2 suppression types checks passed');
@@ -7646,9 +7647,10 @@ async function verifyPhase432SuppressionStore(): Promise<void> {
     emailAddress: 'blocked@verify-phase432.test',
     reason: 'verify manual',
   });
-  assert(created.normalizedEmail === 'blocked@verify-phase432.test', 'manual suppression saved');
+  assert(created.record.normalizedEmail === 'blocked@verify-phase432.test', 'manual suppression saved');
+  assert(created.writeSource === 'local', 'manual suppression uses local writeSource');
   const list = await listMailSuppressions('want-reach');
-  assert(list.some((r) => r.suppressionId === created.suppressionId), 'list includes record');
+  assert(list.some((r) => r.suppressionId === created.record.suppressionId), 'list includes record');
   assert(!JSON.stringify(list).includes('rawToken'), 'no raw token in list json');
 
   const token = 'verify-phase432-token';
@@ -8481,6 +8483,27 @@ async function verifyPhase441OperationsLoggingPreserved(): Promise<void> {
   assert(workLog.includes('## 通常営業運用'), 'routine ops section preserved');
   assert(workLog.includes('## Phase 43開発'), 'phase 43 section preserved');
   ok('Phase 44.1 operations logging preserved checks passed');
+}
+
+async function verifyPhase441Step16EManualSuppressionWrite(): Promise<void> {
+  const storeSrc = await readFile(join(SRC_ROOT, 'mail-operations/suppressionStore.ts'), 'utf-8');
+  const readSrc = await readFile(join(SRC_ROOT, 'mail-operations/salesSuppressionReadSource.ts'), 'utf-8');
+  const buildSrc = await readFile(join(SRC_ROOT, 'mail-operations/buildManualSuppressionRecord.ts'), 'utf-8');
+  const uiServer = await readFile(join(SRC_ROOT, 'server/uiServer.ts'), 'utf-8');
+  const replyView = await readFile(join(SRC_ROOT, 'ui/ReplyManagementView.tsx'), 'utf-8');
+  const workflow = await readFile(join(SRC_ROOT, 'workflow/registerSuppressionFromReply.ts'), 'utf-8');
+  const pkg = await readFile(join(PROJECT_ROOT, 'package.json'), 'utf-8');
+
+  assert(storeSrc.includes('persistManualSuppressionToGcs'), 'GCS write path exists');
+  assert(storeSrc.includes('addSuppressionFromReplyOptOut'), 'reply_opt_out helper exists');
+  assert(readSrc.includes('resolveSalesSuppressionWriteSource'), 'write source resolver exists');
+  assert(buildSrc.includes('buildManualSuppressionRecord'), 'record builder exists');
+  assert(uiServer.includes('register-suppression-from-reply'), 'reply register API route');
+  assert(uiServer.includes('writeSource'), 'manual API returns writeSource');
+  assert(replyView.includes('配信禁止に登録'), 'reply UI suppression button');
+  assert(workflow.includes('addSuppressionFromReplyOptOut'), 'workflow uses reply_opt_out');
+  assert(pkg.includes('verify:step16e-manual-suppression-write'), 'step16e verify script registered');
+  ok('Phase 44.1 Step 16E manual suppression write checks passed');
 }
 
 async function verifyPhase441GcsDesignApprovedDoc(): Promise<void> {
@@ -9720,6 +9743,7 @@ async function main(): Promise<void> {
   await verifyPhase441MaskEmailForDisplay();
   await verifyPhase441NoPrematureSaasFeatures();
   await verifyPhase441OperationsLoggingPreserved();
+  await verifyPhase441Step16EManualSuppressionWrite();
   await verifyPhase441GcsDesignApprovedDoc();
   await verifyPhase441MailOpsCloudRunDesignDoc();
   await verifyPhase441GcsStoreDocumentSchema();

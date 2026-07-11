@@ -58,6 +58,7 @@ export function MailSuppressionListPanel({ onError, refreshKey = 0 }: MailSuppre
   const [loading, setLoading] = useState(true);
   const [records, setRecords] = useState<MailSuppression[]>([]);
   const [mode, setMode] = useState<'mock' | 'live'>('mock');
+  const [writeSource, setWriteSource] = useState<'local' | 'gcs'>('local');
   const [companySearch, setCompanySearch] = useState('');
   const [emailSearch, setEmailSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -86,6 +87,7 @@ export function MailSuppressionListPanel({ onError, refreshKey = 0 }: MailSuppre
       ]);
       setRecords(data.records);
       setMode(data.mode);
+      setWriteSource(data.writeSource ?? 'local');
       setFooterPreview(footer.previewText);
     } catch (err) {
       onError(err instanceof Error ? err.message : '配信禁止リストの読み込みに失敗しました');
@@ -219,7 +221,8 @@ export function MailSuppressionListPanel({ onError, refreshKey = 0 }: MailSuppre
     <>
       <SectionCard title="配信禁止リスト">
         <p className="hint">
-          モード: <strong>{mode}</strong>（mock）— 公開URL・GCS live書き込みは未接続です。
+          モード: <strong>{mode}</strong> / writeSource: <strong>{writeSource}</strong>
+          — CP-16E-write（実 GCS 登録）は別承認。
         </p>
         <div className="suppression-filters">
           <label>

@@ -13,10 +13,17 @@ import { MAIL_OPS_SUPPRESSIONS_LOGICAL } from './mailOpsPaths.js';
 import { buildMailOpsSuppressionBackupObjectPath } from './mailOpsPaths.js';
 import { buildGcsObjectPath } from '../config/storageBackend.js';
 import { withGenerationMatchRetry } from './withGenerationMatchRetry.js';
+import type { SuppressionAuditEvent } from './gcsDocumentTypes.js';
 import type { GcsSuppressionAuditWriter, AuditWriteResult } from './gcsSuppressionAuditWriter.js';
 import { createGcsSuppressionAuditWriter } from './gcsSuppressionAuditWriter.js';
 import { getDefaultMailOperationsTenantId } from './tenantResolver.js';
 import type { SuppressionScope } from './suppressionTypes.js';
+
+function auditActorTypeForSource(source: string): SuppressionAuditEvent['actorType'] {
+  if (source === 'unsubscribe_link') return 'recipient';
+  if (source === 'manual' || source === 'reply_opt_out') return 'human';
+  return 'system';
+}
 
 function hydrateTenant(record: MailSuppression): MailSuppression {
   return {
@@ -78,6 +85,7 @@ export class GcsJsonMailSuppressionStore implements MailSuppressionStore {
           reason: record.reason,
           source: record.source,
           suppressionId: record.suppressionId,
+          actorType: auditActorTypeForSource(record.source),
         },
       };
     });
@@ -193,6 +201,7 @@ export class GcsJsonMailSuppressionStore implements MailSuppressionStore {
         reason?: string;
         source: string;
         suppressionId?: string;
+        actorType?: SuppressionAuditEvent['actorType'];
       } | null;
     }>
   ): Promise<T> {
@@ -239,7 +248,7 @@ export class GcsJsonMailSuppressionStore implements MailSuppressionStore {
             action: mutated.auditAction.action,
             reason: mutated.auditAction.reason,
             source: mutated.auditAction.source,
-            actorType: 'system',
+            actorType: mutated.auditAction.actorType ?? auditActorTypeForSource(mutated.auditAction.source),
             suppressionId: mutated.auditAction.suppressionId,
           });
         }

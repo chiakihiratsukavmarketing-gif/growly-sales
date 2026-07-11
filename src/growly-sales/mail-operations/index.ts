@@ -24,6 +24,7 @@ export {
   readSalesSuppressionStoreDocument,
   listMailSuppressions,
   addManualSuppression,
+  addSuppressionFromReplyOptOut,
   reactivateSuppression,
   recordSuppressionFromUnsubscribe,
   registerMockUnsubscribeToken,
@@ -90,12 +91,18 @@ export { InMemoryGcsJsonStorage } from './gcsJsonStoragePort.js';
 export {
   resolveSalesSuppressionReadSource,
   isSalesSuppressionGcsReadEnabled,
+  resolveSalesSuppressionWriteSource,
+  isSalesSuppressionGcsWriteEnabled,
 } from './salesSuppressionReadSource.js';
-export type { SalesSuppressionReadSource } from './salesSuppressionReadSource.js';
+export type { SalesSuppressionReadSource, SalesSuppressionWriteSource } from './salesSuppressionReadSource.js';
+export { buildManualSuppressionRecord } from './buildManualSuppressionRecord.js';
+export type { BuildManualSuppressionRecordInput } from './buildManualSuppressionRecord.js';
+export type { ManualSuppressionInput, ManualSuppressionResult } from './suppressionStore.js';
 export {
   setGcsSuppressionReadStoragePortForTests,
   clearGcsSuppressionReadCacheForTests,
   setGcsSuppressionReadCacheForTests,
+  resolveSalesSuppressionGcsStoragePort,
 } from './gcsSuppressionReadAdapter.js';
 export {
   resolveSalesUnsubscribeTokenIssueSource,

@@ -18,12 +18,21 @@ import {
 } from './suppressionToken.js';
 import { getDefaultMailOperationsTenantId } from './tenantResolver.js';
 import { SuppressionStoreUnavailableError } from './suppressionTypes.js';
-import { isSalesSuppressionGcsReadEnabled } from './salesSuppressionReadSource.js';
+import {
+  isSalesSuppressionGcsReadEnabled,
+  resolveSalesSuppressionWriteSource,
+  type SalesSuppressionWriteSource,
+} from './salesSuppressionReadSource.js';
 import {
   getGcsSuppressionReadCache,
   readGcsSuppressionStoreDocument,
   refreshGcsSuppressionReadCache,
+  resolveSalesSuppressionGcsStoragePort,
 } from './gcsSuppressionReadAdapter.js';
+import { buildManualSuppressionRecord } from './buildManualSuppressionRecord.js';
+import { createMailSuppressionStore } from './createMailSuppressionStore.js';
+import { loadMailOpsRuntimeConfig } from './config/mailOpsRuntimeConfig.js';
+import { validateMailOpsLiveReadiness } from './validateMailOpsLiveReadiness.js';
 
 const EMPTY_STORE: MailSuppressionStoreDocument = {
   version: 1,
@@ -220,7 +229,7 @@ export async function listMailSuppressions(tenantId: string): Promise<MailSuppre
   return [...scoped].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
-export async function addManualSuppression(input: {
+export interface ManualSuppressionInput {
   tenantId: string;
   emailAddress: string;
   leadId?: string;
@@ -228,35 +237,86 @@ export async function addManualSuppression(input: {
   companyName?: string;
   reason: string;
   status?: MailSuppressionStatus;
+  source?: MailSuppressionSource;
   scope?: SuppressionScope;
-}): Promise<MailSuppression> {
-  const store = await loadMailSuppressionStore();
-  const tenantId = input.tenantId.trim();
-  const normalizedEmail = normalizeEmailAddress(input.emailAddress);
-  const scope: SuppressionScope = input.scope ?? 'tenant';
-  const existing = findActiveSuppressionByEmail(store, { tenantId, normalizedEmail });
-  if (existing) {
-    return existing;
-  }
-  const now = new Date().toISOString();
-  const record: MailSuppression = {
-    suppressionId: randomUUID(),
+}
+
+export interface ManualSuppressionResult {
+  record: MailSuppression;
+  created: boolean;
+  writeSource: SalesSuppressionWriteSource;
+}
+
+async function persistManualSuppressionToLocal(
+  record: MailSuppression
+): Promise<{ record: MailSuppression; created: boolean }> {
+  const store = storeOverride
+    ? structuredClone(storeOverride)
+    : await loadLocalMailSuppressionStore();
+  const tenantId = record.tenantId?.trim() || getDefaultMailOperationsTenantId();
+  const existing = findActiveSuppressionByEmail(store, {
     tenantId,
-    scope,
-    companyId: input.companyId,
-    leadId: input.leadId,
-    emailAddress: input.emailAddress.trim(),
-    normalizedEmail,
-    status: input.status ?? 'manually_blocked',
-    reason: input.reason.trim() || '手動による配信禁止',
-    source: 'manual',
-    createdAt: now,
-    updatedAt: now,
-    unsubscribedAt: now,
-  };
+    normalizedEmail: record.normalizedEmail,
+  });
+  if (existing) {
+    return { record: existing, created: false };
+  }
   store.records.push(record);
   await saveStore(store);
-  return record;
+  return { record, created: true };
+}
+
+async function persistManualSuppressionToGcs(
+  record: MailSuppression
+): Promise<{ record: MailSuppression; created: boolean }> {
+  const config = loadMailOpsRuntimeConfig();
+  const readiness = validateMailOpsLiveReadiness({ ...config, mode: 'live' });
+  if (!readiness.ready) {
+    throw new SuppressionStoreUnavailableError();
+  }
+  const storage = resolveSalesSuppressionGcsStoragePort();
+  const store = createMailSuppressionStore({
+    mode: 'live',
+    gcsStorage: storage,
+    env: process.env,
+    config: { ...config, mode: 'live' },
+  });
+  const tenantId = record.tenantId?.trim() || getDefaultMailOperationsTenantId();
+  const existing = await store.findActive({
+    tenantId,
+    normalizedEmail: record.normalizedEmail,
+  });
+  const saved = await store.add(record);
+  await refreshGcsSuppressionReadCache({ storage });
+  return { record: saved, created: !existing };
+}
+
+export async function addManualSuppression(input: ManualSuppressionInput): Promise<ManualSuppressionResult> {
+  const writeSource = resolveSalesSuppressionWriteSource();
+  const record = buildManualSuppressionRecord({
+    ...input,
+    source: input.source ?? 'manual',
+    status: input.status ?? 'manually_blocked',
+  });
+
+  if (writeSource === 'gcs') {
+    const { record: saved, created } = await persistManualSuppressionToGcs(record);
+    return { record: saved, created, writeSource: 'gcs' };
+  }
+
+  const { record: saved, created } = await persistManualSuppressionToLocal(record);
+  return { record: saved, created, writeSource: 'local' };
+}
+
+export async function addSuppressionFromReplyOptOut(
+  input: Omit<ManualSuppressionInput, 'source' | 'status'> & { leadId: string }
+): Promise<ManualSuppressionResult> {
+  return addManualSuppression({
+    ...input,
+    source: 'reply_opt_out',
+    status: 'manually_blocked',
+    reason: input.reason.trim() || '返信による停止希望',
+  });
 }
 
 export async function reactivateSuppression(input: {

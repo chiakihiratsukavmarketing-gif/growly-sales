@@ -16,6 +16,7 @@
     "growly-sales:verify:step16b-unsubscribe-token-issue": "tsx src/growly-sales/scripts/verify-phase441-step16b-unsubscribe-token-issue.ts",
     "growly-sales:verify:step16c-draft-token-gate": "tsx src/growly-sales/scripts/verify-phase441-step16c-draft-token-gate.ts",
     "growly-sales:verify:step16d-unsubscribe-footer": "tsx src/growly-sales/scripts/verify-phase441-step16d-unsubscribe-footer.ts",
+    "growly-sales:verify:step16e-manual-suppression-write": "tsx src/growly-sales/scripts/verify-phase441-step16e-manual-suppression-write.ts",
     "growly-sales:ui:build": "vite build",
     "growly-sales:ui": "vite build && tsx src/growly-sales/scripts/run-growly-sales-ui.ts",
     "growly-sales:export-drafts": "tsx src/growly-sales/scripts/run-growly-sales-export-drafts.ts",

@@ -47,6 +47,13 @@ function resolveGcsSuppressionReadStorage(input?: {
   return createDefaultGcsJsonStoragePort();
 }
 
+/** Shared GCS port for sales pipeline read/write (Step 16E). */
+export function resolveSalesSuppressionGcsStoragePort(input?: {
+  storage?: GcsJsonStoragePort;
+}): GcsJsonStoragePort {
+  return resolveGcsSuppressionReadStorage(input);
+}
+
 export function getGcsSuppressionReadCache(): MailSuppressionStoreDocument | null {
   return gcsSuppressionReadCache;
 }

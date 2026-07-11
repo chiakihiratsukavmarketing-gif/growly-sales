@@ -167,7 +167,7 @@ function matchLeadAction(pathname: string): { leadId: string; action: string } |
 
 function matchCommunicationAction(pathname: string): { leadId: string; action: string } | null {
   const match = pathname.match(
-    /^\/api\/leads\/([^/]+)\/(manual-sent|reply-status|reply-management|follow-up|deal-status|communication-memo|record-manual-gmail-sent|create-gmail-draft)$/
+    /^\/api\/leads\/([^/]+)\/(manual-sent|reply-status|reply-management|follow-up|deal-status|communication-memo|record-manual-gmail-sent|create-gmail-draft|register-suppression-from-reply)$/
   );
   if (!match) return null;
   return { leadId: decodeURIComponent(match[1]), action: match[2] };
@@ -281,18 +281,27 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
     }
 
     if (req.method === 'GET' && pathname === '/api/mail-suppressions') {
-      const { listMailSuppressions, getMailOpsMode } = await import('../mail-operations/index.js');
+      const {
+        listMailSuppressions,
+        getMailOpsMode,
+        resolveSalesSuppressionWriteSource,
+      } = await import('../mail-operations/index.js');
       const tenantId = url.searchParams.get('tenantId')?.trim();
       if (!tenantId) {
         sendApiError(res, 400, pathname, 'tenantId が必要です');
         return;
       }
       const records = await listMailSuppressions(tenantId);
+      const writeSource = resolveSalesSuppressionWriteSource();
       sendJson(res, 200, {
         records,
         generatedAt: new Date().toISOString(),
         mode: getMailOpsMode(),
-        note: 'mock配信禁止リスト。GCS live書き込み・公開URLは未接続です。',
+        writeSource,
+        note:
+          writeSource === 'gcs'
+            ? 'GCS 正本参照。live write は readiness 必須（Step 16E）。'
+            : 'ローカル配信禁止リスト（mock/local）。',
       });
       return;
     }
@@ -409,7 +418,7 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
         return;
       }
       const { addManualSuppression } = await import('../mail-operations/index.js');
-      const record = await addManualSuppression({
+      const result = await addManualSuppression({
         tenantId,
         emailAddress,
         leadId: body.leadId?.trim(),
@@ -417,8 +426,10 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
         reason,
       });
       sendJson(res, 200, {
-        record,
-        message: '配信禁止を手動登録しました（mock）',
+        record: result.record,
+        created: result.created,
+        writeSource: result.writeSource,
+        message: result.created ? '配信禁止を手動登録しました' : '既に配信禁止登録済みです',
       });
       return;
     }
@@ -1255,6 +1266,64 @@ export async function handleUiRequest(req: IncomingMessage, res: ServerResponse)
             const createDraftsGate = String(body.createDraftsGate ?? '');
             const result = await createGmailDraftForLead(leadId, createDraftsGate);
             sendJson(res, 200, result);
+            return;
+          }
+          case 'register-suppression-from-reply': {
+            if (body.confirmToken?.trim() !== 'SUPPRESSION_REPLY_OPT_OUT') {
+              sendApiError(res, 403, pathname, '確認トークン SUPPRESSION_REPLY_OPT_OUT が必要です');
+              return;
+            }
+            const reason = body.reason !== undefined ? String(body.reason) : '';
+            const { registerSuppressionFromReplyForLead } = await import(
+              '../workflow/registerSuppressionFromReply.js'
+            );
+            const {
+              RegisterSuppressionFromReplyNotFoundError,
+              RegisterSuppressionFromReplyValidationError,
+            } = await import('../workflow/registerSuppressionFromReply.js');
+            const { ReplyManagementNotAllowedError } = await import(
+              '../workflow/replyManagementValidation.js'
+            );
+            const { SuppressionStoreUnavailableError } = await import('../mail-operations/index.js');
+            try {
+              const result = await registerSuppressionFromReplyForLead({
+                leadId,
+                reason,
+                tenantId: body.tenantId ? String(body.tenantId) : undefined,
+              });
+              sendJson(res, 200, {
+                lead: result.lead,
+                suppression: {
+                  suppressionId: result.suppression.record.suppressionId,
+                  source: result.suppression.record.source,
+                  status: result.suppression.record.status,
+                  created: result.suppression.created,
+                  writeSource: result.suppression.writeSource,
+                  maskedEmail: result.maskedEmail,
+                },
+                correlationId: result.correlationId,
+                message: result.suppression.created
+                  ? '返信停止希望を配信禁止リストに登録しました'
+                  : '既に配信禁止登録済みです',
+              });
+            } catch (err) {
+              if (err instanceof RegisterSuppressionFromReplyNotFoundError) {
+                sendApiError(res, 404, pathname, err.message);
+                return;
+              }
+              if (
+                err instanceof RegisterSuppressionFromReplyValidationError ||
+                err instanceof ReplyManagementNotAllowedError
+              ) {
+                sendApiError(res, 400, pathname, err.message);
+                return;
+              }
+              if (err instanceof SuppressionStoreUnavailableError) {
+                sendApiError(res, 503, pathname, err.message);
+                return;
+              }
+              throw err;
+            }
             return;
           }
           default:

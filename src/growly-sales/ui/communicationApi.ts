@@ -95,3 +95,41 @@ export async function updateCommunicationMemoApi(leadId: string, memo: string): 
   return data.lead;
 }
 
+export interface RegisterSuppressionFromReplyResponse {
+  lead: Lead;
+  suppression: {
+    suppressionId: string;
+    source: string;
+    status: string;
+    created: boolean;
+    writeSource: string;
+    maskedEmail: string | null;
+  };
+  correlationId: string;
+  message: string;
+}
+
+export async function registerSuppressionFromReplyApi(
+  leadId: string,
+  payload: { reason: string; confirmToken: string; tenantId?: string }
+): Promise<RegisterSuppressionFromReplyResponse> {
+  const res = await fetch(
+    `${API_BASE}/api/leads/${encodeURIComponent(leadId)}/register-suppression-from-reply`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  if (!res.ok) {
+    throw new Error(
+      await readApiError(
+        res,
+        `POST /api/leads/${leadId}/register-suppression-from-reply`,
+        '配信禁止登録に失敗しました'
+      )
+    );
+  }
+  return (await res.json()) as RegisterSuppressionFromReplyResponse;
+}
+

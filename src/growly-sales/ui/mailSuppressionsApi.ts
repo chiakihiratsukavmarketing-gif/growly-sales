@@ -8,6 +8,7 @@ export interface MailSuppressionsResponse {
   records: MailSuppression[];
   generatedAt: string;
   mode: 'mock' | 'live';
+  writeSource?: 'local' | 'gcs';
   note: string;
 }
 
@@ -49,7 +50,7 @@ export async function addManualSuppressionApi(input: {
   companyId?: string;
   reason: string;
   confirmToken: string;
-}): Promise<{ record: MailSuppression; message: string }> {
+}): Promise<{ record: MailSuppression; created: boolean; writeSource: string; message: string }> {
   const res = await fetch(`${API_BASE}/api/mail-suppressions/manual`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -58,7 +59,12 @@ export async function addManualSuppressionApi(input: {
   if (!res.ok) {
     throw new Error(await readApiError(res, 'POST /api/mail-suppressions/manual', '手動登録に失敗しました'));
   }
-  return (await res.json()) as { record: MailSuppression; message: string };
+  return (await res.json()) as {
+    record: MailSuppression;
+    created: boolean;
+    writeSource: string;
+    message: string;
+  };
 }
 
 export async function reactivateSuppressionApi(input: {

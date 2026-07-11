@@ -11,6 +11,7 @@ const STATUS_LABELS: Record<MailSuppressionStatus, string> = {
 const SOURCE_LABELS: Record<MailSuppressionSource, string> = {
   unsubscribe_link: '配信停止リンク',
   manual: '手動登録',
+  reply_opt_out: '返信による停止希望',
   bounce: '不達',
   complaint: '苦情',
   import: 'インポート',

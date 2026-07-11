@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Lead } from '../../types/lead.js';
 import { fetchLeads } from './api.js';
-import { updateLeadReplyManagementApi } from './communicationApi.js';
+import { updateLeadReplyManagementApi, registerSuppressionFromReplyApi } from './communicationApi.js';
 import {
   isAwaitingReplyLead,
   needsFollowUpDateSetup,
@@ -26,6 +26,10 @@ import { EmptyState } from './common/EmptyState.js';
 import { SearchAndFilterBar } from './common/SearchAndFilterBar.js';
 import { FilterEmptyState } from './common/FilterEmptyState.js';
 import { ReplyManagementConfirmDialog } from './ReplyManagementConfirmDialog.js';
+import {
+  ReplySuppressionConfirmDialog,
+  SUPPRESSION_REPLY_OPT_OUT_CONFIRM_TOKEN,
+} from './ReplySuppressionConfirmDialog.js';
 import {
   filterByCompanyName,
   matchesReplyManagementFilter,
@@ -91,6 +95,10 @@ export function ReplyManagementView({
   const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [suppressOpen, setSuppressOpen] = useState(false);
+  const [suppressReason, setSuppressReason] = useState('返信による停止希望');
+  const [suppressToken, setSuppressToken] = useState('');
+  const [suppressBusy, setSuppressBusy] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const formScrollRef = useRef<HTMLElement>(null);
@@ -218,6 +226,40 @@ export function ReplyManagementView({
     const nextDraft = applyReplyStatusToDraft(leadToReplyFormDraft(selectedLead), 'no_reply');
     await saveDraft(selectedLead, nextDraft);
   }
+
+  async function handleRegisterSuppressionConfirmed(): Promise<void> {
+    if (!selectedLead) return;
+    if (suppressToken.trim() !== SUPPRESSION_REPLY_OPT_OUT_CONFIRM_TOKEN) {
+      onError(`確認トークン「${SUPPRESSION_REPLY_OPT_OUT_CONFIRM_TOKEN}」を入力してください`);
+      return;
+    }
+    if (!suppressReason.trim()) {
+      onError('理由は必須です');
+      return;
+    }
+    setSuppressBusy(true);
+    try {
+      const result = await registerSuppressionFromReplyApi(selectedLead.id, {
+        reason: suppressReason.trim(),
+        confirmToken: suppressToken.trim(),
+        tenantId: 'want-reach',
+      });
+      setLeads((prev) => prev.map((l) => (l.id === result.lead.id ? result.lead : l)));
+      onUpdated?.(result.lead);
+      setSuccessMessage(result.message);
+      setSuppressOpen(false);
+      setSuppressToken('');
+    } catch (err) {
+      onError(err instanceof Error ? err.message : '配信禁止登録に失敗しました');
+    } finally {
+      setSuppressBusy(false);
+    }
+  }
+
+  const canRegisterSuppression =
+    selectedLead &&
+    (selectedLead.sendStatus === 'sent' || selectedLead.sendStatus === 'manual_sent') &&
+    Boolean(selectedLead.emailCandidates[0]?.trim());
 
   if (loading) return <p className="loading">返信管理を読み込み中…</p>;
 
@@ -370,11 +412,22 @@ export function ReplyManagementView({
           )}
 
           <div className="reply-form-footer">
+            {canRegisterSuppression && (
+              <button
+                type="button"
+                className="btn btn-danger"
+                disabled={saving || suppressBusy}
+                onClick={() => setSuppressOpen(true)}
+              >
+                配信禁止に登録
+              </button>
+            )}
             <button
               type="button"
               className="btn btn-primary"
               disabled={
                 saving ||
+                suppressBusy ||
                 (requiresReplySummary(draft) && !draft.replySummary.trim()) ||
                 (requiresFollowUpDueDate(draft.nextAction) && !draft.followUpDueAt.trim())
               }
@@ -402,6 +455,18 @@ export function ReplyManagementView({
           saving={saving}
           onConfirm={() => void saveDraft(selectedLead, draft)}
           onCancel={() => !saving && setConfirmOpen(false)}
+        />
+      )}
+      {suppressOpen && selectedLead && (
+        <ReplySuppressionConfirmDialog
+          lead={selectedLead}
+          reason={suppressReason}
+          confirmToken={suppressToken}
+          busy={suppressBusy}
+          onReasonChange={setSuppressReason}
+          onConfirmTokenChange={setSuppressToken}
+          onConfirm={() => void handleRegisterSuppressionConfirmed()}
+          onCancel={() => !suppressBusy && setSuppressOpen(false)}
         />
       )}
     </div>
