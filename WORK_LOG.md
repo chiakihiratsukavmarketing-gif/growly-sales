@@ -1840,7 +1840,34 @@ From / Reply-To / 署名: **c_hiratsuka@wantreach.jp**
 | 返信停止 | `register-suppression-from-reply` API + UI ボタン / `source: reply_opt_out` |
 | Human Approval | `SUPPRESSION_REPLY_OPT_OUT`（返信管理）/ 既存 `SUPPRESSION_MANUAL` |
 | verify | `growly-sales:verify:step16e-manual-suppression-write` ✅ / verify 静的 16E ✅ |
-| 未実施 | **CP-16E-write**（実 GCS 登録）/ liveConnected=true / Gmail / 送信 |
+| 未実施 | liveConnected=true / Gmail / 送信 |
 
 **停止位置:** コード + InMemory verify 完了。CP-16E-write は Human Approval 待ち。
+
+---
+
+### 2026-07-11 — Phase 44.1 CP-16E-write 実 GCS suppression 1件登録検証 ✅
+
+**種別:** Phase 43開発（44.1 配信停止）。Human Approval CP-16E-write 承認済み。
+
+| 項目 | 結果 |
+|------|------|
+| コマンド | `npm run growly-sales:cp16e-write` |
+| writeSource | `gcs` |
+| source | `reply_opt_out` |
+| maskedEmail | `cp***@fixture.verify` |
+| activeCount before / after | **2** / **2**（テスト用レコードは登録済み・冪等） |
+| totalRecords | **2**（変更なし） |
+| generation before → after | `1783779984153648` → `1783780051119237` → `1783780053216673` |
+| firstCreated / secondCreated | **false** / **false**（idempotent） |
+| backup | 登録前 **2** 件 → 登録後 **3** 件（backup 作成あり） |
+| readCacheRefreshed | ✅ |
+| assertNotSuppressedBlocked | ✅ |
+| tokensModified | **false** |
+| CREATE_DRAFTS / Gmail / send | **未実施** |
+| liveConnected | **false** 維持 |
+| Cloud Armor enforce | **未実施** |
+| Phase 44.1 / 44 全体 | 限定パイロット Go 維持 / **No-Go 維持** |
+
+**停止位置:** CP-16E-write 完了。Phase 44.2 / 44.3 には進まない。
 

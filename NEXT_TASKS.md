@@ -33,7 +33,7 @@
 - [x] **配信停止メール末尾文面** — Human Approval 済み（2026-07-07・`buildUnsubscribeEmailFooterCopy`・所在地なし・Gmail/live 未適用）
 - [x] fail-closed 営業フロー確認（in-memory verify 済み・§7.23.11・GCS↔ローカル未接続ギャップ記録）
 - [x] **Step 16E** — 手動 / 返信停止 → GCS write 接続（InMemory verify のみ・`growly-sales:verify:step16e-manual-suppression-write`）
-- [ ] **CP-16E-write** — 実 GCS suppression 1件登録検証（Human Approval 別途・**未実施**）
+- [x] **CP-16E-write** — 実 GCS suppression 1件登録検証（2026-07-11・masked / 件数 / generation のみ記録・Gmail / send 未実施）
 
 ### 44.1 実装原則（自社優先 + SaaS拡張余地）
 

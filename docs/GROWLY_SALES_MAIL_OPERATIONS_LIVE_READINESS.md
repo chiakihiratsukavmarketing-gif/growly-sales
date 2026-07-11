@@ -1224,7 +1224,7 @@ prefix: `gs://growly-sales-daily30/prod/growly-sales/mail-operations/`
 
 #### 7.23.14a Step 16E — 手動 / 返信停止 suppression GCS write 接続（2026-07-11）
 
-> **コード + InMemory GCS verify のみ。** 実 GCS 書込（**CP-16E-write**）・Gmail draft・実送信・`liveConnected=true` **未実施**。
+> **コード + InMemory GCS verify 完了。** 実 GCS 書込は **CP-16E-write**（§7.23.14b）で実施。Gmail draft・実送信・`liveConnected=true` **未実施**。
 
 | 項目 | 結果 |
 |------|------|
@@ -1234,8 +1234,28 @@ prefix: `gs://growly-sales-daily30/prod/growly-sales/mail-operations/`
 | Human Approval | `SUPPRESSION_MANUAL`（設定タブ）/ `SUPPRESSION_REPLY_OPT_OUT`（返信管理） |
 | UI | 返信管理「配信禁止に登録」+ 確認ダイアログ（masked email） |
 | 監査 | GCS audit `actorType: human`（manual / reply_opt_out） |
-| 未実施 | **CP-16E-write**（実 GCS 1件登録検証） |
 | verify | `growly-sales:verify:step16e-manual-suppression-write` ✅ + `growly-sales:verify` 静的 16E ✅ |
+| Go / No-Go | Phase 44.1 **限定パイロット Go 維持** / Phase 44 全体 **No-Go 維持** |
+
+#### 7.23.14b CP-16E-write — 実 GCS suppression 1件登録検証（2026-07-11）
+
+> **Human Approval CP-16E-write 承認済み。** テスト用メールのみ・`reply_opt_out`・GCS tokens / external-candidates **未変更**。
+
+| 項目 | 結果 |
+|------|------|
+| コマンド | `npm run growly-sales:cp16e-write` |
+| writeSource | `gcs` |
+| source | `reply_opt_out` |
+| maskedEmail | `cp***@fixture.verify` |
+| activeCount before / after | **2** / **2** |
+| totalRecords | **2** |
+| generation before → after | `1783779984153648` → `1783780051119237` → `1783780053216673` |
+| firstCreated / idempotent retry | **false** / **false** |
+| backup objects before → after | **2** → **3** |
+| readCacheRefreshed | ✅ |
+| assertNotSuppressedBlocked | ✅ |
+| CREATE_DRAFTS / Gmail / send | **未実施** |
+| liveConnected | **false** 維持 |
 | Go / No-Go | Phase 44.1 **限定パイロット Go 維持** / Phase 44 全体 **No-Go 維持** |
 
 #### 7.23.15 CP-Go — Phase 44.1 限定パイロット Go（2026-07-10）
