@@ -514,6 +514,23 @@
 | Phase 44.1 | **限定パイロット Go 維持** |
 | Phase 44 全体 | **No-Go 維持** |
 
+### 2026-07-11 — Daily30 Human Approval R1: スケジュール復旧（areaQueuePosition リセット）
+
+| 項目 | 内容 |
+|------|------|
+| 承認 | **R1** — `daily30-collection-schedule.json` 復旧 |
+| 原因 | `autoContinue.areaQueuePosition=46/46` → `plannedAreas=[]` → 07-08以降 `collected=0` |
+| 更新前 | `areaQueuePosition=46` / `lastCompletedBatchId=2026-07-07` |
+| 更新後 | `areaQueuePosition=0` / `lastCompletedBatchId=2026-07-07` **維持** |
+| GCS generation | 更新前 `1783382525223893` → 更新後 `1783729953734551` |
+| バックアップ | `daily30-collection-schedule.json.2026-07-11T00-32-22-653Z.r1.bak` |
+| remainingPrefectures | **46**（先頭 plannedArea: **宮城県**） |
+| dry-run preview | `growly-sales:daily30-preview` ✅ — 対象エリア先頭 **宮城県** |
+| 未変更 | `external-candidates.json`（641件）/ suppression / tokens / Cloud Run env / Scheduler |
+| 未実施 | `FETCH_DAILY_30` / force / Gmail / send / send API |
+| Phase 44.1 | **限定パイロット Go 維持** |
+| Phase 44 全体 | **No-Go 維持** |
+
 ### 2026-07-09 — Phase 44.1 Step 15: live dry-run 1件（完了・live Go 未移行）
 
 | 項目 | 内容 |

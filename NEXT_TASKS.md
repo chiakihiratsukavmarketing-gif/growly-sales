@@ -1,6 +1,6 @@
 # Growly Sales — NEXT_TASKS
 
-**更新日:** 2026-07-10
+**更新日:** 2026-07-11
 **進行:** Phase 43 **4 / 4** 完了 / Phase 44 **0 / 3**（44.1 **限定パイロット Go**・全体 live Go **No-Go 維持**）
 
 ---
@@ -89,6 +89,23 @@
 **パイロット制約:** Want Reach / CREATE_DRAFTS のみ / token・完全URL・完全メール非出力 / Step 15 suppression active 1件維持
 
 **Phase 44 全体 live Go:** **No-Go 維持**（44.2 / 44.3 未着手）
+
+---
+
+## Daily30 — 収集復旧（R1 完了）
+
+| 項目 | 状態 |
+|------|------|
+| 症状 | 2026-07-08〜 collected=0 / `area_expansion_exhausted` |
+| 原因 | GCS schedule `areaQueuePosition=46/46` 枯渇 |
+| **R1** | ✅ `areaQueuePosition` **0 リセット**（2026-07-11） |
+| remainingPrefectures | **46** / plannedAreas 先頭 **宮城県** |
+| dry-run preview | ✅ |
+| external-candidates | **641件**（未変更） |
+| **次（別承認）** | **R2 `FETCH_DAILY_30`** — dry-run 確認済み後・手動 fetch |
+| 恒久化（任意） | wrap-around コード（修正候補 B） |
+
+**禁止（継続）:** 自動 fetch 無承認実行 / force 無承認 / Phase 44 send 系操作
 
 ### Phase 43 完了（mock・参照）
 
